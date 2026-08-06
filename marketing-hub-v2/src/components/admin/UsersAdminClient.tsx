@@ -9,6 +9,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { PasswordField } from "@/components/ui/PasswordField";
 
 const ROLE_OPTIONS: {
   value: HubAccessRole;
@@ -646,10 +647,8 @@ export function UsersAdminClient({
             <label className="label" htmlFor="admin-new-password">
               New password
             </label>
-            <input
+            <PasswordField
               id="admin-new-password"
-              className="field"
-              type="password"
               autoComplete="new-password"
               value={newPassword}
               onChange={(e) => {
@@ -664,10 +663,8 @@ export function UsersAdminClient({
             <label className="label" htmlFor="admin-confirm-password">
               Confirm password
             </label>
-            <input
+            <PasswordField
               id="admin-confirm-password"
-              className="field"
-              type="password"
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => {

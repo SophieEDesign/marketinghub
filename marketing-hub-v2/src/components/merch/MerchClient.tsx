@@ -546,7 +546,8 @@ export function MerchClient({
     : null;
 
   async function create() {
-    const { for_mode: _forMode, ...payload } = form;
+    const { for_mode, ...payload } = form;
+    void for_mode;
     await fetch("/api/merch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -577,7 +578,8 @@ export function MerchClient({
     if (!editingId || !edit) return;
     setSaving(true);
     try {
-      const { for_mode: _forMode, ...payload } = edit;
+      const { for_mode, ...payload } = edit;
+      void for_mode;
       await fetch("/api/merch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

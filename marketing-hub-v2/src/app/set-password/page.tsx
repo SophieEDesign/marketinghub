@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { hasSupabaseConfig } from "@/lib/auth/config-client";
 import { BrandLockup } from "@/components/shell/BrandLockup";
+import { PasswordField } from "@/components/ui/PasswordField";
 
 function SetPasswordForm() {
   const router = useRouter();
@@ -109,10 +110,8 @@ function SetPasswordForm() {
               <label className="label" htmlFor="password">
                 New password
               </label>
-              <input
+              <PasswordField
                 id="password"
-                className="field"
-                type="password"
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -124,10 +123,8 @@ function SetPasswordForm() {
               <label className="label" htmlFor="confirm">
                 Confirm password
               </label>
-              <input
+              <PasswordField
                 id="confirm"
-                className="field"
-                type="password"
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}

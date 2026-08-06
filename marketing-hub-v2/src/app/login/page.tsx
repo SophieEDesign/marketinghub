@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/config-client";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { BrandLockup } from "@/components/shell/BrandLockup";
+import { PasswordField } from "@/components/ui/PasswordField";
 
 function LoginForm() {
   const router = useRouter();
@@ -118,10 +119,8 @@ function LoginForm() {
               <label className="label" htmlFor="password">
                 Password
               </label>
-              <input
+              <PasswordField
                 id="password"
-                className="field"
-                type="password"
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

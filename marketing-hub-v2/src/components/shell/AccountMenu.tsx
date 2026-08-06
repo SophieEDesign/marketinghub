@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, LogOut, UserCircle } from "lucide-react";
+import { ChevronDown, LogOut, Sparkles, UserCircle } from "lucide-react";
 import { signOutOfHub } from "@/lib/auth/sign-out";
+import { useHubTour } from "@/components/tour/HubTour";
+import { clearTourCompleted, sessionRoleToTourAudience } from "@/lib/tour/storage";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -42,12 +44,21 @@ export function AccountMenu({
   className?: string;
 }) {
   const router = useRouter();
+  const tour = useHubTour();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const initials = getInitials(userName, userEmail);
   const label = roleLabel(accessRole);
+
+  function replayTour() {
+    const audience =
+      tour?.audience ?? sessionRoleToTourAudience(accessRole);
+    clearTourCompleted(audience, userEmail || userName);
+    setOpen(false);
+    tour?.startTour();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -81,7 +92,11 @@ export function AccountMenu({
   }
 
   return (
-    <div ref={rootRef} className={cn("relative", className)}>
+    <div
+      ref={rootRef}
+      data-tour="account-menu"
+      className={cn("relative", className)}
+    >
       <button
         type="button"
         className={cn(
@@ -152,6 +167,17 @@ export function AccountMenu({
             <UserCircle className="h-3.5 w-3.5" />
             My details
           </Link>
+          {tour ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-sand/80"
+              onClick={replayTour}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Take a tour
+            </button>
+          ) : null}
           <button
             type="button"
             role="menuitem"
