@@ -10,7 +10,7 @@ import { safeNextPath } from "@/lib/auth/safe-next";
  * - PKCE: ?code=… → exchangeCodeForSession
  * - Implicit: #access_token=… → browser client picks up the hash
  *
- * Preferred path for new emails: /auth/confirm?token_hash=… (server cookies).
+ * Preferred path for new emails: /auth/confirm?token_hash=… (click-to-confirm; Safe Links safe).
  */
 function AuthCallbackInner() {
   const router = useRouter();

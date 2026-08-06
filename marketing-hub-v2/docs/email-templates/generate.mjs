@@ -127,7 +127,7 @@ const readme = `# Auth email templates (branded header)
 
 All Marketing Hub Auth emails share the same Peters &amp; May header (logo + teal bar) and footer.
 
-CTA links use \`/auth/confirm?token_hash=…\` so invite/reset sessions are stored in cookies (SSR-safe). Do not switch back to \`{{ .ConfirmationURL }}\` — that uses the implicit hash flow and breaks \`/set-password\`.
+CTA links use \`/auth/confirm?token_hash=…\`. That page does not verify on open — the user must click Continue first (Outlook Safe Links safe). Do not switch back to \`{{ .ConfirmationURL }}\` or restore auto-verify-on-GET.
 
 ## Apply in Supabase (required for production)
 

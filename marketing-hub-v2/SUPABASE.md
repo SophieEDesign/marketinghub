@@ -80,9 +80,10 @@ On each user row (when Supabase is connected):
 
 Self-serve: **Forgot password?** on `/login` → `/forgot-password`.
 
-Invite and recovery links go through `/auth/callback` then `/set-password`. Add these under Authentication → URL Configuration → Redirect URLs:
+Branded invite/recovery emails link to `/auth/confirm?token_hash=…` (user must click Continue — stops Outlook Safe Links burning the token). Legacy redirects still use `/auth/callback` then `/set-password`. Allow-list under Authentication → URL Configuration → Redirect URLs:
 
 - `{NEXT_PUBLIC_APP_URL}/auth/callback`
+- `{NEXT_PUBLIC_APP_URL}/auth/confirm`
 - `{NEXT_PUBLIC_APP_URL}/set-password`
 
 ### Change role later
