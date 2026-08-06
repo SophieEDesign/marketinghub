@@ -29,12 +29,14 @@ export function InternalHub({
   requests,
   canManageAll = false,
   viewerName = "",
+  viewerContactId = null,
 }: {
   merch: MerchOrder[];
   inventory: MerchInventoryItem[];
   requests: StaffRequest[];
   canManageAll?: boolean;
   viewerName?: string;
+  viewerContactId?: string | null;
 }) {
   const [tab, setTab] = useState<Tab>("merch");
   const [merchView, setMerchView] = useState<MerchView>("orders");
@@ -84,6 +86,7 @@ export function InternalHub({
               hideHeader
               canManageAll={canManageAll}
               viewerName={viewerName}
+              viewerContactId={viewerContactId}
             />
           )}
         </div>

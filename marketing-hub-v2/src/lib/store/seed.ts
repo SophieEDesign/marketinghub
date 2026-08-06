@@ -525,6 +525,7 @@ export function createSeedStore(): HubStore {
         colour: "Navy",
         logo: "Commercial",
         requested_for: "Sophie Edgerley",
+        requested_for_contact_id: null,
         office: "Southampton",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 21)
           .toISOString()
@@ -545,6 +546,7 @@ export function createSeedStore(): HubStore {
         colour: "Navy",
         logo: "Yacht Transport",
         requested_for: "Ops â€” Southampton",
+        requested_for_contact_id: null,
         office: "Southampton",
         needed_by: null,
         status: "ordered",
@@ -563,6 +565,7 @@ export function createSeedStore(): HubStore {
         colour: "Navy",
         logo: "Forwarding",
         requested_for: "Loadmasters",
+        requested_for_contact_id: null,
         office: "Southampton",
         needed_by: new Date(Date.now() + 1000 * 60 * 60 * 24 * 45)
           .toISOString()
@@ -576,6 +579,7 @@ export function createSeedStore(): HubStore {
       },
     ],
     merch_inventory: createMerchInventorySeed(now),
+    merch_catalogue: [],
     staff_requests: [
       {
         id: "sr_seed_1",

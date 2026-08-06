@@ -12,6 +12,7 @@ import type {
   HubAccessRole,
   HubTask,
   HubUser,
+  MerchCatalogueImage,
   MerchInventoryItem,
   MerchOrder,
   PaidCampaign,
@@ -292,6 +293,12 @@ export async function listContacts() {
 
 function normalizeContact(c: Contact): Contact {
   return { ...c, user_id: c.user_id ?? null };
+}
+
+export async function getContact(id: string) {
+  const store = await readStore();
+  const c = store.contacts.find((x) => x.id === id);
+  return c ? normalizeContact(c) : null;
 }
 
 export async function getContactByUserId(userId: string) {
@@ -870,6 +877,7 @@ export async function createMerchOrder(
   const item: MerchOrder = {
     ...input,
     logo: input.logo || "Commercial",
+    requested_for_contact_id: input.requested_for_contact_id ?? null,
     created_by_user_id: input.created_by_user_id ?? null,
     id: uid("mrc"),
     created_at: nowIso(),
@@ -891,12 +899,20 @@ export async function updateMerchOrder(
     if (idx === -1) return;
     const nextPatch = { ...patch };
     delete nextPatch.id;
-    delete nextPatch.created_by_user_id;
+    const nextOwner =
+      nextPatch.created_by_user_id !== undefined
+        ? nextPatch.created_by_user_id
+        : (s.merch_orders[idx].created_by_user_id ?? null);
+    const nextContactId =
+      nextPatch.requested_for_contact_id !== undefined
+        ? nextPatch.requested_for_contact_id
+        : (s.merch_orders[idx].requested_for_contact_id ?? null);
     s.merch_orders[idx] = {
       ...s.merch_orders[idx],
       ...nextPatch,
       id,
-      created_by_user_id: s.merch_orders[idx].created_by_user_id ?? null,
+      requested_for_contact_id: nextContactId,
+      created_by_user_id: nextOwner,
       updated_at: nowIso(),
     };
     updated = s.merch_orders[idx];
@@ -908,6 +924,41 @@ export async function deleteMerchOrder(id: string) {
   await updateStore((s) => {
     s.merch_orders = s.merch_orders.filter((c) => c.id !== id);
   });
+}
+
+export async function listMerchCatalogue() {
+  const store = await readStore();
+  return [...(store.merch_catalogue ?? [])];
+}
+
+export async function upsertMerchCatalogueImage(
+  productId: string,
+  imageUrl: string
+) {
+  const id = productId.trim();
+  if (!id) return null;
+  let updated: MerchCatalogueImage | null = null;
+  await updateStore((s) => {
+    const list = s.merch_catalogue ?? [];
+    const idx = list.findIndex((c) => c.product_id === id);
+    const next: MerchCatalogueImage = {
+      product_id: id,
+      image_url: imageUrl.trim(),
+      updated_at: nowIso(),
+    };
+    if (!next.image_url) {
+      s.merch_catalogue = list.filter((c) => c.product_id !== id);
+      updated = null;
+      return;
+    }
+    if (idx === -1) {
+      s.merch_catalogue = [...list, next];
+    } else {
+      s.merch_catalogue = list.map((c, i) => (i === idx ? next : c));
+    }
+    updated = next;
+  });
+  return updated;
 }
 
 export async function listMerchInventory() {

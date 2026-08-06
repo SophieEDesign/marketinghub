@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { MerchOrder, MerchStatus } from "@/lib/types";
+import type { Contact, MerchOrder, MerchStatus } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,14 @@ import {
   type ClothingFit,
   type ClothingLogo,
 } from "@/lib/merch/north-sails";
+import {
+  MERCH_FOR_OTHER,
+  contactMerchForOptions,
+} from "@/lib/merch/requested-for";
+import {
+  ClothingProductCards,
+  type ClothingProductCardItem,
+} from "@/components/merch/ClothingProductCards";
 
 const STATUSES: { id: MerchStatus; label: string }[] = [
   { id: "requested", label: "Requested" },
@@ -39,7 +47,9 @@ const MEMBER_STATUSES: { id: MerchStatus; label: string }[] = [
 
 const DEFAULT_ITEM = CLOTHING_PRODUCTS[0]!.label;
 
-function buildEmptyForm(viewerName = "") {
+type ForMode = "me" | "other";
+
+function buildEmptyForm(viewerName = "", viewerContactId: string | null = null) {
   return {
     item: DEFAULT_ITEM,
     fit: "male" as ClothingFit | "",
@@ -48,6 +58,8 @@ function buildEmptyForm(viewerName = "") {
     colour: defaultColourForItem(DEFAULT_ITEM),
     logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
     requested_for: viewerName,
+    requested_for_contact_id: viewerContactId,
+    for_mode: "me" as ForMode,
     office: "Southampton",
     needed_by: "",
     status: "requested" as MerchStatus,
@@ -58,7 +70,17 @@ function buildEmptyForm(viewerName = "") {
 
 type EditForm = ReturnType<typeof buildEmptyForm>;
 
-function toEditForm(order: MerchOrder): EditForm {
+function toEditForm(
+  order: MerchOrder,
+  viewerName: string,
+  viewerContactId: string | null
+): EditForm {
+  const isMe =
+    (viewerContactId &&
+      order.requested_for_contact_id === viewerContactId) ||
+    (!order.requested_for_contact_id &&
+      order.requested_for.trim().toLowerCase() ===
+        viewerName.trim().toLowerCase());
   return {
     item: order.item,
     fit: (order.fit as ClothingFit | "") || "male",
@@ -67,6 +89,8 @@ function toEditForm(order: MerchOrder): EditForm {
     colour: order.colour,
     logo: isClothingLogo(order.logo) ? order.logo : DEFAULT_CLOTHING_LOGO,
     requested_for: order.requested_for,
+    requested_for_contact_id: order.requested_for_contact_id ?? null,
+    for_mode: isMe ? "me" : "other",
     office: order.office,
     needed_by: order.needed_by ?? "",
     status: order.status,
@@ -108,12 +132,195 @@ function applyItemChange(form: EditForm, item: string): EditForm {
   return { ...form, item, colour };
 }
 
-function OrderFields({
+function RequestedForField({
   form,
   onChange,
+  canManageAll,
+  viewerName,
+  viewerContactId,
 }: {
   form: EditForm;
   onChange: (next: EditForm) => void;
+  canManageAll: boolean;
+  viewerName: string;
+  viewerContactId: string | null;
+}) {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!canManageAll) {
+      setLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/contacts");
+        if (!res.ok) return;
+        const data = (await res.json()) as { contacts?: Contact[] };
+        if (!cancelled) setContacts(data.contacts ?? []);
+      } catch {
+        /* keep empty */
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageAll]);
+
+  const selectedContact = useMemo(
+    () =>
+      contacts.find((c) => c.id === form.requested_for_contact_id) ?? null,
+    [contacts, form.requested_for_contact_id]
+  );
+
+  if (canManageAll) {
+    const selectValue = form.requested_for_contact_id || MERCH_FOR_OTHER;
+    return (
+      <div className="md:col-span-2 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="label">For</label>
+          <SearchSelect
+            className="field"
+            value={selectValue}
+            disabled={!loaded}
+            aria-label="Allocate order to contact"
+            placeholder={loaded ? "Choose contact…" : "Loading…"}
+            options={contactMerchForOptions(
+              contacts,
+              form.requested_for_contact_id,
+              form.requested_for
+            )}
+            onChange={(value) => {
+              if (value === MERCH_FOR_OTHER) {
+                onChange({
+                  ...form,
+                  requested_for_contact_id: null,
+                  requested_for: form.requested_for_contact_id
+                    ? ""
+                    : form.requested_for,
+                  for_mode: "other",
+                });
+                return;
+              }
+              const contact = contacts.find((c) => c.id === value);
+              onChange({
+                ...form,
+                requested_for_contact_id: value,
+                requested_for: contact?.name ?? form.requested_for,
+                for_mode: "other",
+              });
+            }}
+          />
+          {selectedContact?.user_id ? (
+            <p className="mt-1 text-xs text-muted">
+              Linked hub member — order will appear in their clothing requests.
+            </p>
+          ) : !form.requested_for_contact_id ? (
+            <p className="mt-1 text-xs text-muted">
+              Type a name for now; you can reallocate to a contact later.
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted">
+              Not linked to a hub user yet — link them in Contacts to allocate.
+            </p>
+          )}
+        </div>
+        {!form.requested_for_contact_id ? (
+          <div>
+            <label className="label">Name</label>
+            <input
+              className="field"
+              placeholder="Name or team"
+              value={form.requested_for}
+              onChange={(e) =>
+                onChange({
+                  ...form,
+                  requested_for: e.target.value,
+                  for_mode: "other",
+                })
+              }
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="md:col-span-2 grid gap-2 sm:grid-cols-2">
+      <div>
+        <label className="label">For</label>
+        <SearchSelect
+          className="field"
+          value={form.for_mode}
+          aria-label="Who is this order for"
+          options={[
+            {
+              value: "me",
+              label: viewerName.trim()
+                ? `Myself (${viewerName.trim()})`
+                : "Myself",
+            },
+            { value: "other", label: "Someone else" },
+          ]}
+          onChange={(mode) => {
+            if (mode === "me") {
+              onChange({
+                ...form,
+                for_mode: "me",
+                requested_for: viewerName,
+                requested_for_contact_id: viewerContactId,
+              });
+              return;
+            }
+            onChange({
+              ...form,
+              for_mode: "other",
+              requested_for:
+                form.for_mode === "me" ? "" : form.requested_for,
+              requested_for_contact_id: null,
+            });
+          }}
+        />
+      </div>
+      {form.for_mode === "other" ? (
+        <div>
+          <label className="label">Name</label>
+          <input
+            className="field"
+            placeholder="Name or team"
+            value={form.requested_for}
+            onChange={(e) =>
+              onChange({ ...form, requested_for: e.target.value })
+            }
+          />
+          <p className="mt-1 text-xs text-muted">
+            Marketing can reallocate this to a contact later.
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function OrderFields({
+  form,
+  onChange,
+  canManageAll,
+  viewerName,
+  viewerContactId,
+  productCards,
+}: {
+  form: EditForm;
+  onChange: (next: EditForm) => void;
+  canManageAll: boolean;
+  viewerName: string;
+  viewerContactId: string | null;
+  productCards: ClothingProductCardItem[];
 }) {
   const product = clothingProductByLabel(form.item);
   const colours = coloursForItem(form.item);
@@ -123,6 +330,11 @@ function OrderFields({
 
   return (
     <>
+      <ClothingProductCards
+        products={productCards}
+        value={form.item}
+        onChange={(item) => onChange(applyItemChange(form, item))}
+      />
       <div className="md:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
         Supplier: <span className="font-medium text-foreground">{CLOTHING_BRAND}</span>
         {product?.material ? ` · ${product.material}` : ""}
@@ -203,17 +415,13 @@ function OrderFields({
           onChange={(e) => onChange({ ...form, quantity: e.target.value })}
         />
       </div>
-      <div>
-        <label className="label">For</label>
-        <input
-          className="field"
-          placeholder="Name or team"
-          value={form.requested_for}
-          onChange={(e) =>
-            onChange({ ...form, requested_for: e.target.value })
-          }
-        />
-      </div>
+      <RequestedForField
+        form={form}
+        onChange={onChange}
+        canManageAll={canManageAll}
+        viewerName={viewerName}
+        viewerContactId={viewerContactId}
+      />
       <div>
         <label className="label">Office</label>
         <input
@@ -249,16 +457,21 @@ export function MerchClient({
   hideHeader = false,
   canManageAll = false,
   viewerName = "",
+  viewerContactId = null,
 }: {
   initial: MerchOrder[];
   hideHeader?: boolean;
   /** Admins see every order; members only receive their own from the API. */
   canManageAll?: boolean;
   viewerName?: string;
+  viewerContactId?: string | null;
 }) {
-  const emptyForm = buildEmptyForm(viewerName);
+  const emptyForm = buildEmptyForm(viewerName, viewerContactId);
   const statusOptions = canManageAll ? STATUSES : MEMBER_STATUSES;
   const [orders, setOrders] = useState(initial);
+  const [productCards, setProductCards] = useState<ClothingProductCardItem[]>(
+    () => CLOTHING_PRODUCTS.map((p) => ({ ...p, image_url: "" }))
+  );
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState("");
@@ -274,13 +487,27 @@ export function MerchClient({
     setOrders(data.orders ?? []);
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const refreshCatalogue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/merch/catalogue");
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        products?: ClothingProductCardItem[];
+      };
+      if (data.products?.length) setProductCards(data.products);
+    } catch {
+      /* keep defaults */
+    }
+  }, []);
 
   useEffect(() => {
-    setForm(buildEmptyForm(viewerName));
-  }, [viewerName]);
+    void refresh();
+    void refreshCatalogue();
+  }, [refresh, refreshCatalogue]);
+
+  useEffect(() => {
+    setForm(buildEmptyForm(viewerName, viewerContactId));
+  }, [viewerName, viewerContactId]);
 
   const itemTypes = useMemo(() => {
     const set = new Set([
@@ -319,24 +546,26 @@ export function MerchClient({
     : null;
 
   async function create() {
+    const { for_mode: _forMode, ...payload } = form;
     await fetch("/api/merch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        ...form,
+        ...payload,
         quantity: Number(form.quantity) || 1,
         needed_by: form.needed_by || null,
+        requested_for_contact_id: form.requested_for_contact_id,
         created_by: form.created_by || form.requested_for || "Staff",
       }),
     });
     setShowForm(false);
-    setForm(buildEmptyForm(viewerName));
+    setForm(buildEmptyForm(viewerName, viewerContactId));
     await refresh();
   }
 
   function openEdit(order: MerchOrder) {
     setEditingId(order.id);
-    setEdit(toEditForm(order));
+    setEdit(toEditForm(order, viewerName, viewerContactId));
   }
 
   function closeEdit() {
@@ -348,6 +577,7 @@ export function MerchClient({
     if (!editingId || !edit) return;
     setSaving(true);
     try {
+      const { for_mode: _forMode, ...payload } = edit;
       await fetch("/api/merch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -355,10 +585,11 @@ export function MerchClient({
           action: "update",
           id: editingId,
           patch: {
-            ...edit,
+            ...payload,
             item: edit.item.trim() || DEFAULT_ITEM,
             quantity: Number(edit.quantity) || 1,
             needed_by: edit.needed_by || null,
+            requested_for_contact_id: edit.requested_for_contact_id,
           },
         }),
       });
@@ -468,7 +699,14 @@ export function MerchClient({
 
       {showForm ? (
         <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
-          <OrderFields form={form} onChange={setForm} />
+          <OrderFields
+            form={form}
+            onChange={setForm}
+            canManageAll={canManageAll}
+            viewerName={viewerName}
+            viewerContactId={viewerContactId}
+            productCards={productCards}
+          />
           <div className="flex gap-2 md:col-span-2">
             <button
               type="button"
@@ -593,7 +831,14 @@ export function MerchClient({
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid gap-2 md:grid-cols-1">
-                <OrderFields form={edit} onChange={setEdit} />
+                <OrderFields
+                  form={edit}
+                  onChange={setEdit}
+                  canManageAll={canManageAll}
+                  viewerName={viewerName}
+                  viewerContactId={viewerContactId}
+                  productCards={productCards}
+                />
                 <div>
                   <label className="label">Status</label>
                   <SearchSelect

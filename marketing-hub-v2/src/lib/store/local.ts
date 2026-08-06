@@ -79,6 +79,7 @@ function migrateMerch(items: MerchOrder[] | undefined): MerchOrder[] | undefined
     ...item,
     fit: item.fit === "female" || item.fit === "male" ? item.fit : "",
     logo: item.logo ?? "Commercial",
+    requested_for_contact_id: item.requested_for_contact_id ?? null,
     created_by_user_id: item.created_by_user_id ?? null,
   }));
 }
@@ -163,6 +164,7 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     merch_inventory:
       migrateMerchInventory(store.merch_inventory) ??
       (fillMissingFromSeed ? seed.merch_inventory : []),
+    merch_catalogue: store.merch_catalogue ?? seed.merch_catalogue ?? [],
     staff_requests:
       migrateStaffRequests(store.staff_requests) ?? seed.staff_requests,
     awards: store.awards ?? seed.awards,
@@ -216,6 +218,7 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.paid_campaigns ||
     !store.merch_orders ||
     !store.merch_inventory ||
+    !store.merch_catalogue ||
     !store.staff_requests ||
     !store.awards ||
     !store.tasks ||

@@ -8,11 +8,15 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { SearchSelect } from "@/components/ui/SearchSelect";
-import { isImageUrl } from "@/lib/social/platforms";
+import {
+  ClothingThumb,
+  type ClothingProductCardItem,
+} from "@/components/merch/ClothingProductCards";
 import {
   CLOTHING_FITS,
   CLOTHING_PRODUCTS,
   INVENTORY_SIZES,
+  clothingProductByLabel,
   coloursForItem,
   defaultBrandForItem,
   defaultColourForItem,
@@ -162,12 +166,95 @@ function InventoryFields({
   );
 }
 
+function CataloguePhotosPanel({
+  products,
+  catalogueByProductId,
+  onSaved,
+}: {
+  products: ClothingProductCardItem[];
+  catalogueByProductId: Record<string, string>;
+  onSaved: (products: ClothingProductCardItem[], catalogueById: Record<string, string>) => void;
+}) {
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  async function saveImage(productId: string, image_url: string) {
+    setSavingId(productId);
+    try {
+      const res = await fetch("/api/merch/catalogue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: productId, image_url }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        products?: ClothingProductCardItem[];
+        catalogue?: { product_id: string; image_url: string }[];
+      };
+      const map: Record<string, string> = {};
+      for (const row of data.catalogue ?? []) {
+        if (row.product_id && row.image_url) map[row.product_id] = row.image_url;
+      }
+      if (data.products) onSaved(data.products, map);
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  return (
+    <div className="surface-card mb-6 p-5">
+      <h3 className="font-display text-lg text-brand">Catalogue photos</h3>
+      <p className="mt-0.5 text-xs text-muted">
+        Attach a preview for each orderable item. These show as thumbnails on
+        new clothing orders (inventory photos are used as fallback).
+      </p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {products.map((product) => {
+          const catalogueUrl = catalogueByProductId[product.id] ?? "";
+          const preview = catalogueUrl || product.image_url;
+          return (
+            <div
+              key={product.id}
+              className="rounded-xl border border-border bg-white p-3"
+            >
+              <div className="mb-2 flex items-center gap-3">
+                <ClothingThumb src={preview} label={product.label} />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-foreground">
+                    {product.label}
+                  </div>
+                  <div className="text-xs text-muted">{product.brand}</div>
+                </div>
+              </div>
+              <AssetUploadField
+                value={catalogueUrl}
+                onChange={(image_url) => void saveImage(product.id, image_url)}
+                label="Preview image"
+                hint={
+                  savingId === product.id
+                    ? "Saving…"
+                    : "Shown on order form · max 25MB."
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function InventoryClient({
   initial,
 }: {
   initial: MerchInventoryItem[];
 }) {
   const [items, setItems] = useState(initial);
+  const [catalogueProducts, setCatalogueProducts] = useState<
+    ClothingProductCardItem[]
+  >(() => CLOTHING_PRODUCTS.map((p) => ({ ...p, image_url: "" })));
+  const [catalogueByProductId, setCatalogueByProductId] = useState<
+    Record<string, string>
+  >({});
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [search, setSearch] = useState("");
@@ -183,9 +270,36 @@ export function InventoryClient({
     setItems(data.items ?? []);
   }, []);
 
+  const refreshCatalogue = useCallback(async () => {
+    try {
+      const res = await fetch("/api/merch/catalogue");
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        products?: ClothingProductCardItem[];
+        catalogue?: { product_id: string; image_url: string }[];
+      };
+      if (data.products?.length) setCatalogueProducts(data.products);
+      const map: Record<string, string> = {};
+      for (const row of data.catalogue ?? []) {
+        if (row.product_id && row.image_url) map[row.product_id] = row.image_url;
+      }
+      setCatalogueByProductId(map);
+    } catch {
+      /* keep defaults */
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+    void refreshCatalogue();
+  }, [refresh, refreshCatalogue]);
+
+  function rowPreviewUrl(row: MerchInventoryItem) {
+    if (row.image_url?.trim()) return row.image_url.trim();
+    const product = clothingProductByLabel(row.item);
+    if (product) return catalogueByProductId[product.id] ?? "";
+    return "";
+  }
 
   const itemTypes = useMemo(() => {
     const set = new Set([
@@ -239,6 +353,7 @@ export function InventoryClient({
     setShowForm(false);
     setForm(emptyForm);
     await refresh();
+    await refreshCatalogue();
   }
 
   function openEdit(row: MerchInventoryItem) {
@@ -270,6 +385,7 @@ export function InventoryClient({
       });
       closeEdit();
       await refresh();
+      await refreshCatalogue();
     } finally {
       setSaving(false);
     }
@@ -303,6 +419,7 @@ export function InventoryClient({
     });
     if (editingId === id) closeEdit();
     await refresh();
+    await refreshCatalogue();
   }
 
   return (
@@ -322,6 +439,15 @@ export function InventoryClient({
           Add stock
         </button>
       </div>
+
+      <CataloguePhotosPanel
+        products={catalogueProducts}
+        catalogueByProductId={catalogueByProductId}
+        onSaved={(products, map) => {
+          setCatalogueProducts(products);
+          setCatalogueByProductId(map);
+        }}
+      />
 
       <FilterBar
         search={search}
@@ -381,6 +507,7 @@ export function InventoryClient({
         <table className="min-w-full text-left text-sm">
           <thead className="border-b border-border bg-sand/50 text-xs uppercase tracking-wide text-muted">
             <tr>
+              <th className="px-4 py-3 font-semibold">Photo</th>
               <th className="px-4 py-3 font-semibold">Item</th>
               <th className="px-4 py-3 font-semibold">Fit</th>
               <th className="px-4 py-3 font-semibold">Size</th>
@@ -399,25 +526,21 @@ export function InventoryClient({
                 )}
               >
                 <td className="px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    {row.image_url && isImageUrl(row.image_url) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={row.image_url}
-                        alt=""
-                        className="h-10 w-10 shrink-0 rounded-lg border border-border object-cover"
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                      <div className="font-medium text-foreground">
-                        {row.item}
-                      </div>
-                      <div className="text-xs text-muted">
-                        {row.brand || "—"}
-                        {plainTextFromHtml(row.notes)
-                          ? ` · ${plainTextFromHtml(row.notes)}`
-                          : ""}
-                      </div>
+                  <ClothingThumb
+                    src={rowPreviewUrl(row)}
+                    label={row.item}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-foreground">
+                      {row.item}
+                    </div>
+                    <div className="text-xs text-muted">
+                      {row.brand || "—"}
+                      {plainTextFromHtml(row.notes)
+                        ? ` · ${plainTextFromHtml(row.notes)}`
+                        : ""}
                     </div>
                   </div>
                 </td>

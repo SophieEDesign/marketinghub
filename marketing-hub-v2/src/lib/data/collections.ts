@@ -3,7 +3,11 @@ import type { HubStore } from "@/lib/types";
 /** Spreadsheet collections — excludes users/access requests (Admin → Users). */
 export type CollectionKey = Exclude<
   keyof HubStore,
-  "hub_users" | "access_requests" | "event_attendance" | "page_notes"
+  | "hub_users"
+  | "access_requests"
+  | "event_attendance"
+  | "page_notes"
+  | "merch_catalogue"
 >;
 
 export type FieldType =
@@ -640,6 +644,10 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("colour", { type: "select", options: MERCH_COLOURS }),
       f("logo", { type: "select", options: MERCH_LOGOS, label: "Logo" }),
       f("requested_for", { label: "Requested for" }),
+      f("requested_for_contact_id", {
+        label: "Requested for contact ID",
+        type: "readonly",
+      }),
       f("office"),
       f("needed_by", { type: "date", label: "Needed by" }),
       f("status", { type: "select", options: MERCH_STATUS }),

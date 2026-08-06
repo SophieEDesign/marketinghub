@@ -266,6 +266,8 @@ export type MerchOrder = {
   /** Embroidered / printed logo variant */
   logo: string;
   requested_for: string;
+  /** Contact this order is for (from Contacts). When that contact has user_id, ownership is allocated to them. */
+  requested_for_contact_id: string | null;
   office: string;
   needed_by: string | null;
   status: MerchStatus;
@@ -291,6 +293,13 @@ export type MerchInventoryItem = {
   image_url: string;
   notes: string;
   created_at: string;
+  updated_at: string;
+};
+
+/** Catalogue preview image for a fixed clothing product (by product id). */
+export type MerchCatalogueImage = {
+  product_id: string;
+  image_url: string;
   updated_at: string;
 };
 
@@ -447,6 +456,8 @@ export type HubStore = {
   theme_offshoots: ThemeOffshoot[];
   merch_orders: MerchOrder[];
   merch_inventory: MerchInventoryItem[];
+  /** Preview images for fixed clothing catalogue products. */
+  merch_catalogue: MerchCatalogueImage[];
   staff_requests: StaffRequest[];
   awards: AwardEntry[];
   tasks: HubTask[];

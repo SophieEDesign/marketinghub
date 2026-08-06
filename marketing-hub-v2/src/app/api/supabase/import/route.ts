@@ -87,7 +87,7 @@ export async function GET() {
         tasks: tasks
           ? { name: tasks.name, table: tasks.supabase_table }
           : null,
-        localOnly: ["merch_orders", "merch_inventory", "staff_requests", "reports"],
+        localOnly: ["merch_orders", "merch_inventory", "merch_catalogue", "staff_requests", "reports"],
         legacyContentIgnored: legacy
           ? { name: legacy.name, table: legacy.supabase_table }
           : null,

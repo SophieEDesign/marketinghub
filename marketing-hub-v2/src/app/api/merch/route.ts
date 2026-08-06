@@ -3,6 +3,7 @@ import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import {
   createMerchOrder,
   deleteMerchOrder,
+  getContact,
   getMerchOrder,
   listMerchOrders,
   updateMerchOrder,
@@ -16,6 +17,7 @@ import {
   DEFAULT_CLOTHING_LOGO,
   isClothingLogo,
 } from "@/lib/merch/north-sails";
+import { resolveMerchRequestedFor } from "@/lib/merch/requested-for";
 
 export async function GET() {
   const { user, error } = await requireStaff();
@@ -30,6 +32,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const action = body.action as string | undefined;
   const admin = isMerchAdmin(user);
+  const fallbackName = user.full_name || user.email || "Staff";
 
   if (action === "update") {
     const existing = await getMerchOrder(body.id);
@@ -38,10 +41,26 @@ export async function POST(request: NextRequest) {
       return jsonError("Forbidden", 403);
     }
     const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
-    // Members cannot reassign ownership or escalate status beyond cancel.
+    // Members cannot reassign ownership.
     delete patch.created_by_user_id;
+    delete patch.for_mode;
     if (!admin) {
       delete patch.created_by;
+      // Members may change the display name / clear contact, but not allocate to others.
+      if (patch.requested_for_contact_id !== undefined) {
+        const rawId =
+          typeof patch.requested_for_contact_id === "string"
+            ? patch.requested_for_contact_id.trim()
+            : "";
+        // Only allow keeping/clearing — not picking another person's contact.
+        if (rawId && rawId !== (existing.requested_for_contact_id ?? "")) {
+          const ownContactOk =
+            (await getContact(rawId))?.user_id === user.id;
+          if (!ownContactOk) {
+            delete patch.requested_for_contact_id;
+          }
+        }
+      }
       if (
         patch.status !== undefined &&
         patch.status !== existing.status &&
@@ -49,6 +68,33 @@ export async function POST(request: NextRequest) {
         patch.status !== "requested"
       ) {
         return jsonError("Only marketing admins can change order status", 403);
+      }
+    } else if (
+      patch.requested_for_contact_id !== undefined ||
+      patch.requested_for !== undefined
+    ) {
+      const contactId =
+        patch.requested_for_contact_id === null ||
+        patch.requested_for_contact_id === ""
+          ? null
+          : typeof patch.requested_for_contact_id === "string"
+            ? patch.requested_for_contact_id
+            : (existing.requested_for_contact_id ?? null);
+      const contact = contactId ? await getContact(contactId) : null;
+      const resolved = resolveMerchRequestedFor({
+        requested_for:
+          typeof patch.requested_for === "string"
+            ? patch.requested_for
+            : existing.requested_for,
+        requested_for_contact_id: contactId,
+        contact,
+        fallbackName: existing.requested_for || fallbackName,
+      });
+      patch.requested_for = resolved.requested_for;
+      patch.requested_for_contact_id = resolved.requested_for_contact_id;
+      // Linked contact → allocate order to that hub member so it appears in their list.
+      if (resolved.allocated_user_id) {
+        patch.created_by_user_id = resolved.allocated_user_id;
       }
     }
     const updated = await updateMerchOrder(body.id, patch);
@@ -71,6 +117,22 @@ export async function POST(request: NextRequest) {
     return jsonOk({ ok: true });
   }
 
+  const contactId =
+    typeof body.requested_for_contact_id === "string"
+      ? body.requested_for_contact_id.trim()
+      : "";
+  let contact = contactId ? await getContact(contactId) : null;
+  // Members may only link their own contact (Myself), not allocate to others.
+  if (!admin && contact && contact.user_id !== user.id) {
+    contact = null;
+  }
+  const resolved = resolveMerchRequestedFor({
+    requested_for: body.requested_for,
+    requested_for_contact_id: contact?.id ?? null,
+    contact,
+    fallbackName,
+  });
+
   const item = await createMerchOrder({
     item: body.item ?? "Polo — Regatta (polyester)",
     fit: body.fit === "female" || body.fit === "male" ? body.fit : "",
@@ -78,17 +140,19 @@ export async function POST(request: NextRequest) {
     quantity: Number(body.quantity) > 0 ? Number(body.quantity) : 1,
     colour: body.colour ?? "",
     logo: isClothingLogo(body.logo) ? body.logo : DEFAULT_CLOTHING_LOGO,
-    requested_for:
-      body.requested_for?.trim() ||
-      user.full_name ||
-      user.email ||
-      "Staff",
+    requested_for: resolved.requested_for,
+    requested_for_contact_id: resolved.requested_for_contact_id,
     office: body.office ?? "",
     needed_by: body.needed_by || null,
     status: admin ? body.status ?? "requested" : "requested",
     notes: body.notes ?? "",
-    created_by: user.full_name || user.email || "Staff",
-    created_by_user_id: user.id,
+    created_by: fallbackName,
+    // Admin allocating to a linked contact → order appears under that member.
+    // Otherwise ownership stays with the submitter.
+    created_by_user_id:
+      admin && resolved.allocated_user_id
+        ? resolved.allocated_user_id
+        : user.id,
   });
   return jsonOk({ item }, { status: 201 });
 }
