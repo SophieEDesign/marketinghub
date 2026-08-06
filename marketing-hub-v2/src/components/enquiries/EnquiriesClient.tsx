@@ -18,6 +18,49 @@ import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { EnquiryYearCompare } from "@/components/enquiries/EnquiryYearCompare";
 import { cn } from "@/lib/utils";
 
+const MARKETING_SOURCE_UPDATE_KEY = "web-enquiries-marketing-source-1.3.24";
+
+type AttrRow = { label: string; value: string };
+
+function channelChipClass(label: string): string {
+  switch (label) {
+    case "Google Ads":
+      return "border-sky-200 bg-sky-50 text-sky-900";
+    case "Meta Ads":
+      return "border-indigo-200 bg-indigo-50 text-indigo-900";
+    case "Organic search":
+      return "border-emerald-200 bg-emerald-50 text-emerald-900";
+    case "Referral":
+      return "border-amber-200 bg-amber-50 text-amber-900";
+    case "Unknown":
+      return "border-border bg-sand/60 text-muted";
+    default:
+      return "border-border bg-accent-soft/80 text-brand";
+  }
+}
+
+function ChannelChip({
+  label,
+  className,
+}: {
+  label: string;
+  className?: string;
+}) {
+  const display = label === "Unknown" ? "No source" : label;
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center truncate rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+        channelChipClass(label),
+        className
+      )}
+      title={label === "Unknown" ? "No attribution captured" : label}
+    >
+      {display}
+    </span>
+  );
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -319,22 +362,33 @@ function buildDetailSections(e: WebEnquiry) {
   ].filter((r) => r.value);
 
   const attr = getEnquiryAttribution(e);
-  const attributionRows = [
-    { label: "Source", value: attr.sourceLabel },
-    { label: "How they heard about us", value: attr.heardAbout },
+  const sourceMedium =
+    attr.utmSource && attr.utmMedium
+      ? `${attr.utmSource} / ${attr.utmMedium}`
+      : attr.utmSource || attr.utmMedium;
+  const channel =
+    attr.sourceLabel !== "Unknown" ? attr.sourceLabel : "";
+
+  // Friendly fields only — technical click IDs live in trackingRows.
+  const attributionRows: AttrRow[] = [
+    { label: "Channel", value: channel },
     { label: "Campaign", value: attr.utmCampaign },
-    { label: "Keyword / term", value: attr.utmTerm },
-    { label: "UTM source", value: attr.utmSource },
-    { label: "UTM medium", value: attr.utmMedium },
-    { label: "UTM content", value: attr.utmContent },
+    { label: "Source / Medium", value: sourceMedium },
+    { label: "Keyword / search term", value: attr.utmTerm },
+    { label: "Ad content", value: attr.utmContent },
+    { label: "Google Ads click", value: attr.gclid ? "Yes" : "" },
+    { label: "How they heard about us", value: attr.heardAbout },
+    { label: "Referrer", value: attr.referrer },
+    { label: "Landing page", value: attr.pageUrl },
+  ].filter((r) => r.value);
+
+  const trackingRows: AttrRow[] = [
     { label: "Google click ID (gclid)", value: attr.gclid },
     { label: "gbraid", value: attr.gbraid },
     { label: "wbraid", value: attr.wbraid },
     { label: "Ads campaign ID (hsa_cam)", value: attr.hsaCam },
     { label: "Ads ad ID (hsa_ad)", value: attr.hsaAd },
     { label: "Ads group ID (hsa_grp)", value: attr.hsaGrp },
-    { label: "Referrer", value: attr.referrer },
-    { label: "Landing / page URL", value: attr.pageUrl },
   ].filter((r) => r.value);
 
   const racingRows = entriesFrom(racing, {
@@ -369,6 +423,7 @@ function buildDetailSections(e: WebEnquiry) {
       ...vesselRows,
       ...journeyRows,
       ...attributionRows,
+      ...trackingRows,
       ...racingRows,
       ...timingRows,
       ...membershipRows,
@@ -444,6 +499,9 @@ function buildDetailSections(e: WebEnquiry) {
     vesselRows,
     journeyRows,
     attributionRows,
+    trackingRows,
+    channel: attr.sourceLabel,
+    campaign: attr.utmCampaign,
     racingRows,
     timingRows,
     membershipRows,
@@ -537,6 +595,19 @@ export function EnquiriesClient({
   const [selected, setSelected] = useState<WebEnquiry | null>(null);
   const [saving, setSaving] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [showSourceUpdate, setShowSourceUpdate] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (
+        window.localStorage.getItem(MARKETING_SOURCE_UPDATE_KEY) !== "1"
+      ) {
+        setShowSourceUpdate(true);
+      }
+    } catch {
+      setShowSourceUpdate(true);
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     const qs = showTest ? "?include_test=1" : "";
@@ -677,7 +748,7 @@ export function EnquiriesClient({
     <div>
       <PageHeader
         title="Web Enquiries"
-        description="Website quote form submissions — live via WordPress webhook, with imported history."
+        description="Website quote form submissions — live via WordPress webhook, with imported history. Marketing source (channel, campaign, UTM) shows when available."
         actions={
           <button
             type="button"
@@ -690,6 +761,41 @@ export function EnquiriesClient({
           </button>
         }
       />
+
+      {showSourceUpdate ? (
+        <div className="mb-6 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-foreground">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wide text-brand">
+                Recent update
+              </p>
+              <p className="mt-1 text-muted">
+                Enquiry emails and this list now show{" "}
+                <span className="font-medium text-foreground">
+                  Marketing source
+                </span>{" "}
+                (channel, campaign, UTM) when captured. Google Ads tip: add{" "}
+                <code className="text-[11px]">utm_campaign=…</code> to the final
+                URL so the campaign name comes through — plugin 1.3.24.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-ghost shrink-0 px-2.5 py-1 text-xs"
+              onClick={() => {
+                try {
+                  window.localStorage.setItem(MARKETING_SOURCE_UPDATE_KEY, "1");
+                } catch {
+                  /* ignore */
+                }
+                setShowSourceUpdate(false);
+              }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {!configured ? (
         <div className="surface-card mb-6 border-amber-200 bg-amber-50/80 p-5 text-sm text-muted">
@@ -846,7 +952,7 @@ export function EnquiriesClient({
         {rangeStats.topSources.length > 0 ? (
           <div className="surface-card p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-              Source
+              Channel
             </p>
             <ul className="mt-3 flex flex-wrap gap-2">
               {rangeStats.topSources.map((s) => (
@@ -854,10 +960,13 @@ export function EnquiriesClient({
                   <button
                     type="button"
                     className={cn(
-                      "rounded-full border border-border px-3 py-1 text-xs transition",
+                      "rounded-full border px-3 py-1 text-xs transition",
                       sourceFilter === s.label
                         ? "border-brand bg-accent-soft text-brand"
-                        : "bg-sand/50 text-muted hover:text-foreground"
+                        : cn(
+                            "hover:opacity-90",
+                            channelChipClass(s.label)
+                          )
                     )}
                     onClick={() =>
                       setSourceFilter((cur) =>
@@ -865,13 +974,13 @@ export function EnquiriesClient({
                       )
                     }
                   >
-                    {s.label} · {s.count}
+                    {s.label === "Unknown" ? "No source" : s.label} · {s.count}
                   </button>
                 </li>
               ))}
             </ul>
             <p className="mt-2 text-xs text-muted">
-              Google Ads from page/referrer params (gclid, utm, hsa_*).
+              From UTM / click IDs when present — blank means we don’t have it.
             </p>
           </div>
         ) : null}
@@ -974,12 +1083,13 @@ export function EnquiriesClient({
                 <th className="px-4 py-3 font-medium">Service</th>
                 <th className="px-4 py-3 font-medium">Route</th>
                 <th className="px-4 py-3 font-medium">Office</th>
-                <th className="px-4 py-3 font-medium">Source</th>
+                <th className="px-4 py-3 font-medium">Channel</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filtered.map((e) => {
                 const vessel = vesselLabel(e);
+                const attr = getEnquiryAttribution(e);
                 return (
                   <tr
                     key={e.id}
@@ -1029,8 +1139,16 @@ export function EnquiriesClient({
                     <td className="px-4 py-3 text-muted">
                       {e.selected_office || "—"}
                     </td>
-                    <td className="px-4 py-3 text-muted">
-                      {enquirySourceLabel(e)}
+                    <td className="px-4 py-3">
+                      <ChannelChip label={attr.sourceLabel} />
+                      {attr.utmCampaign ? (
+                        <p
+                          className="mt-1 max-w-[160px] truncate text-[11px] text-muted"
+                          title={attr.utmCampaign}
+                        >
+                          {attr.utmCampaign}
+                        </p>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -1077,19 +1195,75 @@ export function EnquiriesClient({
               </button>
             </div>
             <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              <p className="text-xs text-muted">
-                Submitted {formatDate(selected.created_at ?? selected.received_at)}{" "}
-                · Source: {enquirySourceLabel(selected)}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs text-muted">
+                  Submitted{" "}
+                  {formatDate(selected.created_at ?? selected.received_at)}
+                </p>
+                <ChannelChip label={detail.channel} />
+                {detail.campaign ? (
+                  <span
+                    className="max-w-[220px] truncate text-xs text-muted"
+                    title={detail.campaign}
+                  >
+                    {detail.campaign}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-border bg-sand/30 p-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                  Marketing source
+                </h3>
+                {detail.attributionRows.length > 0 ? (
+                  <dl className="space-y-2 text-sm">
+                    {detail.attributionRows.map((r) => (
+                      <div
+                        key={r.label}
+                        className="grid grid-cols-[7.5rem_1fr] gap-2 sm:grid-cols-[9rem_1fr]"
+                      >
+                        <dt className="text-xs text-muted">{r.label}</dt>
+                        <dd className="min-w-0 break-words text-foreground">
+                          {r.label === "Channel" ? (
+                            <ChannelChip label={r.value} />
+                          ) : (
+                            r.value
+                          )}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="text-sm text-muted">
+                    No marketing source captured for this enquiry.
+                  </p>
+                )}
+                {detail.trackingRows.length > 0 ? (
+                  <details className="mt-3 border-t border-border pt-2">
+                    <summary className="cursor-pointer text-xs font-medium text-brand">
+                      Tracking IDs
+                    </summary>
+                    <dl className="mt-2 space-y-2 text-sm">
+                      {detail.trackingRows.map((r) => (
+                        <div
+                          key={r.label}
+                          className="grid grid-cols-[7.5rem_1fr] gap-2 sm:grid-cols-[9rem_1fr]"
+                        >
+                          <dt className="text-xs text-muted">{r.label}</dt>
+                          <dd className="min-w-0 break-all text-xs text-foreground">
+                            {r.value}
+                          </dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                ) : null}
+              </div>
 
               <DetailSection title="Customer" rows={detail.customerRows} />
               <DetailSection title="Vessel / cargo" rows={detail.vesselRows} />
               <DetailSection title="Service & routing" rows={detail.serviceRows} />
               <DetailSection title="Journey" rows={detail.journeyRows} />
-              <DetailSection
-                title="Attribution / Google Ads"
-                rows={detail.attributionRows}
-              />
               <DetailSection title="Racing" rows={detail.racingRows} />
               <DetailSection title="Timing" rows={detail.timingRows} />
               <DetailSection title="Membership" rows={detail.membershipRows} />

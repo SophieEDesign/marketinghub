@@ -108,6 +108,12 @@ export function getEnquiryAttribution(e: WebEnquiry): EnquiryAttribution {
     "";
   const gbraid = params.get("gbraid") || asString(tracking.gbraid) || "";
   const wbraid = params.get("wbraid") || asString(tracking.wbraid) || "";
+  const fbclid =
+    asString(tracking.fbclid) ||
+    asString(make.fbclid) ||
+    asString(form.fbclid) ||
+    params.get("fbclid") ||
+    "";
 
   const utmSource =
     asString(tracking.utm_source) ||
@@ -149,6 +155,9 @@ export function getEnquiryAttribution(e: WebEnquiry): EnquiryAttribution {
   const sourceLower = utmSource.toLowerCase();
   const mediumLower = utmMedium.toLowerCase();
   const refHost = tryParseUrl(referrer)?.hostname.toLowerCase() ?? "";
+  const isMetaSource =
+    /^(facebook|fb|meta|instagram|ig)$/i.test(utmSource) ||
+    /facebook\.|instagram\.|meta\.com/i.test(refHost);
   const pageHasAdsParams = Boolean(
     gclid ||
       gbraid ||
@@ -166,11 +175,42 @@ export function getEnquiryAttribution(e: WebEnquiry): EnquiryAttribution {
     (sourceLower === "adwords" || sourceLower === "googleads") ||
     (sourceLower === "google" && /cpc|ppc|paid/i.test(mediumLower));
 
+  const isMetaAds =
+    Boolean(fbclid) ||
+    (isMetaSource && /cpc|ppc|paid|paidsocial|social/i.test(mediumLower)) ||
+    /meta\s*ads?|facebook\s*ads?|instagram\s*ads?/i.test(heardAbout);
+
+  const isOrganicSearch =
+    /organic/i.test(mediumLower) ||
+    ((!utmMedium || mediumLower === "organic") &&
+      (refHost.includes("google.") ||
+        refHost.includes("bing.") ||
+        refHost.includes("yahoo.") ||
+        /^(google|bing|yahoo)$/i.test(utmSource)) &&
+      !isGoogleAds);
+
+  const isReferral =
+    /referral/i.test(mediumLower) ||
+    (Boolean(refHost) &&
+      !isGoogleAds &&
+      !isMetaAds &&
+      !isOrganicSearch &&
+      !refHost.includes("petersandmay.") &&
+      !utmSource);
+
+  /** Friendly channel label — matches team enquiry email Marketing source. */
   let sourceLabel = "Unknown";
   if (isGoogleAds) {
     sourceLabel = "Google Ads";
+  } else if (isMetaAds) {
+    sourceLabel = "Meta Ads";
+  } else if (isOrganicSearch) {
+    sourceLabel = "Organic search";
+  } else if (isReferral) {
+    sourceLabel = "Referral";
   } else if (utmSource) {
-    sourceLabel = utmSource;
+    if (isMetaSource) sourceLabel = "Meta";
+    else sourceLabel = utmSource;
   } else if (heardAbout) {
     if (/google/i.test(heardAbout)) sourceLabel = "Google";
     else sourceLabel = heardAbout;
