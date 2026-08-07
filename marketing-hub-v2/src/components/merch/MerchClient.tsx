@@ -31,6 +31,7 @@ import {
   ClothingProductCards,
   type ClothingProductCardItem,
 } from "@/components/merch/ClothingProductCards";
+import { onTourPrepare } from "@/lib/tour/bus";
 
 const STATUSES: { id: MerchStatus; label: string }[] = [
   { id: "requested", label: "Requested" },
@@ -481,6 +482,14 @@ export function MerchClient({
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    return onTourPrepare((action) => {
+      if (action.type === "requests-open-order-form") {
+        setShowForm(true);
+      }
+    });
+  }, []);
+
   const refresh = useCallback(async () => {
     const res = await fetch("/api/merch");
     const data = await res.json();
@@ -648,6 +657,7 @@ export function MerchClient({
           <button
             type="button"
             className="btn-primary"
+            data-tour="requests-new-order"
             onClick={() => setShowForm(true)}
           >
             New order
@@ -661,6 +671,7 @@ export function MerchClient({
             <button
               type="button"
               className="btn-primary"
+              data-tour="requests-new-order"
               onClick={() => setShowForm(true)}
             >
               New order
@@ -700,7 +711,10 @@ export function MerchClient({
       />
 
       {showForm ? (
-        <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
+        <div
+          className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2"
+          data-tour="requests-order-form"
+        >
           <OrderFields
             form={form}
             onChange={setForm}

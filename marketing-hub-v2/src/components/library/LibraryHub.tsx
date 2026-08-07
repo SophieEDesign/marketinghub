@@ -77,6 +77,7 @@ export function LibraryHub({
         onChange={setTab}
         options={tabs}
         size="lg"
+        tourIdPrefix="library-tab"
       />
 
       {activeTab === "media" ? (

@@ -47,6 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { mediaCategoryTourId, onTourPrepare } from "@/lib/tour/bus";
 
 type ListResponse = {
   configured: boolean;
@@ -605,6 +606,24 @@ export function MediaGallery({
   const [formError, setFormError] = useState<string | null>(null);
   const [divisionFilter, setDivisionFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return onTourPrepare((action) => {
+      if (action.type === "media-root") {
+        setCollection(null);
+        setActiveSubfolder(null);
+        setLightboxIndex(null);
+        setSelectedItemId(null);
+        return;
+      }
+      if (action.type === "media-open") {
+        setCollection(action.category);
+        setActiveSubfolder(null);
+        setLightboxIndex(null);
+        setSelectedItemId(null);
+      }
+    });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1679,11 +1698,15 @@ export function MediaGallery({
           <p className="mb-5 text-center text-xs font-semibold uppercase tracking-[0.18em] text-muted">
             Categories
           </p>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div
+            className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+            data-tour="media-categories"
+          >
             {collections.map((col) => (
               <button
                 key={col.name}
                 type="button"
+                data-tour={mediaCategoryTourId(col.name)}
                 onClick={() => openCollection(col.name)}
                 className="group overflow-hidden rounded-2xl border border-border bg-white text-left shadow-soft transition hover:-translate-y-0.5 hover:shadow-md"
               >
@@ -1725,6 +1748,7 @@ export function MediaGallery({
           <div className="mb-6">
             <button
               type="button"
+              data-tour="media-back"
               className="mb-2 text-sm text-muted transition hover:text-brand"
               onClick={() => {
                 setCollection(null);
@@ -1848,6 +1872,7 @@ export function MediaGallery({
             <div>
               <button
                 type="button"
+                data-tour="media-back"
                 className="mb-2 text-sm text-muted transition hover:text-brand"
                 onClick={() => {
                   if (inGallery && activeSubfolder) {

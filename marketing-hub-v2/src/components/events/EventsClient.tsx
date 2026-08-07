@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { useHubView } from "@/lib/hub-view";
+import { onTourPrepare } from "@/lib/tour/bus";
 import {
   divisionColor,
   normalizeDivision,
@@ -480,6 +481,20 @@ export function EventsClient({
     [filtered]
   );
 
+  useEffect(() => {
+    return onTourPrepare((action) => {
+      if (action.type === "events-list-view") {
+        setViewMode("list");
+        return;
+      }
+      if (action.type === "events-select-first") {
+        setViewMode("list");
+        const first = dated[0] ?? undated[0] ?? filtered[0] ?? null;
+        setSelected(first);
+      }
+    });
+  }, [dated, undated, filtered]);
+
   const calendarEvents = useMemo(
     () =>
       dated.map((e) => {
@@ -755,6 +770,7 @@ export function EventsClient({
             <button
               type="button"
               className="btn-secondary"
+              data-tour="events-view-toggle"
               onClick={() =>
                 setViewMode(viewMode === "calendar" ? "list" : "calendar")
               }
@@ -764,6 +780,7 @@ export function EventsClient({
             <button
               type="button"
               className="btn-primary"
+              data-tour="events-add"
               onClick={() => setShowForm(true)}
             >
               Add event
@@ -887,7 +904,10 @@ export function EventsClient({
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <div className="hub-events-fc surface-card p-4">
+        <div
+          className="hub-events-fc surface-card p-4"
+          data-tour="events-calendar"
+        >
           {viewMode === "calendar" ? (
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
@@ -989,6 +1009,7 @@ export function EventsClient({
                 <li key={e.id}>
                   <button
                     type="button"
+                    data-tour="events-list-item"
                     className={`flex w-full items-start justify-between gap-3 py-3 text-left hover:bg-sand ${
                       selected?.id === e.id ? "bg-accent-soft/50" : ""
                     }`}
@@ -1019,7 +1040,7 @@ export function EventsClient({
           )}
         </div>
 
-        <aside className="flex flex-col gap-4">
+        <aside className="flex flex-col gap-4" data-tour="events-detail">
           <div className="surface-card p-5">
             {selected ? (
               <div className="space-y-3">
@@ -1099,13 +1120,17 @@ export function EventsClient({
                 />
 
                 {currentUserId ? (
-                  <div className="border-t border-border pt-3">
+                  <div
+                    className="border-t border-border pt-3"
+                    data-tour="events-attendance"
+                  >
                     <p className="label !mb-2">Your attendance</p>
                     <div className="flex flex-wrap gap-1.5">
                       {ATTENDANCE_OPTIONS.map((opt) => (
                         <button
                           key={opt.value}
                           type="button"
+                          data-tour={`events-attendance-${opt.value}`}
                           disabled={attendanceSaving}
                           className={
                             myAttendanceStatus === opt.value
@@ -1121,7 +1146,10 @@ export function EventsClient({
                   </div>
                 ) : null}
 
-                <div className="border-t border-border pt-3">
+                <div
+                  className="border-t border-border pt-3"
+                  data-tour="events-attending-list"
+                >
                   <p className="label !mb-2">
                     Attending ({attendingPeople.length})
                   </p>

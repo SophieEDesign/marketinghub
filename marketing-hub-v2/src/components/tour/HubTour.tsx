@@ -18,6 +18,7 @@ import {
   type TourAudience,
 } from "@/lib/tour/storage";
 import { tourStepsFor, tourWelcomeCopy, type TourStep } from "@/lib/tour/steps";
+import { dispatchTourPrepare } from "@/lib/tour/bus";
 import { cn } from "@/lib/utils";
 
 type TourContextValue = {
@@ -33,6 +34,10 @@ export function useHubTour() {
 
 type Rect = { top: number; left: number; width: number; height: number };
 
+/** Fixed tip width — avoids remeasure flicker after first paint. */
+const TIP_W = 320;
+const TIP_H_EST = 200;
+
 function readRect(el: Element | null): Rect | null {
   if (!el) return null;
   const r = el.getBoundingClientRect();
@@ -46,34 +51,72 @@ function readRect(el: Element | null): Rect | null {
 }
 
 function pickVisibleElement(selector: string): Element | null {
-  const nodes = Array.from(document.querySelectorAll(selector));
-  for (const node of nodes) {
-    const style = window.getComputedStyle(node);
-    if (style.display === "none" || style.visibility === "hidden") continue;
-    const r = node.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) continue;
-    return node;
-  }
-  return nodes[0] ?? null;
-}
+  // Prefer left-to-right selector parts so fallbacks come last
+  const parts = selector
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const groups = parts.length > 0 ? parts : [selector];
 
-async function waitForSelector(
-  selector: string,
-  timeoutMs = 4000
-): Promise<Element | null> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const el = pickVisibleElement(selector);
-    if (el) return el;
-    await new Promise((r) => setTimeout(r, 50));
+  for (const part of groups) {
+    const nodes = Array.from(document.querySelectorAll(part));
+    for (const node of nodes) {
+      const style = window.getComputedStyle(node);
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      const r = node.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      return node;
+    }
   }
-  return pickVisibleElement(selector);
+  return null;
 }
 
 function pathMatches(pathname: string, href: string) {
   if (href === "/app") return pathname === "/app";
-  if (href === "/media") return pathname === "/media" || pathname.startsWith("/media/");
+  if (href === "/media")
+    return pathname === "/media" || pathname.startsWith("/media/");
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function needsMobileNav(selector: string) {
+  return (
+    selector.includes('data-tour="nav-') ||
+    selector.includes("sidebar") ||
+    selector.includes("view-toggle") ||
+    selector.includes("account-menu")
+  );
+}
+
+async function waitForSelector(
+  selector: string,
+  timeoutMs = 2000
+): Promise<Element | null> {
+  const start = Date.now();
+  const el = pickVisibleElement(selector);
+  if (el) return el;
+  while (Date.now() - start < timeoutMs) {
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+    const found = pickVisibleElement(selector);
+    if (found) return found;
+  }
+  return pickVisibleElement(selector);
+}
+
+async function waitForPath(
+  getPath: () => string,
+  href: string,
+  timeoutMs = 2500
+) {
+  if (pathMatches(getPath(), href)) return;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (pathMatches(getPath(), href)) return;
+    await new Promise((r) => setTimeout(r, 16));
+  }
+}
+
+function nextFrame() {
+  return new Promise<void>((r) => requestAnimationFrame(() => r()));
 }
 
 function tooltipPosition(
@@ -110,11 +153,8 @@ function tooltipPosition(
   else if (prefer === "left") tryLeft();
   else if (prefer === "bottom") tryBottom();
   else if (prefer === "top") tryTop();
-  else {
-    // Prefer right of sidebar targets, else bottom
-    if (rect.left < 280 && rect.width < 320) tryRight();
-    else tryBottom();
-  }
+  else if (rect.left < 280 && rect.width < 320) tryRight();
+  else tryBottom();
 
   left = Math.max(12, Math.min(left, vw - tipW - 12));
   top = Math.max(12, Math.min(top, vh - tipH - 12));
@@ -124,13 +164,9 @@ function tooltipPosition(
 type HubTourProps = {
   userKey: string;
   accessRole?: "admin" | "staff" | "media_guest";
-  /** Force audience (e.g. media page always external). */
   audience?: TourAudience;
-  /** Optional: ensure admin view so all admin nav targets exist. */
   onEnsureAdminView?: () => void;
-  /** Current hub UI view — admin tour waits until this is "admin". */
   hubView?: "admin" | "member" | "external";
-  /** Open mobile nav when targeting sidebar links on small screens. */
   onOpenMobileNav?: () => void;
   className?: string;
 };
@@ -144,25 +180,38 @@ export function HubTourProvider({
   hubView,
   onOpenMobileNav,
 }: HubTourProps & { children: React.ReactNode }) {
-  const audience =
-    audienceProp ?? sessionRoleToTourAudience(accessRole);
+  const audience = audienceProp ?? sessionRoleToTourAudience(accessRole);
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
+
   const [phase, setPhase] = useState<"idle" | "welcome" | "running">("idle");
   const [stepIndex, setStepIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [tipReady, setTipReady] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(true);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [advancing, setAdvancing] = useState(false);
   const tipRef = useRef<HTMLDivElement>(null);
-  const [tipSize, setTipSize] = useState({ w: 320, h: 160 });
+  const tipHRef = useRef(TIP_H_EST);
   const steps = useMemo(() => tourStepsFor(audience), [audience]);
   const welcome = useMemo(() => tourWelcomeCopy(audience), [audience]);
   const runningRef = useRef(false);
   const pendingRunRef = useRef(false);
+  const stepIndexRef = useRef(0);
+  const onOpenMobileNavRef = useRef(onOpenMobileNav);
+  onOpenMobileNavRef.current = onOpenMobileNav;
+  const onEnsureAdminViewRef = useRef(onEnsureAdminView);
+  onEnsureAdminViewRef.current = onEnsureAdminView;
 
   const finish = useCallback(
     (persist: boolean) => {
       runningRef.current = false;
       pendingRunRef.current = false;
+      setLeaveConfirmOpen(false);
+      setTipReady(false);
+      setAdvancing(false);
       setPhase("idle");
       setStepIndex(0);
       setRect(null);
@@ -171,124 +220,178 @@ export function HubTourProvider({
     [audience, userKey]
   );
 
+  const requestLeave = useCallback(() => {
+    if (phase === "running") {
+      setLeaveConfirmOpen(true);
+      return;
+    }
+    finish(dontShowAgain);
+  }, [phase, dontShowAgain, finish]);
+
   const startTour = useCallback(() => {
-    if (audience === "admin") onEnsureAdminView?.();
+    if (audience === "admin") onEnsureAdminViewRef.current?.();
     setDontShowAgain(true);
+    setLeaveConfirmOpen(false);
+    setTipReady(false);
+    setRect(null);
     setStepIndex(0);
     setPhase("welcome");
-  }, [audience, onEnsureAdminView]);
+  }, [audience]);
 
-  // Auto-offer on first load if not completed
   useEffect(() => {
     if (!userKey) return;
     if (isTourCompleted(audience, userKey)) return;
     const t = window.setTimeout(() => {
       if (!runningRef.current && phase === "idle") {
-        if (audience === "admin") onEnsureAdminView?.();
+        if (audience === "admin") onEnsureAdminViewRef.current?.();
         setPhase("welcome");
       }
     }, 700);
     return () => window.clearTimeout(t);
-    // only on mount / identity change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audience, userKey]);
 
-  // When running, keep highlight aligned (resize / route)
-  useEffect(() => {
-    if (phase !== "running") return;
-    const step = steps[stepIndex];
-    if (!step) return;
-    let cancelled = false;
+  /** Navigate + prepare tabs + measure before painting the tip. */
+  const showStep = useCallback(
+    async (index: number) => {
+      const step = steps[index];
+      if (!step) return;
 
-    async function align() {
-      if (cancelled) return;
-      if (step.href && !pathMatches(pathname, step.href)) {
+      setAdvancing(true);
+      setTipReady(false);
+
+      if (audience === "admin") onEnsureAdminViewRef.current?.();
+
+      const onTargetPath =
+        !step.href || pathMatches(pathnameRef.current, step.href);
+
+      if (step.href && !onTargetPath) {
+        setRect(null);
         router.push(step.href);
-        return;
+        await waitForPath(() => pathnameRef.current, step.href);
       }
-      if (window.innerWidth < 768) {
-        if (
-          step.selector.includes("data-tour=\"nav-") ||
-          step.selector.includes("sidebar") ||
-          step.selector.includes("view-toggle") ||
-          step.selector.includes("account-menu")
-        ) {
-          onOpenMobileNav?.();
-        }
+
+      if (
+        typeof window !== "undefined" &&
+        window.innerWidth < 768 &&
+        needsMobileNav(step.selector)
+      ) {
+        onOpenMobileNavRef.current?.();
+        await nextFrame();
       }
-      const el = await waitForSelector(step.selector);
-      if (cancelled) return;
+
+      if (step.prepare?.length) {
+        dispatchTourPrepare(step.prepare);
+        // Let React apply tab / selection updates
+        await nextFrame();
+        await nextFrame();
+        await new Promise((r) => setTimeout(r, 30));
+      }
+
+      const el = await waitForSelector(step.selector, 2000);
       el?.scrollIntoView({ block: "nearest", inline: "nearest" });
-      setRect(readRect(el));
-    }
+      await nextFrame();
 
-    void align();
+      let nextRect = readRect(pickVisibleElement(step.selector) ?? el);
+      if (!nextRect) {
+        await new Promise((r) => setTimeout(r, 40));
+        nextRect = readRect(pickVisibleElement(step.selector));
+      }
 
-    const onResize = () => {
-      const el = pickVisibleElement(step.selector);
-      setRect(readRect(el));
-    };
-    window.addEventListener("resize", onResize);
-    window.addEventListener("scroll", onResize, true);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("resize", onResize);
-      window.removeEventListener("scroll", onResize, true);
-    };
-  }, [phase, stepIndex, steps, pathname, router, onOpenMobileNav]);
-
-  useEffect(() => {
-    if (phase !== "running" || !tipRef.current) return;
-    const r = tipRef.current.getBoundingClientRect();
-    setTipSize({ w: r.width, h: r.height });
-  }, [phase, stepIndex, rect]);
+      stepIndexRef.current = index;
+      setStepIndex(index);
+      setRect(nextRect);
+      setPhase("running");
+      setTipReady(Boolean(nextRect));
+      setAdvancing(false);
+    },
+    [steps, audience, router]
+  );
 
   const beginSteps = () => {
     runningRef.current = true;
+    setTipReady(false);
+    setRect(null);
+    setPhase("running");
     if (audience === "admin") {
-      onEnsureAdminView?.();
+      onEnsureAdminViewRef.current?.();
       if (hubView && hubView !== "admin") {
         pendingRunRef.current = true;
+        setAdvancing(true);
         return;
       }
     }
     pendingRunRef.current = false;
-    setStepIndex(0);
-    setPhase("running");
+    void showStep(0);
   };
 
-  // Wait for Admin view before highlighting admin-only nav items
   useEffect(() => {
     if (!pendingRunRef.current) return;
     if (audience !== "admin") return;
     if (hubView !== "admin") {
-      onEnsureAdminView?.();
+      onEnsureAdminViewRef.current?.();
       return;
     }
     pendingRunRef.current = false;
-    setStepIndex(0);
-    setPhase("running");
-  }, [hubView, audience, onEnsureAdminView]);
+    void showStep(0);
+  }, [hubView, audience, showStep]);
+
+  // Keep spotlight aligned on resize/scroll only (not on step change)
+  useEffect(() => {
+    if (phase !== "running") return;
+    const step = steps[stepIndex];
+    if (!step) return;
+
+    const sync = () => {
+      const el = pickVisibleElement(step.selector);
+      const next = readRect(el);
+      if (next) setRect(next);
+    };
+
+    window.addEventListener("resize", sync);
+    window.addEventListener("scroll", sync, true);
+    return () => {
+      window.removeEventListener("resize", sync);
+      window.removeEventListener("scroll", sync, true);
+    };
+  }, [phase, stepIndex, steps]);
+
+  // Soft-prefetch the next route while the user reads
+  useEffect(() => {
+    if (phase !== "running") return;
+    const next = steps[stepIndex + 1];
+    if (next?.href) router.prefetch(next.href);
+  }, [phase, stepIndex, steps, router]);
+
+  // Measure actual tip height once without shifting position mid-animation
+  useEffect(() => {
+    if (!tipReady || !tipRef.current) return;
+    const h = tipRef.current.getBoundingClientRect().height;
+    if (h > 40) tipHRef.current = h;
+  }, [tipReady, stepIndex]);
 
   const goNext = () => {
-    if (audience === "admin") onEnsureAdminView?.();
+    if (advancing) return;
     if (stepIndex >= steps.length - 1) {
       finish(dontShowAgain);
       return;
     }
-    setStepIndex((i) => i + 1);
+    void showStep(stepIndex + 1);
   };
 
   const goBack = () => {
+    if (advancing) return;
     if (stepIndex <= 0) {
       setPhase("welcome");
+      setTipReady(false);
       setRect(null);
       return;
     }
-    setStepIndex((i) => i - 1);
+    void showStep(stepIndex - 1);
   };
 
-  const skip = () => finish(dontShowAgain);
+  const skip = () => requestLeave();
+  const confirmLeave = () => finish(dontShowAgain);
 
   const ctx = useMemo(
     () => ({ startTour, audience }),
@@ -297,11 +400,12 @@ export function HubTourProvider({
 
   const step = steps[stepIndex];
   const tipPos =
-    rect && phase === "running"
-      ? tooltipPosition(rect, step?.placement, tipSize.w, tipSize.h)
+    rect && tipReady && phase === "running"
+      ? tooltipPosition(rect, step?.placement, TIP_W, tipHRef.current)
       : null;
 
   const pad = 8;
+  const showTourChrome = phase === "running" && step;
 
   return (
     <TourContext.Provider value={ctx}>
@@ -331,7 +435,7 @@ export function HubTourProvider({
                 type="button"
                 className="rounded-lg p-1.5 text-muted hover:bg-sand hover:text-foreground"
                 aria-label="Close"
-                onClick={skip}
+                onClick={() => finish(dontShowAgain)}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -347,28 +451,37 @@ export function HubTourProvider({
               Don&apos;t show this again
             </label>
             <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={skip}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => finish(dontShowAgain)}
+              >
                 Skip
               </button>
-              <button type="button" className="btn-primary" onClick={beginSteps}>
-                Start tour
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={beginSteps}
+                disabled={advancing}
+              >
+                {advancing ? "Starting…" : "Start tour"}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {phase === "running" && step ? (
+      {/* preparing state uses running chrome with full dim */}
+      {showTourChrome ? (
         <div className="fixed inset-0 z-[100]" aria-live="polite">
-          {/* Dim overlay with spotlight hole */}
           <div
             className="pointer-events-auto absolute inset-0"
             onClick={skip}
             aria-hidden
           >
-            {rect ? (
+            {rect && tipReady ? (
               <div
-                className="absolute rounded-xl ring-2 ring-accent transition-all duration-200"
+                className="absolute rounded-xl ring-2 ring-accent"
                 style={{
                   top: rect.top - pad,
                   left: rect.left - pad,
@@ -382,80 +495,143 @@ export function HubTourProvider({
             )}
           </div>
 
-          <div
-            ref={tipRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="hub-tour-step-title"
-            className={cn(
-              "pointer-events-auto absolute z-[101] w-[min(100vw-1.5rem,20rem)] rounded-2xl border border-border bg-white p-4 shadow-xl",
-              !tipPos && "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-            )}
-            style={
-              tipPos
-                ? { top: tipPos.top, left: tipPos.left }
-                : undefined
-            }
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-[11px] font-medium text-muted">
-                  {stepIndex + 1} of {steps.length}
-                </p>
-                <h3
-                  id="hub-tour-step-title"
-                  className="mt-0.5 font-display text-lg text-brand"
+          {tipPos ? (
+            <div
+              ref={tipRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="hub-tour-step-title"
+              className={cn(
+                "pointer-events-auto absolute z-[101] rounded-2xl border border-border bg-white p-4 shadow-xl",
+                advancing && "opacity-80"
+              )}
+              style={{
+                top: tipPos.top,
+                left: tipPos.left,
+                width: TIP_W,
+                maxWidth: "calc(100vw - 1.5rem)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-medium text-muted">
+                    {stepIndex + 1} of {steps.length}
+                  </p>
+                  <h3
+                    id="hub-tour-step-title"
+                    className="mt-0.5 font-display text-lg text-brand"
+                  >
+                    {step.title}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  className="rounded-lg p-1 text-muted hover:bg-sand hover:text-foreground"
+                  aria-label="Close tour"
+                  onClick={skip}
                 >
-                  {step.title}
-                </h3>
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                className="rounded-lg p-1 text-muted hover:bg-sand hover:text-foreground"
-                aria-label="Close tour"
-                onClick={skip}
+              <p className="mt-2 text-sm text-muted">{step.body}</p>
+              <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  className="accent-[var(--brand)]"
+                  checked={dontShowAgain}
+                  onChange={(e) => setDontShowAgain(e.target.checked)}
+                />
+                Don&apos;t show again when finished
+              </label>
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost !px-2 !py-1.5 text-xs"
+                  onClick={skip}
+                >
+                  Skip tour
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary !px-3 !py-1.5 text-xs"
+                    onClick={goBack}
+                    disabled={advancing}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary !px-3 !py-1.5 text-xs"
+                    onClick={goNext}
+                    disabled={advancing}
+                  >
+                    {advancing
+                      ? "…"
+                      : stepIndex >= steps.length - 1
+                        ? "Done"
+                        : "Next"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {leaveConfirmOpen ? (
+            <div
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="hub-tour-leave-title"
+              aria-describedby="hub-tour-leave-desc"
+              onClick={() => setLeaveConfirmOpen(false)}
+            >
+              <div
+                className="surface-card w-full max-w-sm p-5 shadow-xl"
+                onClick={(e) => e.stopPropagation()}
               >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mt-2 text-sm text-muted">{step.body}</p>
-            <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-muted">
-              <input
-                type="checkbox"
-                className="accent-[var(--brand)]"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-              />
-              Don&apos;t show again when finished
-            </label>
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <button type="button" className="btn-ghost !px-2 !py-1.5 text-xs" onClick={skip}>
-                Skip tour
-              </button>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary !px-3 !py-1.5 text-xs"
-                  onClick={goBack}
+                <h3
+                  id="hub-tour-leave-title"
+                  className="font-display text-xl text-brand"
                 >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary !px-3 !py-1.5 text-xs"
-                  onClick={goNext}
-                >
-                  {stepIndex >= steps.length - 1 ? "Done" : "Next"}
-                </button>
+                  Leave the tour?
+                </h3>
+                <p id="hub-tour-leave-desc" className="mt-2 text-sm text-muted">
+                  You can restart anytime from Account → Take a tour.
+                </p>
+                <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    className="accent-[var(--brand)]"
+                    checked={dontShowAgain}
+                    onChange={(e) => setDontShowAgain(e.target.checked)}
+                  />
+                  Don&apos;t show this tour again
+                </label>
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setLeaveConfirmOpen(false)}
+                  >
+                    Keep going
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={confirmLeave}
+                  >
+                    Leave tour
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
       ) : null}
     </TourContext.Provider>
   );
 }
 
-/** @deprecated use HubTourProvider — kept name alias for clarity at call sites */
 export const HubTour = HubTourProvider;

@@ -1,4 +1,5 @@
 import type { TourAudience } from "@/lib/tour/storage";
+import type { TourPrepareAction } from "@/lib/tour/bus";
 
 export type TourStep = {
   id: string;
@@ -10,6 +11,8 @@ export type TourStep = {
   href?: string;
   /** Prefer desktop sidebar target; falls back to mobile. */
   placement?: "auto" | "right" | "left" | "top" | "bottom";
+  /** Switch tabs / select records before highlighting. */
+  prepare?: TourPrepareAction[];
 };
 
 const WELCOME_SIDEBAR: TourStep = {
@@ -29,6 +32,161 @@ const ACCOUNT_STEP: TourStep = {
   placement: "right",
 };
 
+/** Shared deep-dives used by member + admin tours */
+const EVENTS_DEEP: TourStep[] = [
+  {
+    id: "events-nav",
+    selector: '[data-tour="nav-events"]',
+    title: "Events",
+    body: "Shows, meetings, and ceremonies. Next we’ll look at adding events and marking attendance.",
+    href: "/app/events",
+    placement: "right",
+  },
+  {
+    id: "events-add",
+    selector: '[data-tour="events-add"]',
+    title: "Add an event",
+    body: "Use Add event for anything you’re organising or want on the team calendar.",
+    href: "/app/events",
+    placement: "bottom",
+  },
+  {
+    id: "events-calendar",
+    selector: '[data-tour="events-calendar"]',
+    title: "Browse events",
+    body: "Switch between calendar and list. Click any event to open its details on the right.",
+    href: "/app/events",
+    placement: "left",
+    prepare: [{ type: "events-list-view" }],
+  },
+  {
+    id: "events-attendance",
+    selector:
+      '[data-tour="events-attendance"], [data-tour="events-detail"]',
+    title: "Your attendance",
+    body: "Open an event, then mark Attending, Maybe, Not attending, or Interested so others know who’s going.",
+    href: "/app/events",
+    placement: "left",
+    prepare: [{ type: "events-select-first" }],
+  },
+  {
+    id: "events-attending-list",
+    selector:
+      '[data-tour="events-attending-list"], [data-tour="events-detail"]',
+    title: "Who’s attending",
+    body: "See who else has marked Attending for this event.",
+    href: "/app/events",
+    placement: "left",
+    prepare: [{ type: "events-select-first" }],
+  },
+];
+
+const LIBRARY_DEEP: TourStep[] = [
+  {
+    id: "library-nav",
+    selector: '[data-tour="nav-library"]',
+    title: "Library",
+    body: "Brand assets live here. We’ll flick through Logos, Images, and Presentations.",
+    href: "/app/library",
+    placement: "right",
+  },
+  {
+    id: "library-categories",
+    selector: '[data-tour="media-categories"]',
+    title: "Media categories",
+    body: "Pick a category card to browse that folder. Start with Logos, Images, or Presentations.",
+    href: "/app/library",
+    placement: "top",
+    prepare: [
+      { type: "click", selector: '[data-tour="library-tab-media"]' },
+      { type: "media-root" },
+    ],
+  },
+  {
+    id: "library-logos",
+    selector: '[data-tour="media-category-logos"]',
+    title: "Logos",
+    body: "Official logos and lockups — open this folder when you need brand marks.",
+    href: "/app/library",
+    placement: "top",
+    prepare: [
+      { type: "click", selector: '[data-tour="library-tab-media"]' },
+      { type: "media-root" },
+    ],
+  },
+  {
+    id: "library-images",
+    selector:
+      '[data-tour="media-category-images"], [data-tour="media-category-gallery"]',
+    title: "Images & Gallery",
+    body: "Photo and image assets — open Images or Gallery for pictures you can use.",
+    href: "/app/library",
+    placement: "top",
+    prepare: [{ type: "media-root" }],
+  },
+  {
+    id: "library-presentations",
+    selector: '[data-tour="media-category-presentations"]',
+    title: "Presentations",
+    body: "Slide decks and presentation files ready to download.",
+    href: "/app/library",
+    placement: "top",
+    prepare: [
+      { type: "media-root" },
+    ],
+  },
+  {
+    id: "library-open-logos",
+    selector: '[data-tour="media-back"]',
+    title: "Inside a folder",
+    body: "Open a category to browse files. Use ← All categories to jump back to the grid.",
+    href: "/app/library",
+    placement: "bottom",
+    prepare: [{ type: "media-open", category: "Logos" }],
+  },
+];
+
+const REQUESTS_DEEP: TourStep[] = [
+  {
+    id: "requests-nav",
+    selector: '[data-tour="nav-requests"]',
+    title: "Requests",
+    body: "Clothes, assets, and social forms. Next — Corporate clothing, where you order kit.",
+    href: "/app/requests",
+    placement: "right",
+  },
+  {
+    id: "requests-clothing-tab",
+    selector: '[data-tour="requests-tab-merch"]',
+    title: "Corporate clothing",
+    body: "This tab is where you order North Sails clothing and track your requests.",
+    href: "/app/requests",
+    placement: "bottom",
+    prepare: [{ type: "requests-tab", tab: "merch" }],
+  },
+  {
+    id: "requests-new-order",
+    selector: '[data-tour="requests-new-order"]',
+    title: "New order",
+    body: "Click New order to request polo shirts, gilets, jackets, and more.",
+    href: "/app/requests",
+    placement: "bottom",
+    prepare: [{ type: "requests-tab", tab: "merch" }],
+  },
+  {
+    id: "requests-order-form",
+    selector: '[data-tour="requests-order-form"]',
+    title: "Order form",
+    body: "Pick products, size, fit, and who it’s for, then submit. Your orders appear in the list below.",
+    href: "/app/requests",
+    placement: "top",
+    prepare: [
+      { type: "requests-tab", tab: "merch" },
+      { type: "requests-open-order-form" },
+    ],
+  },
+];
+
 export const MEMBER_TOUR_STEPS: TourStep[] = [
   WELCOME_SIDEBAR,
   {
@@ -39,14 +197,7 @@ export const MEMBER_TOUR_STEPS: TourStep[] = [
     href: "/app",
     placement: "right",
   },
-  {
-    id: "events",
-    selector: '[data-tour="nav-events"]',
-    title: "Events",
-    body: "Shows, meetings, and ceremonies. Open an event to see details and linked work.",
-    href: "/app/events",
-    placement: "right",
-  },
+  ...EVENTS_DEEP,
   {
     id: "content",
     selector: '[data-tour="nav-content"]',
@@ -71,22 +222,8 @@ export const MEMBER_TOUR_STEPS: TourStep[] = [
     href: "/app/awards",
     placement: "right",
   },
-  {
-    id: "library",
-    selector: '[data-tour="nav-library"]',
-    title: "Library",
-    body: "Brand assets, media, guidelines, and useful links — shared with the wider team.",
-    href: "/app/library",
-    placement: "right",
-  },
-  {
-    id: "requests",
-    selector: '[data-tour="nav-requests"]',
-    title: "Requests",
-    body: "Clothes, merch, asset asks, and staff social forms live here.",
-    href: "/app/requests",
-    placement: "right",
-  },
+  ...LIBRARY_DEEP,
+  ...REQUESTS_DEEP,
   {
     id: "enquiries",
     selector: '[data-tour="nav-enquiries"]',
@@ -116,14 +253,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
     href: "/app",
     placement: "right",
   },
-  {
-    id: "events",
-    selector: '[data-tour="nav-events"]',
-    title: "Events",
-    body: "Manage shows, meetings, and ceremonies.",
-    href: "/app/events",
-    placement: "right",
-  },
+  ...EVENTS_DEEP,
   {
     id: "content",
     selector: '[data-tour="nav-content"]',
@@ -156,14 +286,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
     href: "/app/awards",
     placement: "right",
   },
-  {
-    id: "library",
-    selector: '[data-tour="nav-library"]',
-    title: "Library",
-    body: "Media library and brand resources. External guests only see the public media side.",
-    href: "/app/library",
-    placement: "right",
-  },
+  ...LIBRARY_DEEP,
   {
     id: "themes",
     selector: '[data-tour="nav-themes"]',
@@ -172,14 +295,7 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
     href: "/app/themes",
     placement: "right",
   },
-  {
-    id: "requests",
-    selector: '[data-tour="nav-requests"]',
-    title: "Requests",
-    body: "Incoming clothes, merch, asset, and social requests.",
-    href: "/app/requests",
-    placement: "right",
-  },
+  ...REQUESTS_DEEP,
   {
     id: "enquiries",
     selector: '[data-tour="nav-enquiries"]',
@@ -225,12 +341,31 @@ export const EXTERNAL_TOUR_STEPS: TourStep[] = [
     placement: "bottom",
   },
   {
-    id: "media-gallery",
-    selector: '[data-tour="media-gallery"]',
-    title: "Browse folders",
-    body: "Open categories and folders to find the assets you need. Click an item for a larger preview.",
+    id: "media-categories",
+    selector: '[data-tour="media-categories"]',
+    title: "Categories",
+    body: "Open Logos, Presentations, or Gallery to find the assets you need.",
     href: "/media",
     placement: "top",
+    prepare: [{ type: "media-root" }],
+  },
+  {
+    id: "media-logos",
+    selector: '[data-tour="media-category-logos"]',
+    title: "Logos",
+    body: "Brand logos and lockups — click to open the folder.",
+    href: "/media",
+    placement: "top",
+    prepare: [{ type: "media-root" }],
+  },
+  {
+    id: "media-presentations",
+    selector: '[data-tour="media-category-presentations"]',
+    title: "Presentations",
+    body: "Slide decks and presentation files.",
+    href: "/media",
+    placement: "top",
+    prepare: [{ type: "media-root" }],
   },
   {
     id: "media-download",
@@ -255,17 +390,17 @@ export function tourWelcomeCopy(audience: TourAudience): {
   if (audience === "admin") {
     return {
       title: "Quick admin tour",
-      body: "A short walkthrough of Admin tools and menus. We’ll open each section as we go — about a minute.",
+      body: "A walkthrough of Admin tools plus key pages — Events attendance, Library folders, and clothing orders.",
     };
   }
   if (audience === "external") {
     return {
       title: "Welcome to the media gallery",
-      body: "A quick look at how to browse and download brand assets. You can skip anytime.",
+      body: "A quick look at Logos, Presentations, and downloads. You can skip anytime.",
     };
   }
   return {
     title: "Welcome to Marketing Hub",
-    body: "A short tour of the menus you’ll use most. We’ll open each page as we go — skip anytime, or tick Don’t show again.",
+    body: "We’ll open each area and show useful bits — adding events, Library folders, and ordering clothes.",
   };
 }

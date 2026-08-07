@@ -13,12 +13,15 @@ export function SegmentFilter<T extends string>({
   options,
   label,
   size = "lg",
+  tourIdPrefix,
 }: {
   value: T;
   onChange: (next: T) => void;
   options: SegmentOption<T>[];
   label: string;
   size?: "md" | "lg";
+  /** When set, each tab gets data-tour={`${tourIdPrefix}-${id}`} */
+  tourIdPrefix?: string;
 }) {
   return (
     <div
@@ -28,6 +31,7 @@ export function SegmentFilter<T extends string>({
       )}
       role="tablist"
       aria-label={label}
+      data-tour={tourIdPrefix ? `${tourIdPrefix}-list` : undefined}
     >
       {options.map((opt) => (
         <button
@@ -35,6 +39,7 @@ export function SegmentFilter<T extends string>({
           type="button"
           role="tab"
           aria-selected={value === opt.id}
+          data-tour={tourIdPrefix ? `${tourIdPrefix}-${opt.id}` : undefined}
           onClick={() => onChange(opt.id)}
           className={cn(
             "flex-1 rounded-xl font-semibold transition",

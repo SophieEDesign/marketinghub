@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MerchClient } from "@/components/merch/MerchClient";
 import { InventoryClient } from "@/components/merch/InventoryClient";
 import { StaffRequestsClient } from "@/components/internal/StaffRequestsClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
+import { onTourPrepare } from "@/lib/tour/bus";
 import type {
   MerchInventoryItem,
   MerchOrder,
@@ -41,6 +42,15 @@ export function InternalHub({
   const [tab, setTab] = useState<Tab>("merch");
   const [merchView, setMerchView] = useState<MerchView>("orders");
 
+  useEffect(() => {
+    return onTourPrepare((action) => {
+      if (action.type === "requests-tab") {
+        setTab(action.tab);
+        if (action.tab === "merch") setMerchView("orders");
+      }
+    });
+  }, []);
+
   const merchViews: { id: MerchView; label: string }[] = canManageAll
     ? [
         { id: "orders", label: "Orders" },
@@ -65,10 +75,11 @@ export function InternalHub({
         onChange={setTab}
         options={TABS}
         size="lg"
+        tourIdPrefix="requests-tab"
       />
 
       {tab === "merch" ? (
-        <div>
+        <div data-tour="requests-clothing">
           {merchViews.length > 1 ? (
             <SegmentFilter
               label="Clothing section"
@@ -76,6 +87,7 @@ export function InternalHub({
               onChange={setMerchView}
               options={merchViews}
               size="md"
+              tourIdPrefix="requests-merch-view"
             />
           ) : null}
           {merchView === "inventory" && canManageAll ? (
