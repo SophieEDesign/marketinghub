@@ -148,32 +148,80 @@ function formatEventWhen(event: EventItem): string {
   return line;
 }
 
-function DivisionSwatch({
-  division,
-  compact = false,
-}: {
-  division: string;
-  compact?: boolean;
-}) {
+function DivisionSwatch({ division }: { division: string }) {
   const color = divisionColor(division);
   const label = normalizeDivision(division) || "Unassigned";
-  if (compact) {
-    return (
-      <span
-        className="inline-flex max-w-full truncate rounded px-1 py-px text-[9px] font-semibold leading-tight"
-        style={{ backgroundColor: color.bg, color: color.text }}
-        title={label}
-      >
-        {label}
-      </span>
-    );
-  }
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium"
       style={{ backgroundColor: color.bg, color: color.text }}
     >
       {label}
+    </span>
+  );
+}
+
+const AVATAR_PALETTE = [
+  "#0f766e",
+  "#1d4ed8",
+  "#b45309",
+  "#be185d",
+  "#6d28d9",
+  "#0369a1",
+  "#15803d",
+  "#9f1239",
+];
+
+function personInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "?";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  return trimmed.slice(0, 2).toUpperCase();
+}
+
+function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length]!;
+}
+
+function AttendeeInitials({
+  people,
+  max = 4,
+  size = "sm",
+}: {
+  people: { id: string; name: string }[];
+  max?: number;
+  size?: "sm" | "md";
+}) {
+  if (people.length === 0) return null;
+  const shown = people.slice(0, max);
+  const overflow = people.length - shown.length;
+  const dim = size === "sm" ? "h-4 w-4 text-[8px]" : "h-6 w-6 text-[10px]";
+  return (
+    <span className="inline-flex items-center" title={people.map((p) => p.name).join(", ")}>
+      <span className="inline-flex items-center -space-x-1">
+        {shown.map((person) => (
+          <span
+            key={person.id}
+            className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ring-1 ring-white/80 ${dim}`}
+            style={{ backgroundColor: avatarColor(person.id || person.name) }}
+            title={person.name}
+          >
+            {personInitials(person.name)}
+          </span>
+        ))}
+      </span>
+      {overflow > 0 ? (
+        <span className="ml-0.5 text-[9px] font-semibold text-current opacity-80">
+          +{overflow}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -283,11 +331,13 @@ function EventFields({
 
 export function EventsClient({
   initialEvents,
+  initialAttendance = [],
   currentUserId,
   currentUserName,
   fieldOptions: fieldOptionsProp,
 }: {
   initialEvents: EventItem[];
+  initialAttendance?: EventAttendance[];
   currentUserId: string | null;
   currentUserName: string | null;
   /** From Field Manager — drives select option order on this page. */
@@ -320,10 +370,11 @@ export function EventsClient({
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [divisionFilter, setDivisionFilter] = useState("all");
+  const [personFilter, setPersonFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState(() => todayDateKey());
   const [dateTo, setDateTo] = useState("");
-  const [attendance, setAttendance] = useState<EventAttendance[]>([]);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [allAttendance, setAllAttendance] =
+    useState<EventAttendance[]>(initialAttendance);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -332,6 +383,9 @@ export function EventsClient({
     const res = await fetch("/api/events");
     const data = await res.json();
     setEvents(data.events ?? []);
+    if (Array.isArray(data.attendance)) {
+      setAllAttendance(data.attendance);
+    }
   }, []);
 
   useEffect(() => {
@@ -347,28 +401,29 @@ export function EventsClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selected intentionally omitted
   }, [events, selected?.id]);
 
-  useEffect(() => {
-    if (!selected?.id) {
-      setAttendance([]);
-      return;
+  const attendance = useMemo(
+    () =>
+      selected?.id
+        ? allAttendance
+            .filter((a) => a.event_id === selected.id)
+            .sort((a, b) => a.user_name.localeCompare(b.user_name))
+        : [],
+    [allAttendance, selected?.id]
+  );
+
+  const attendingByEventId = useMemo(() => {
+    const map = new Map<string, EventAttendance[]>();
+    for (const row of allAttendance) {
+      if (row.attendance_status !== "attending") continue;
+      const list = map.get(row.event_id);
+      if (list) list.push(row);
+      else map.set(row.event_id, [row]);
     }
-    let cancelled = false;
-    setAttendanceLoading(true);
-    void fetch(`/api/events/attendance?eventId=${encodeURIComponent(selected.id)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled) setAttendance(data.attendance ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setAttendance([]);
-      })
-      .finally(() => {
-        if (!cancelled) setAttendanceLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected?.id]);
+    for (const list of map.values()) {
+      list.sort((a, b) => a.user_name.localeCompare(b.user_name));
+    }
+    return map;
+  }, [allAttendance]);
 
   const myAttendanceStatus = useMemo(() => {
     if (!currentUserId) return null;
@@ -386,13 +441,16 @@ export function EventsClient({
   const setMyAttendance = useCallback(
     async (status: EventAttendanceStatus) => {
       if (!selected?.id || !currentUserId || attendanceSaving) return;
+      const eventId = selected.id;
       setAttendanceSaving(true);
-      // Optimistic update
-      setAttendance((prev) => {
-        const existing = prev.find((a) => a.user_id === currentUserId);
+      // Optimistic update across calendar + detail
+      setAllAttendance((prev) => {
+        const existing = prev.find(
+          (a) => a.event_id === eventId && a.user_id === currentUserId
+        );
         if (existing) {
           return prev.map((a) =>
-            a.user_id === currentUserId
+            a.event_id === eventId && a.user_id === currentUserId
               ? {
                   ...a,
                   attendance_status: status,
@@ -406,7 +464,7 @@ export function EventsClient({
           ...prev,
           {
             id: `att_temp_${currentUserId}`,
-            event_id: selected.id,
+            event_id: eventId,
             user_id: currentUserId,
             user_name: currentUserName || "You",
             attendance_status: status,
@@ -419,11 +477,14 @@ export function EventsClient({
         const res = await fetch("/api/events/attendance", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventId: selected.id, status }),
+          body: JSON.stringify({ eventId, status }),
         });
         const data = await res.json();
-        if (res.ok) {
-          setAttendance(data.attendance ?? []);
+        if (res.ok && Array.isArray(data.attendance)) {
+          setAllAttendance((prev) => [
+            ...prev.filter((a) => a.event_id !== eventId),
+            ...data.attendance,
+          ]);
         }
       } finally {
         setAttendanceSaving(false);
@@ -443,6 +504,20 @@ export function EventsClient({
       .filter(Boolean);
     return orderedFilterValues(divisionOptions, present);
   }, [events, divisionOptions]);
+
+  const attendeePeople = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const row of allAttendance) {
+      if (row.attendance_status !== "attending") continue;
+      const id = row.user_id.trim();
+      const name = row.user_name.trim();
+      if (!id || !name) continue;
+      if (!byId.has(id)) byId.set(id, name);
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allAttendance]);
 
   const filtered = useMemo(() => {
     return events.filter((e) => {
@@ -464,10 +539,23 @@ export function EventsClient({
       ) {
         return false;
       }
+      if (personFilter !== "all") {
+        const attendees = attendingByEventId.get(e.id) ?? [];
+        if (!attendees.some((a) => a.user_id === personFilter)) return false;
+      }
       if (!matchesDateRange(e, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [events, search, typeFilter, divisionFilter, dateFrom, dateTo]);
+  }, [
+    events,
+    search,
+    typeFilter,
+    divisionFilter,
+    personFilter,
+    attendingByEventId,
+    dateFrom,
+    dateTo,
+  ]);
 
   const dated = useMemo(
     () => filtered.filter((e) => hasValidStart(e)),
@@ -512,6 +600,10 @@ export function EventsClient({
             end = e.ends_at;
           }
         }
+        const attendees = (attendingByEventId.get(e.id) ?? []).map((a) => ({
+          id: a.user_id,
+          name: a.user_name,
+        }));
         return {
           id: e.id,
           title: e.title,
@@ -523,11 +615,11 @@ export function EventsClient({
           textColor: color.text,
           extendedProps: {
             eventType: e.event_type,
-            division: e.division,
+            attendees,
           },
         };
       }),
-    [dated]
+    [dated, attendingByEventId]
   );
 
   const typeLegend = useMemo(() => {
@@ -833,6 +925,19 @@ export function EventsClient({
               ...divisions.map((d) => ({ value: d, label: d })),
             ],
           },
+          {
+            id: "person",
+            label: "Attending",
+            value: personFilter,
+            onChange: setPersonFilter,
+            options: [
+              { value: "all", label: "Anyone" },
+              ...attendeePeople.map((p) => ({
+                value: p.id,
+                label: p.name,
+              })),
+            ],
+          },
         ]}
       />
 
@@ -969,16 +1074,18 @@ export function EventsClient({
                 const eventType = String(
                   arg.event.extendedProps.eventType ?? ""
                 );
-                const division = String(
-                  arg.event.extendedProps.division ?? ""
-                ).trim();
+                const attendees = (
+                  Array.isArray(arg.event.extendedProps.attendees)
+                    ? arg.event.extendedProps.attendees
+                    : []
+                ) as { id: string; name: string }[];
                 const color = eventTypeColor(eventType);
                 const isList = arg.view.type.startsWith("list");
                 return (
                   <div
                     className={
                       isList
-                        ? "flex w-full min-w-0 flex-col gap-0.5 rounded px-2 py-1.5"
+                        ? "flex w-full min-w-0 items-center gap-1.5 rounded px-2 py-1.5"
                         : "flex w-full min-w-0 flex-col gap-0.5 px-1 py-0.5"
                     }
                     style={
@@ -991,14 +1098,12 @@ export function EventsClient({
                     }
                   >
                     <span
-                      className="truncate text-[11px] font-semibold leading-tight"
+                      className="min-w-0 flex-1 truncate text-[11px] font-semibold leading-tight"
                       style={{ color: color.text }}
                     >
                       {arg.event.title}
                     </span>
-                    {division ? (
-                      <DivisionSwatch division={division} compact />
-                    ) : null}
+                    <AttendeeInitials people={attendees} max={isList ? 5 : 3} />
                   </div>
                 );
               }}
@@ -1153,22 +1258,32 @@ export function EventsClient({
                   <p className="label !mb-2">
                     Attending ({attendingPeople.length})
                   </p>
-                  {attendanceLoading ? (
-                    <p className="text-xs text-muted">Loading…</p>
-                  ) : attendingPeople.length > 0 ? (
-                    <ul className="space-y-1">
-                      {attendingPeople.map((person) => (
-                        <li
-                          key={person.id}
-                          className="text-sm text-foreground"
-                        >
-                          {person.user_name}
-                          {person.user_id === currentUserId ? (
-                            <span className="ml-1 text-xs text-muted">(you)</span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
+                  {attendingPeople.length > 0 ? (
+                    <div className="space-y-2">
+                      <AttendeeInitials
+                        people={attendingPeople.map((p) => ({
+                          id: p.user_id,
+                          name: p.user_name,
+                        }))}
+                        max={8}
+                        size="md"
+                      />
+                      <ul className="space-y-1">
+                        {attendingPeople.map((person) => (
+                          <li
+                            key={person.id}
+                            className="text-sm text-foreground"
+                          >
+                            {person.user_name}
+                            {person.user_id === currentUserId ? (
+                              <span className="ml-1 text-xs text-muted">
+                                (you)
+                              </span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   ) : (
                     <p className="text-xs text-muted">No one marked attending yet.</p>
                   )}

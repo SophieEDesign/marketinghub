@@ -117,6 +117,13 @@ export async function listAttendanceForEvent(eventId: string) {
     .sort((a, b) => a.user_name.localeCompare(b.user_name));
 }
 
+export async function listAllAttendance() {
+  const store = await readStore();
+  return [...store.event_attendance].sort((a, b) =>
+    a.user_name.localeCompare(b.user_name)
+  );
+}
+
 export async function upsertEventAttendance(input: {
   event_id: string;
   user_id: string;

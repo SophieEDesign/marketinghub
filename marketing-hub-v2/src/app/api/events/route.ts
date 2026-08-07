@@ -3,6 +3,7 @@ import { jsonError, jsonOk, requireAdmin, requireStaff } from "@/lib/api";
 import {
   createEvent,
   deleteEvent,
+  listAllAttendance,
   listEvents,
   updateEvent,
 } from "@/lib/data/repos";
@@ -10,7 +11,11 @@ import {
 export async function GET() {
   const { error } = await requireStaff();
   if (error) return error;
-  return jsonOk({ events: await listEvents() });
+  const [events, attendance] = await Promise.all([
+    listEvents(),
+    listAllAttendance(),
+  ]);
+  return jsonOk({ events, attendance });
 }
 
 export async function POST(request: NextRequest) {
