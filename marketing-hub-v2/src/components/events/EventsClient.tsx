@@ -95,6 +95,44 @@ function todayDateKey(): string {
   return format(new Date(), "yyyy-MM-dd");
 }
 
+/** Default list filter: from today with no upper bound. */
+function isDefaultUpcomingDateRange(from: string, to: string): boolean {
+  return from === todayDateKey() && !to;
+}
+
+function matchesNonDateFilters(
+  e: EventItem,
+  search: string,
+  typeFilter: string,
+  divisionFilter: string,
+  personFilter: string,
+  attendingByEventId: Map<string, EventAttendance[]>
+): boolean {
+  if (
+    !matchesSearch(search, [
+      e.title,
+      e.location,
+      e.event_type,
+      e.division,
+      plainTextFromHtml(e.notes),
+    ])
+  ) {
+    return false;
+  }
+  if (typeFilter !== "all" && e.event_type !== typeFilter) return false;
+  if (
+    divisionFilter !== "all" &&
+    normalizeDivision(e.division) !== divisionFilter
+  ) {
+    return false;
+  }
+  if (personFilter !== "all") {
+    const attendees = attendingByEventId.get(e.id) ?? [];
+    if (!attendees.some((a) => a.user_id === personFilter)) return false;
+  }
+  return true;
+}
+
 /** Last day the event is still on (end date, or start if no end). */
 function eventLastDateKey(event: EventItem): string | null {
   if (!hasValidStart(event)) return null;
@@ -522,28 +560,52 @@ export function EventsClient({
   const filtered = useMemo(() => {
     return events.filter((e) => {
       if (
-        !matchesSearch(search, [
-          e.title,
-          e.location,
-          e.event_type,
-          e.division,
-          plainTextFromHtml(e.notes),
-        ])
+        !matchesNonDateFilters(
+          e,
+          search,
+          typeFilter,
+          divisionFilter,
+          personFilter,
+          attendingByEventId
+        )
       ) {
         return false;
-      }
-      if (typeFilter !== "all" && e.event_type !== typeFilter) return false;
-      if (
-        divisionFilter !== "all" &&
-        normalizeDivision(e.division) !== divisionFilter
-      ) {
-        return false;
-      }
-      if (personFilter !== "all") {
-        const attendees = attendingByEventId.get(e.id) ?? [];
-        if (!attendees.some((a) => a.user_id === personFilter)) return false;
       }
       if (!matchesDateRange(e, dateFrom, dateTo)) return false;
+      return true;
+    });
+  }, [
+    events,
+    search,
+    typeFilter,
+    divisionFilter,
+    personFilter,
+    attendingByEventId,
+    dateFrom,
+    dateTo,
+  ]);
+
+  /** Calendar keeps historic events so past months stay populated. */
+  const calendarFiltered = useMemo(() => {
+    return events.filter((e) => {
+      if (
+        !matchesNonDateFilters(
+          e,
+          search,
+          typeFilter,
+          divisionFilter,
+          personFilter,
+          attendingByEventId
+        )
+      ) {
+        return false;
+      }
+      if (
+        !isDefaultUpcomingDateRange(dateFrom, dateTo) &&
+        !matchesDateRange(e, dateFrom, dateTo)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [
@@ -560,6 +622,10 @@ export function EventsClient({
   const dated = useMemo(
     () => filtered.filter((e) => hasValidStart(e)),
     [filtered]
+  );
+  const calendarDated = useMemo(
+    () => calendarFiltered.filter((e) => hasValidStart(e)),
+    [calendarFiltered]
   );
   const undated = useMemo(
     () =>
@@ -585,7 +651,7 @@ export function EventsClient({
 
   const calendarEvents = useMemo(
     () =>
-      dated.map((e) => {
+      calendarDated.map((e) => {
         const color = eventTypeColor(e.event_type);
         const startIso = e.starts_at!;
         const allDay = isDateOnlyIso(startIso);
@@ -619,7 +685,7 @@ export function EventsClient({
           },
         };
       }),
-    [dated, attendingByEventId]
+    [calendarDated, attendingByEventId]
   );
 
   const typeLegend = useMemo(() => {
