@@ -1,5 +1,6 @@
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
+import { normalizeClothingLogo } from "@/lib/merch/north-sails";
 import type {
   AccessRequest,
   AwardEntry,
@@ -883,7 +884,7 @@ export async function createMerchOrder(
 ) {
   const item: MerchOrder = {
     ...input,
-    logo: input.logo || "Commercial",
+    logo: normalizeClothingLogo(input.logo),
     requested_for_contact_id: input.requested_for_contact_id ?? null,
     created_by_user_id: input.created_by_user_id ?? null,
     id: uid("mrc"),

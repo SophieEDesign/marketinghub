@@ -1,4 +1,5 @@
 import type { HubStore } from "@/lib/types";
+import { CLOTHING_LOGOS } from "@/lib/merch/north-sails";
 
 /** Spreadsheet collections — excludes users/access requests (Admin → Users). */
 export type CollectionKey = Exclude<
@@ -306,12 +307,10 @@ const MERCH_COLOURS: FieldOption[] = [
   { value: "Yellow", label: "Yellow" },
 ];
 
-const MERCH_LOGOS: FieldOption[] = [
-  { value: "Commercial", label: "Commercial" },
-  { value: "Yacht Transport", label: "Yacht Transport" },
-  { value: "Forwarding", label: "Forwarding" },
-  { value: "Other", label: "Other" },
-];
+const MERCH_LOGOS: FieldOption[] = CLOTHING_LOGOS.map((logo) => ({
+  value: logo.id,
+  label: logo.label,
+}));
 
 const MERCH_BRANDS: FieldOption[] = [
   { value: "North Sails", label: "North Sails" },

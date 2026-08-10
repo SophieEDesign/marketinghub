@@ -3,10 +3,16 @@
 export type ClothingFit = "male" | "female";
 
 export type ClothingLogo =
+  | "Bespoke Logistics"
+  | "Global Yacht Transport"
   | "Commercial"
-  | "Yacht Transport"
   | "Forwarding"
   | "Other";
+
+/** Legacy logo values stored on older orders — mapped to current labels on read. */
+const LEGACY_CLOTHING_LOGOS: Record<string, ClothingLogo> = {
+  "Yacht Transport": "Global Yacht Transport",
+};
 
 export type ClothingBrand =
   | "North Sails"
@@ -33,14 +39,35 @@ export const CLOTHING_FITS: { id: ClothingFit; label: string }[] = [
   { id: "female", label: "Female" },
 ];
 
-export const CLOTHING_LOGOS: { id: ClothingLogo; label: string }[] = [
-  { id: "Commercial", label: "Commercial" },
-  { id: "Yacht Transport", label: "Yacht Transport" },
-  { id: "Forwarding", label: "Forwarding" },
-  { id: "Other", label: "Other" },
+export const CLOTHING_LOGOS: {
+  id: ClothingLogo;
+  label: string;
+  hint?: string;
+}[] = [
+  {
+    id: "Bespoke Logistics",
+    label: "Bespoke Logistics",
+    hint: "Main group logo — generic and the safest default when unsure.",
+  },
+  {
+    id: "Global Yacht Transport",
+    label: "Global Yacht Transport",
+    hint: "Division logo for yacht transport work.",
+  },
+  {
+    id: "Commercial",
+    label: "Commercial",
+    hint: "Division logo for commercial marine forwarding.",
+  },
+  {
+    id: "Forwarding",
+    label: "Forwarding",
+    hint: "Division logo for freight forwarding.",
+  },
+  { id: "Other", label: "Other", hint: "Specify in notes if you need something else." },
 ];
 
-export const DEFAULT_CLOTHING_LOGO: ClothingLogo = "Commercial";
+export const DEFAULT_CLOTHING_LOGO: ClothingLogo = "Bespoke Logistics";
 
 export const CLOTHING_SIZES = [
   "XS",
@@ -172,11 +199,17 @@ export function defaultBrandForItem(itemLabel: string): string {
   return clothingProductByLabel(itemLabel)?.brand ?? "North Sails";
 }
 
+export function normalizeClothingLogo(value: unknown): ClothingLogo {
+  if (typeof value !== "string" || !value.trim()) return DEFAULT_CLOTHING_LOGO;
+  const legacy = LEGACY_CLOTHING_LOGOS[value.trim()];
+  if (legacy) return legacy;
+  return isClothingLogo(value) ? value : DEFAULT_CLOTHING_LOGO;
+}
+
 export function isClothingLogo(value: unknown): value is ClothingLogo {
-  return (
-    value === "Commercial" ||
-    value === "Yacht Transport" ||
-    value === "Forwarding" ||
-    value === "Other"
-  );
+  return CLOTHING_LOGOS.some((logo) => logo.id === value);
+}
+
+export function clothingLogoHint(logo: ClothingLogo): string | undefined {
+  return CLOTHING_LOGOS.find((entry) => entry.id === logo)?.hint;
 }

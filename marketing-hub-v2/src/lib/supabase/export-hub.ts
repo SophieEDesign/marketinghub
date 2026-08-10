@@ -1,4 +1,5 @@
 import type { HubStore } from "@/lib/types";
+import { DEFAULT_CLOTHING_LOGO } from "@/lib/merch/north-sails";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { readStore } from "@/lib/store/local";
 import { formatChannels } from "@/lib/data/normalize";
@@ -235,7 +236,7 @@ export async function exportStoreToSupabase(
       size: m.size ?? "",
       quantity: m.quantity ?? 1,
       colour: m.colour ?? "",
-      logo: m.logo ?? "Commercial",
+      logo: m.logo ?? DEFAULT_CLOTHING_LOGO,
       requested_for: m.requested_for ?? "",
       requested_for_contact_id: m.requested_for_contact_id ?? null,
       office: m.office ?? "",

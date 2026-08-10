@@ -17,9 +17,10 @@ import {
   CLOTHING_SIZES,
   DEFAULT_CLOTHING_LOGO,
   clothingProductByLabel,
+  clothingLogoHint,
   coloursForItem,
   defaultColourForItem,
-  isClothingLogo,
+  normalizeClothingLogo,
   type ClothingFit,
   type ClothingLogo,
 } from "@/lib/merch/north-sails";
@@ -88,7 +89,7 @@ function toEditForm(
     size: order.size,
     quantity: String(order.quantity),
     colour: order.colour,
-    logo: isClothingLogo(order.logo) ? order.logo : DEFAULT_CLOTHING_LOGO,
+    logo: normalizeClothingLogo(order.logo),
     requested_for: order.requested_for,
     requested_for_contact_id: order.requested_for_contact_id ?? null,
     for_mode: isMe ? "me" : "other",
@@ -405,6 +406,10 @@ function OrderFields({
           }
           options={CLOTHING_LOGOS.map((l) => ({ value: l.id, label: l.label }))}
         />
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          {clothingLogoHint(form.logo) ??
+            "Use Bespoke Logistics when unsure; pick a division logo only when the item is clearly for that team."}
+        </p>
       </div>
       <div>
         <label className="label">Quantity</label>
@@ -756,7 +761,9 @@ export function MerchClient({
                 </h2>
                 <p className="mt-1 text-sm text-muted">
                   {order.colour || "—"}
-                  {order.logo ? ` · ${order.logo} logo` : ""}
+                  {order.logo
+                    ? ` · ${normalizeClothingLogo(order.logo)} logo`
+                    : ""}
                   {order.requested_for ? ` · for ${order.requested_for}` : ""}
                   {order.office ? ` · ${order.office}` : ""}
                   {order.needed_by ? ` · needed ${order.needed_by}` : ""}

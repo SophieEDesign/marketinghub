@@ -13,10 +13,7 @@ import {
   isMerchAdmin,
   ownsMerchOrder,
 } from "@/lib/merch/access";
-import {
-  DEFAULT_CLOTHING_LOGO,
-  isClothingLogo,
-} from "@/lib/merch/north-sails";
+import { normalizeClothingLogo } from "@/lib/merch/north-sails";
 import { resolveMerchRequestedFor } from "@/lib/merch/requested-for";
 
 export async function GET() {
@@ -139,7 +136,7 @@ export async function POST(request: NextRequest) {
     size: body.size ?? "",
     quantity: Number(body.quantity) > 0 ? Number(body.quantity) : 1,
     colour: body.colour ?? "",
-    logo: isClothingLogo(body.logo) ? body.logo : DEFAULT_CLOTHING_LOGO,
+    logo: normalizeClothingLogo(body.logo),
     requested_for: resolved.requested_for,
     requested_for_contact_id: resolved.requested_for_contact_id,
     office: body.office ?? "",
