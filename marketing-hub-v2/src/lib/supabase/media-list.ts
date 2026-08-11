@@ -322,7 +322,12 @@ export async function listMediaFromSupabase(options?: {
       }
       return true;
     })
-    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+    .sort((a, b) => {
+      const aCec = (a.division ?? "").toLowerCase() === "cec" ? 1 : 0;
+      const bCec = (b.division ?? "").toLowerCase() === "cec" ? 1 : 0;
+      if (aCec !== bCec) return aCec - bCec;
+      return a.display_name.localeCompare(b.display_name);
+    });
 
   return { items, tableName: mediaTable.name, scope };
 }
