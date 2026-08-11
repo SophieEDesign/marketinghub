@@ -1035,6 +1035,12 @@ export async function listStaffRequests() {
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
+export async function getStaffRequest(id: string) {
+  const store = await readStore();
+  const item = store.staff_requests.find((c) => c.id === id);
+  return item ? normalizeStaffRequest(item) : null;
+}
+
 export async function createStaffRequest(
   input: Omit<StaffRequest, "id" | "created_at" | "updated_at">
 ) {

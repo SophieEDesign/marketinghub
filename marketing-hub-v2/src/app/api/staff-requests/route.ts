@@ -3,6 +3,7 @@ import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import {
   createStaffRequest,
   deleteStaffRequest,
+  getStaffRequest,
   listStaffRequests,
   updateStaffRequest,
 } from "@/lib/data/repos";
@@ -14,7 +15,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { error, user } = await requireStaff();
   if (error) return error;
   const body = await request.json();
   const action = body.action as string | undefined;
@@ -26,6 +27,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "delete") {
+    const existing = await getStaffRequest(body.id);
+    if (!existing) return jsonError("Not found", 404);
+    const isAdmin = user.role === "admin";
+    const isOwner = existing.requested_by === user.full_name;
+    if (!isAdmin && !isOwner) {
+      return jsonError("You can only delete requests you have sent", 403);
+    }
     await deleteStaffRequest(body.id);
     return jsonOk({ ok: true });
   }
