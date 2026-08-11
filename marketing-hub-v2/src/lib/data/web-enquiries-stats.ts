@@ -221,7 +221,6 @@ export function getEnquiryAttribution(e: WebEnquiry): EnquiryAttribution {
   const adsGroupLabel = isGoogleAds
     ? utmCampaign.trim() ||
       (hsaCam ? `Campaign ${hsaCam}` : "") ||
-      enquiryReferrerKeyFromStrings(referrer, pageUrl) ||
       "Google Ads (no campaign)"
     : "";
 
