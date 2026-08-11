@@ -4,6 +4,7 @@ import { isAutoMemberEmail } from "@/lib/auth/member-domain";
 import {
   createAccessRequest,
   createHubUser,
+  deleteAccessRequest,
   findPendingAccessRequestByEmail,
   listAccessRequests,
   updateAccessRequest,
@@ -12,6 +13,12 @@ import {
   hasServiceRoleKey,
   inviteSupabaseHubUser,
 } from "@/lib/supabase/hub-users";
+
+function isAlreadyRegisteredError(message: string): boolean {
+  return /already\s+(been\s+)?registered|already\s+exists|user.*already/i.test(
+    message
+  );
+}
 
 async function inviteForRequest(input: {
   email: string;
@@ -48,7 +55,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string | undefined;
 
-  if (action === "approve" || action === "deny") {
+  if (action === "approve" || action === "deny" || action === "dismiss") {
     const { error, user } = await requireAdmin();
     if (error) return error;
 
@@ -64,15 +71,9 @@ export async function POST(request: NextRequest) {
 
     const decidedBy = user?.email ?? user?.full_name ?? "admin";
 
-    if (action === "deny") {
-      const updated = await updateAccessRequest(id, {
-        status: "denied",
-        decided_role: "external",
-        decided_at: new Date().toISOString(),
-        decided_by: decidedBy,
-        error_message: "",
-      });
-      return jsonOk({ item: updated });
+    if (action === "deny" || action === "dismiss") {
+      await deleteAccessRequest(id);
+      return jsonOk({ ok: true, removed: true });
     }
 
     try {
@@ -99,6 +100,20 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not send invite";
+      if (isAlreadyRegisteredError(message)) {
+        const updated = await updateAccessRequest(id, {
+          status: "approved",
+          decided_role: existing.requested_role === "member" ? "member" : "external",
+          decided_at: new Date().toISOString(),
+          decided_by: decidedBy,
+          error_message: "",
+        });
+        return jsonOk({
+          item: updated,
+          alreadyRegistered: true,
+          message: "This email is already registered — request cleared.",
+        });
+      }
       const updated = await updateAccessRequest(id, {
         status: "failed",
         error_message: message,
@@ -170,6 +185,24 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not send invite";
+      if (isAlreadyRegisteredError(message)) {
+        const resolved = await updateAccessRequest(item.id, {
+          status: "approved",
+          decided_role: "member",
+          decided_at: new Date().toISOString(),
+          decided_by: "auto:already-registered",
+          error_message: "",
+        });
+        return jsonOk(
+          {
+            item: resolved,
+            outcome: "already_registered",
+            message:
+              "This email is already registered — you can sign in with your existing account.",
+          },
+          { status: 200 }
+        );
+      }
       const failed = await updateAccessRequest(item.id, {
         status: "failed",
         error_message: message,

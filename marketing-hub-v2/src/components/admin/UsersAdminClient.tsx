@@ -378,24 +378,31 @@ export function UsersAdminClient({
 
   async function decideAccessRequest(
     id: string,
-    action: "approve" | "deny"
+    action: "approve" | "deny" | "dismiss"
   ) {
     setActingRequestId(id);
     setError(null);
-    const res = await fetch("/api/access-requests", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, id }),
-    });
-    const data = await res.json();
-    setActingRequestId(null);
-    if (!res.ok) {
-      setError(data.error ?? `Could not ${action} request`);
+    setNotice(null);
+    try {
+      const res = await fetch("/api/access-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? `Could not ${action} request`);
+        await refreshAccessRequests();
+        return;
+      }
+      if (data.message) setNotice(data.message);
       await refreshAccessRequests();
-      return;
+      if (action === "approve") await refresh();
+    } catch {
+      setError(`Could not ${action} request`);
+    } finally {
+      setActingRequestId(null);
     }
-    await refreshAccessRequests();
-    if (action === "approve") await refresh();
   }
 
   return (
@@ -478,22 +485,55 @@ export function UsersAdminClient({
                   ) : null}
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={actingRequestId === req.id}
-                    onClick={() => void decideAccessRequest(req.id, "approve")}
-                  >
-                    {actingRequestId === req.id ? "…" : "Accept"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    disabled={actingRequestId === req.id}
-                    onClick={() => void decideAccessRequest(req.id, "deny")}
-                  >
-                    Deny
-                  </button>
+                  {req.status === "failed" ? (
+                    <>
+                      {!/already\s+(been\s+)?registered|already\s+exists/i.test(
+                        req.error_message ?? ""
+                      ) ? (
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          disabled={actingRequestId === req.id}
+                          onClick={() =>
+                            void decideAccessRequest(req.id, "approve")
+                          }
+                        >
+                          {actingRequestId === req.id ? "…" : "Retry"}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={actingRequestId === req.id}
+                        onClick={() =>
+                          void decideAccessRequest(req.id, "dismiss")
+                        }
+                      >
+                        {actingRequestId === req.id ? "…" : "Dismiss"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={actingRequestId === req.id}
+                        onClick={() =>
+                          void decideAccessRequest(req.id, "approve")
+                        }
+                      >
+                        {actingRequestId === req.id ? "…" : "Accept"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={actingRequestId === req.id}
+                        onClick={() => void decideAccessRequest(req.id, "deny")}
+                      >
+                        Deny
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             ))}

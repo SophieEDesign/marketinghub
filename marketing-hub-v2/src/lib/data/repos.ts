@@ -1390,6 +1390,12 @@ export async function updateAccessRequest(
   return updated;
 }
 
+export async function deleteAccessRequest(id: string) {
+  await updateStore((s) => {
+    s.access_requests = (s.access_requests ?? []).filter((r) => r.id !== id);
+  });
+}
+
 export async function findPendingAccessRequestByEmail(email: string) {
   const normalized = email.trim().toLowerCase();
   const all = await listAccessRequests();
