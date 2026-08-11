@@ -10,6 +10,7 @@ import {
   Home,
   Inbox,
   Library,
+  MessageSquarePlus,
   Settings,
   Sparkles,
   Users,
@@ -109,6 +110,13 @@ export const STAFF_NAV: NavItem[] = [
     label: "Contacts",
     description: "Press, partners, and venues",
     icon: Contact,
+  },
+  {
+    href: "/app/feedback",
+    label: "Feedback",
+    description: "Report bugs, improvements, and ideas for the Hub",
+    icon: MessageSquarePlus,
+    member: true,
   },
   {
     href: "/app/admin",
