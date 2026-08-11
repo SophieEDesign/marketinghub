@@ -20,6 +20,7 @@ export type FeedbackItem = {
 type Props = {
   initial: FeedbackItem[];
   isAdmin: boolean;
+  currentUserId: string;
   currentUserName: string;
 };
 
@@ -45,7 +46,7 @@ const PRIORITY_BADGE = {
 
 const emptyForm = { type: "bug" as FeedbackItem["type"], title: "", description: "", priority: "medium" as FeedbackItem["priority"] };
 
-export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
+export function FeedbackClient({ initial, isAdmin, currentUserId, currentUserName }: Props) {
   const [items, setItems] = useState<FeedbackItem[]>(initial);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -113,6 +114,10 @@ export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
+  function canDeleteItem(item: FeedbackItem) {
+    return isAdmin || (currentUserId && item.submitted_by === currentUserId);
+  }
+
   const filtered = items.filter((i) => {
     if (filterType !== "all" && i.type !== filterType) return false;
     if (filterStatus !== "all" && i.status !== filterStatus) return false;
@@ -133,6 +138,9 @@ export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
           <h1 className="font-display text-2xl text-foreground">Feedback</h1>
           <p className="text-sm text-muted mt-1">
             Report bugs, suggest improvements, or share ideas for the Hub.
+          </p>
+          <p className="text-xs text-muted mt-2">
+            Your feedback is only visible to you and the marketing team.
           </p>
         </div>
         <button
@@ -172,6 +180,9 @@ export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
       {showForm && (
         <form onSubmit={submit} className="surface-card p-5 flex flex-col gap-4">
           <h2 className="font-semibold text-foreground">New feedback</h2>
+          <p className="text-xs text-muted -mt-2">
+            Only you and marketing can see what you submit here.
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
               <label className="label">Type</label>
@@ -261,7 +272,9 @@ export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
       <div className="flex flex-col gap-3">
         {filtered.length === 0 && (
           <div className="surface-card p-10 text-center text-muted text-sm">
-            No feedback matches your filters.
+            {isAdmin
+              ? "No feedback matches your filters."
+              : "You haven't submitted any feedback yet."}
           </div>
         )}
         {filtered.map((item) => {
@@ -339,15 +352,29 @@ export function FeedbackClient({ initial, isAdmin, currentUserName }: Props) {
                           <option value="high">High</option>
                         </select>
                       </div>
+                      {canDeleteItem(item) ? (
+                        <button
+                          onClick={() => deleteItem(item.id)}
+                          className="ml-auto btn-ghost text-red-500 hover:text-red-600 flex items-center gap-1 text-xs"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {!isAdmin && canDeleteItem(item) ? (
+                    <div className="flex justify-end">
                       <button
                         onClick={() => deleteItem(item.id)}
-                        className="ml-auto btn-ghost text-red-500 hover:text-red-600 flex items-center gap-1 text-xs"
+                        className="btn-ghost text-red-500 hover:text-red-600 flex items-center gap-1 text-xs"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
                       </button>
                     </div>
-                  )}
+                  ) : null}
 
                   {isAdmin && (
                     <div className="flex flex-col gap-1.5">
