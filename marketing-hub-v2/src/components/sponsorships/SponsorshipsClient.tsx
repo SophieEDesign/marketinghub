@@ -543,15 +543,17 @@ export function SponsorshipsClient({
               minHeight="70px"
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="label">Notes</label>
-            <RichTextEditor
-              value={form.notes}
-              onChange={(notes) => setForm({ ...form, notes })}
-              placeholder="Notes…"
-              minHeight="70px"
-            />
-          </div>
+          {isAdminView && (
+            <div className="md:col-span-2">
+              <label className="label">Notes</label>
+              <RichTextEditor
+                value={form.notes}
+                onChange={(notes) => setForm({ ...form, notes })}
+                placeholder="Notes…"
+                minHeight="70px"
+              />
+            </div>
+          )}
           <div className="flex gap-2">
             <button type="button" className="btn-primary" onClick={() => void create()}>
               Save
@@ -592,7 +594,7 @@ export function SponsorshipsClient({
                       <RichTextView html={item.deliverables} />
                     </div>
                   ) : null}
-                  {plainTextFromHtml(item.notes) ? (
+                  {isAdminView && plainTextFromHtml(item.notes) ? (
                     <RichTextView
                       html={item.notes}
                       plain
@@ -761,12 +763,14 @@ export function SponsorshipsClient({
                       <RichTextView html={selected.deliverables} />
                     </dd>
                   </div>
-                  <div>
-                    <dt className="label !mb-0.5">Notes</dt>
-                    <dd>
-                      <RichTextView html={selected.notes} />
-                    </dd>
-                  </div>
+                  {isAdminView && (
+                    <div>
+                      <dt className="label !mb-0.5">Notes</dt>
+                      <dd>
+                        <RichTextView html={selected.notes} />
+                      </dd>
+                    </div>
+                  )}
                   {selected.onedrive_url ? (
                     <div>
                       <dt className="label !mb-0.5">Docs</dt>
@@ -935,15 +939,17 @@ export function SponsorshipsClient({
                     minHeight="70px"
                   />
                 </div>
-                <div>
-                  <label className="label">Notes</label>
-                  <RichTextEditor
-                    value={edit.notes}
-                    onChange={(notes) => setEdit({ ...edit, notes })}
-                    placeholder="Notes…"
-                    minHeight="90px"
-                  />
-                </div>
+                {isAdminView && (
+                  <div>
+                    <label className="label">Notes</label>
+                    <RichTextEditor
+                      value={edit.notes}
+                      onChange={(notes) => setEdit({ ...edit, notes })}
+                      placeholder="Notes…"
+                      minHeight="90px"
+                    />
+                  </div>
+                )}
                 <RelatedTasksPanel
                   relatedType="sponsorship"
                   relatedId={editingId}
