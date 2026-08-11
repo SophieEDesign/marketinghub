@@ -7,6 +7,7 @@ export type ClothingLogo =
   | "Global Yacht Transport"
   | "Commercial"
   | "Forwarding"
+  | "CEC"
   | "Other";
 
 /** Legacy logo values stored on older orders — mapped to current labels on read. */
@@ -63,6 +64,11 @@ export const CLOTHING_LOGOS: {
     id: "Forwarding",
     label: "Forwarding",
     hint: "Division logo for freight forwarding.",
+  },
+  {
+    id: "CEC",
+    label: "CEC",
+    hint: "CE Couriers division logo.",
   },
   { id: "Other", label: "Other", hint: "Specify in notes if you need something else." },
 ];
