@@ -8,15 +8,23 @@ export const DIVISION_COLORS: Record<
   Commercial: { bg: "#b45309", border: "#92400e", text: "#ffffff" },
   Leisure: { bg: "#15803d", border: "#166534", text: "#ffffff" },
   Forwarding: { bg: "#6d28d9", border: "#5b21b6", text: "#ffffff" },
-  CMT: { bg: "#be185d", border: "#9d174d", text: "#ffffff" },
   CEC: { bg: "#0e7490", border: "#0c5a6e", text: "#ffffff" },
 };
 
 const FALLBACK = { bg: "#64748b", border: "#475569", text: "#ffffff" };
 
+/** Legacy stored values mapped to current division labels. */
+const LEGACY_DIVISION_ALIASES: Record<string, string> = {
+  cmt: "Commercial",
+  "commercial transport": "Commercial",
+  "commercial marine transport": "Commercial",
+};
+
 export function normalizeDivision(raw: string | null | undefined): string {
   const s = (raw ?? "").trim();
   if (!s) return "";
+  const alias = LEGACY_DIVISION_ALIASES[s.toLowerCase()];
+  if (alias) return alias;
   const known = Object.keys(DIVISION_COLORS).find(
     (k) => k.toLowerCase() === s.toLowerCase()
   );
@@ -35,6 +43,5 @@ export const DIVISION_OPTIONS = [
   "Commercial",
   "Leisure",
   "Forwarding",
-  "CMT",
   "CEC",
 ] as const;

@@ -36,7 +36,7 @@ export type MediaListItem = {
    */
   visibility: GalleryFolderVisibility;
   /**
-   * Business division (All, Racing, Commercial, Leisure, Forwarding, CMT).
+   * Business division (All, Racing, Commercial, Leisure, Forwarding, CEC).
    * "All" = company-wide / shared across departments.
    */
   division: string;
@@ -112,8 +112,9 @@ export function matchesMediaDivisionFilter(
 ): boolean {
   if (!filter || filter === "all") return true;
   const division = normalizeMediaDivision(itemDivision);
+  const normalizedFilter = normalizeDivision(filter) || filter;
   if (division === "All") return true;
-  return division === filter;
+  return division === normalizedFilter;
 }
 
 function parseFiles(raw: unknown): MediaFile[] {
