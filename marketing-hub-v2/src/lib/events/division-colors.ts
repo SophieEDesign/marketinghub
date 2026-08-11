@@ -9,6 +9,7 @@ export const DIVISION_COLORS: Record<
   Leisure: { bg: "#15803d", border: "#166534", text: "#ffffff" },
   Forwarding: { bg: "#6d28d9", border: "#5b21b6", text: "#ffffff" },
   CMT: { bg: "#be185d", border: "#9d174d", text: "#ffffff" },
+  CEC: { bg: "#0e7490", border: "#0c5a6e", text: "#ffffff" },
 };
 
 const FALLBACK = { bg: "#64748b", border: "#475569", text: "#ffffff" };
@@ -35,4 +36,5 @@ export const DIVISION_OPTIONS = [
   "Leisure",
   "Forwarding",
   "CMT",
+  "CEC",
 ] as const;

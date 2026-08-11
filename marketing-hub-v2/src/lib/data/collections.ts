@@ -344,6 +344,7 @@ export const DIVISIONS: FieldOption[] = [
   { value: "Leisure", label: "Leisure" },
   { value: "Forwarding", label: "Forwarding" },
   { value: "CMT", label: "CMT" },
+  { value: "CEC", label: "CEC" },
 ];
 
 const f = (
