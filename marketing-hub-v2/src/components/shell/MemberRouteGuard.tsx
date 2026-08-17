@@ -10,14 +10,17 @@ const ALWAYS_ALLOWED = ["/app/me"];
 
 /** Redirect restricted views away from routes they should not see. */
 export function MemberRouteGuard({ children }: { children: React.ReactNode }) {
-  const { view, ready } = useHubView();
+  const { view, ready, canAccessBudget } = useHubView();
   const pathname = usePathname();
   const router = useRouter();
 
   useEffect(() => {
     if (!ready || view === "admin") return;
     const allowed = Array.from(
-      new Set([...ALWAYS_ALLOWED, ...navForView(view).map((n) => n.href)])
+      new Set([
+        ...ALWAYS_ALLOWED,
+        ...navForView(view, { canAccessBudget }).map((n) => n.href),
+      ])
     );
     const ok = allowed.some((href) =>
       href === "/app"
@@ -27,7 +30,7 @@ export function MemberRouteGuard({ children }: { children: React.ReactNode }) {
     if (!ok) {
       router.replace(view === "external" ? "/app/library" : "/app");
     }
-  }, [ready, view, pathname, router]);
+  }, [ready, view, pathname, router, canAccessBudget]);
 
   return <>{children}</>;
 }

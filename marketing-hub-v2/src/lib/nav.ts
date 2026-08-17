@@ -15,6 +15,7 @@ import {
   Settings,
   Sparkles,
   Users,
+  Wallet,
 } from "lucide-react";
 
 export type HubViewMode = "admin" | "member" | "external";
@@ -28,6 +29,8 @@ export type NavItem = {
   member?: boolean;
   /** Shown in external (media guest) preview when true. */
   external?: boolean;
+  /** Only shown to Hub admins plus the Budget allowlist. */
+  budgetAccess?: boolean;
 };
 
 export const STAFF_NAV: NavItem[] = [
@@ -107,6 +110,13 @@ export const STAFF_NAV: NavItem[] = [
     icon: BarChart3,
   },
   {
+    href: "/app/budget",
+    label: "Budget",
+    description: "2026 marketing budget — admins, plus Simon, Tom, and Michael",
+    icon: Wallet,
+    budgetAccess: true,
+  },
+  {
     href: "/app/contacts",
     label: "Contacts",
     description: "People, press, and supplier companies",
@@ -133,8 +143,24 @@ export const STAFF_NAV: NavItem[] = [
   },
 ];
 
-export function navForView(view: HubViewMode): NavItem[] {
-  if (view === "admin") return STAFF_NAV;
-  if (view === "external") return STAFF_NAV.filter((item) => item.external);
-  return STAFF_NAV.filter((item) => item.member);
+export function navForView(
+  view: HubViewMode,
+  options?: { canAccessBudget?: boolean }
+): NavItem[] {
+  const includeBudget = Boolean(options?.canAccessBudget);
+
+  if (view === "external") {
+    return STAFF_NAV.filter((item) => item.external);
+  }
+
+  const items =
+    view === "admin"
+      ? STAFF_NAV
+      : STAFF_NAV.filter(
+          (item) => item.member || (includeBudget && item.budgetAccess)
+        );
+
+  return includeBudget
+    ? items
+    : items.filter((item) => !item.budgetAccess);
 }

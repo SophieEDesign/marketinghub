@@ -5,8 +5,10 @@ import { useHubView } from "@/lib/hub-view";
 import { navForView } from "@/lib/nav";
 
 export function HomeModules({ supabaseReady }: { supabaseReady: boolean }) {
-  const { view } = useHubView();
-  const modules = navForView(view).filter((n) => n.href !== "/app");
+  const { view, canAccessBudget } = useHubView();
+  const modules = navForView(view, { canAccessBudget }).filter(
+    (n) => n.href !== "/app"
+  );
 
   return (
     <>

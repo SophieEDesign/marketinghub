@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Menu, X } from "lucide-react";
+import { canAccessBudget as userCanAccessBudget } from "@/lib/auth/budget-access";
 import { navForView } from "@/lib/nav";
 import { HubViewProvider, useHubView } from "@/lib/hub-view";
 import { MemberRouteGuard } from "@/components/shell/MemberRouteGuard";
@@ -83,8 +84,8 @@ function ShellInner({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { view, setView } = useHubView();
-  const nav = navForView(view);
+  const { view, setView, canAccessBudget } = useHubView();
+  const nav = navForView(view, { canAccessBudget });
 
   const ensureAdminView = useCallback(() => {
     if (canToggleAdminView) setView("admin");
@@ -213,6 +214,10 @@ export function AppShell({
   accessRole?: "admin" | "staff" | "media_guest";
 }) {
   const canToggleAdminView = accessRole === "admin";
+  const canAccessBudget = userCanAccessBudget({
+    role: accessRole,
+    email: userEmail ?? "",
+  });
   const initialView: HubViewMode =
     accessRole === "admin" ? "admin" : "member";
 
@@ -220,6 +225,7 @@ export function AppShell({
     <HubViewProvider
       initialView={initialView}
       canToggleAdminView={canToggleAdminView}
+      canAccessBudget={canAccessBudget}
     >
       <ShellInner
         userName={userName}

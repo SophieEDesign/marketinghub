@@ -19,6 +19,7 @@ type HubViewContextValue = {
   setView: (view: HubViewMode) => void;
   ready: boolean;
   canToggleAdminView: boolean;
+  canAccessBudget: boolean;
 };
 
 const HubViewContext = createContext<HubViewContextValue | null>(null);
@@ -27,10 +28,12 @@ export function HubViewProvider({
   children,
   initialView = "member",
   canToggleAdminView = false,
+  canAccessBudget = false,
 }: {
   children: React.ReactNode;
   initialView?: HubViewMode;
   canToggleAdminView?: boolean;
+  canAccessBudget?: boolean;
 }) {
   const [view, setViewState] = useState<HubViewMode>(initialView);
   const [ready, setReady] = useState(false);
@@ -69,8 +72,8 @@ export function HubViewProvider({
   );
 
   const value = useMemo(
-    () => ({ view, setView, ready, canToggleAdminView }),
-    [view, setView, ready, canToggleAdminView]
+    () => ({ view, setView, ready, canToggleAdminView, canAccessBudget }),
+    [view, setView, ready, canToggleAdminView, canAccessBudget]
   );
 
   return (

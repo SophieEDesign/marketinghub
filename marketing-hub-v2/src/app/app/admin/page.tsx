@@ -1,4 +1,4 @@
-import { Database, Users } from "lucide-react";
+import { Database, Users, Wallet } from "lucide-react";
 import { ModuleCard, PageHeader } from "@/components/ui/PageHeader";
 
 export default function AdminPage() {
@@ -20,6 +20,12 @@ export default function AdminPage() {
           title="Data tables"
           description="Spreadsheet view of events, content, contacts, and other collections."
           icon={Database}
+        />
+        <ModuleCard
+          href="/app/budget"
+          title="Budget"
+          description="2026 marketing budget — admins, plus Simon, Tom, and Michael."
+          icon={Wallet}
         />
       </div>
     </div>
