@@ -1,6 +1,10 @@
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
-import { normalizeClothingLogo } from "@/lib/merch/north-sails";
+import {
+  clothingProductById,
+  normalizeClothingLogo,
+} from "@/lib/merch/north-sails";
+import { effectiveProductLabel } from "@/lib/merch/product-images";
 import type {
   AccessRequest,
   AwardEntry,
@@ -220,6 +224,13 @@ export async function listSponsorships() {
       changed = true;
       next = { ...next, kind: "sponsorship" as const };
     }
+    if (
+      next.membership_type !== "membership" &&
+      next.membership_type !== "directory_listing"
+    ) {
+      changed = true;
+      next = { ...next, membership_type: "membership" as const };
+    }
     if (next.created_by === undefined || next.created_by_user_id === undefined) {
       changed = true;
       next = {
@@ -257,9 +268,20 @@ export async function getSponsorship(id: string) {
   const store = await readStore();
   const item = store.sponsorships.find((c) => c.id === id);
   if (!item) return null;
-  return item.kind === "membership" || item.kind === "sponsorship"
-    ? item
-    : { ...item, kind: "sponsorship" as const };
+  if (item.kind !== "membership" && item.kind !== "sponsorship") {
+    return {
+      ...item,
+      kind: "sponsorship" as const,
+      membership_type: "membership" as const,
+    };
+  }
+  if (
+    item.membership_type !== "membership" &&
+    item.membership_type !== "directory_listing"
+  ) {
+    return { ...item, membership_type: "membership" as const };
+  }
+  return item;
 }
 
 export async function updateSponsorship(
@@ -939,26 +961,120 @@ export async function listMerchCatalogue() {
   return [...(store.merch_catalogue ?? [])];
 }
 
-export async function upsertMerchCatalogueImage(
+export type MerchCataloguePatch = {
+  image_url?: string;
+  label?: string;
+  brand?: string;
+  material?: string;
+  colours?: string[];
+  default_colour?: string;
+};
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function normalizeColourList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const colours = value
+    .map((c) => (typeof c === "string" ? c.trim() : ""))
+    .filter(Boolean);
+  return colours;
+}
+
+/** True when the row still carries any stored override / image. */
+function catalogueRowHasContent(row: MerchCatalogueImage): boolean {
+  return Boolean(
+    row.image_url?.trim() ||
+      row.label?.trim() ||
+      row.brand?.trim() ||
+      row.material?.trim() ||
+      (row.colours && row.colours.length > 0) ||
+      row.default_colour?.trim()
+  );
+}
+
+/**
+ * Upsert catalogue overrides for a clothing product.
+ * Renaming `label` also rewrites matching merch order / inventory item strings.
+ */
+export async function upsertMerchCatalogue(
   productId: string,
-  imageUrl: string
+  patch: MerchCataloguePatch
 ) {
   const id = productId.trim();
-  if (!id) return null;
+  const base = clothingProductById(id);
+  if (!id || !base) return null;
+
   let updated: MerchCatalogueImage | null = null;
   await updateStore((s) => {
     const list = s.merch_catalogue ?? [];
     const idx = list.findIndex((c) => c.product_id === id);
+    const prev = idx >= 0 ? list[idx] : undefined;
+    const oldLabel = effectiveProductLabel(id, list) ?? base.label;
+
     const next: MerchCatalogueImage = {
       product_id: id,
-      image_url: imageUrl.trim(),
+      image_url:
+        patch.image_url !== undefined
+          ? patch.image_url.trim()
+          : (prev?.image_url ?? ""),
       updated_at: nowIso(),
     };
-    if (!next.image_url) {
+
+    if (patch.label !== undefined) {
+      const label = normalizeOptionalText(patch.label);
+      if (label) next.label = label;
+    } else if (prev?.label?.trim()) {
+      next.label = prev.label.trim();
+    }
+
+    if (patch.brand !== undefined) {
+      const brand = normalizeOptionalText(patch.brand);
+      if (brand) next.brand = brand;
+    } else if (prev?.brand?.trim()) {
+      next.brand = prev.brand.trim();
+    }
+
+    if (patch.material !== undefined) {
+      const material = normalizeOptionalText(patch.material);
+      if (material) next.material = material;
+    } else if (prev?.material?.trim()) {
+      next.material = prev.material.trim();
+    }
+
+    if (patch.colours !== undefined) {
+      const colours = normalizeColourList(patch.colours);
+      if (colours && colours.length) next.colours = colours;
+    } else if (prev?.colours?.length) {
+      next.colours = [...prev.colours];
+    }
+
+    if (patch.default_colour !== undefined) {
+      const defaultColour = normalizeOptionalText(patch.default_colour);
+      if (defaultColour) next.default_colour = defaultColour;
+    } else if (prev?.default_colour?.trim()) {
+      next.default_colour = prev.default_colour.trim();
+    }
+
+    const newLabel = next.label?.trim() || base.label;
+    if (oldLabel !== newLabel) {
+      s.merch_orders = s.merch_orders.map((order) =>
+        order.item === oldLabel ? { ...order, item: newLabel, updated_at: nowIso() } : order
+      );
+      s.merch_inventory = s.merch_inventory.map((row) =>
+        row.item === oldLabel ? { ...row, item: newLabel, updated_at: nowIso() } : row
+      );
+    }
+
+    if (!catalogueRowHasContent(next)) {
       s.merch_catalogue = list.filter((c) => c.product_id !== id);
       updated = null;
       return;
     }
+
     if (idx === -1) {
       s.merch_catalogue = [...list, next];
     } else {
@@ -967,6 +1083,13 @@ export async function upsertMerchCatalogueImage(
     updated = next;
   });
   return updated;
+}
+
+export async function upsertMerchCatalogueImage(
+  productId: string,
+  imageUrl: string
+) {
+  return upsertMerchCatalogue(productId, { image_url: imageUrl });
 }
 
 export async function listMerchInventory() {

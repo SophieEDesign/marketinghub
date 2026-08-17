@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { notifyMarketingAlert } from "@/lib/email/send-marketing-alert";
 
 async function getFeedbackItem(supabase: ReturnType<typeof createServiceClient>, id: string) {
   const { data, error } = await supabase
@@ -81,5 +82,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const feedbackType =
+    typeof body.type === "string" && body.type.trim()
+      ? body.type.trim()
+      : undefined;
+  notifyMarketingAlert({ kind: "feedback", subtype: feedbackType });
   return NextResponse.json({ ok: true });
 }

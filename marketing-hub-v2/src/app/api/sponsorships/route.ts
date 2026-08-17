@@ -17,6 +17,10 @@ function partnerKindOf(kind: unknown): "membership" | "sponsorship" {
   return kind === "membership" ? "membership" : "sponsorship";
 }
 
+function membershipTypeOf(type: unknown): "membership" | "directory_listing" {
+  return type === "directory_listing" ? "directory_listing" : "membership";
+}
+
 /** Value / fee is internal (admin) only — redact for members. */
 function redactPartnerValue(item: Sponsorship): Sponsorship {
   return { ...item, value: "" };
@@ -60,6 +64,9 @@ export async function POST(request: NextRequest) {
     // Never allow clients to reassign ownership.
     delete patch.created_by_user_id;
     delete patch.created_by;
+    if (patch.membership_type !== undefined) {
+      patch.membership_type = membershipTypeOf(patch.membership_type);
+    }
     if (!admin) {
       patch.kind = "membership";
       // Preserve existing fee/value — members cannot read or change it.
@@ -94,6 +101,8 @@ export async function POST(request: NextRequest) {
 
   const item = await createSponsorship({
     kind,
+    membership_type:
+      kind === "membership" ? membershipTypeOf(body.membership_type) : "membership",
     partner: body.partner ?? (kind === "membership" ? "Organisation" : "Partner"),
     package_name: body.package_name ?? "",
     starts_at: body.starts_at ?? null,

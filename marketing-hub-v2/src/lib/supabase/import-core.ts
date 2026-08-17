@@ -719,6 +719,7 @@ function mapSponsorshipRows(
     return {
       id: `sb_${id}`,
       kind: "sponsorship",
+      membership_type: "membership",
       partner,
       package_name: packageName,
       starts_at:
@@ -987,6 +988,7 @@ function mapMembershipRows(
     out.push({
       id: `sb_mem_${id}`,
       kind: "membership",
+      membership_type: "membership",
       partner: partner || name || "Membership",
       package_name: name,
       starts_at: null,

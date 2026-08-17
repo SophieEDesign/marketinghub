@@ -185,24 +185,40 @@ export const CLOTHING_PRODUCTS: ClothingProduct[] = [
   },
 ];
 
-export function clothingProductByLabel(label: string): ClothingProduct | undefined {
-  return CLOTHING_PRODUCTS.find((p) => p.label === label);
+export function clothingProductByLabel(
+  label: string,
+  products: ClothingProduct[] = CLOTHING_PRODUCTS
+): ClothingProduct | undefined {
+  return products.find((p) => p.label === label);
 }
 
 export function clothingProductById(id: string): ClothingProduct | undefined {
   return CLOTHING_PRODUCTS.find((p) => p.id === id);
 }
 
-export function coloursForItem(itemLabel: string): string[] {
-  return clothingProductByLabel(itemLabel)?.colours ?? ["Navy", "White"];
+export function coloursForItem(
+  itemLabel: string,
+  products: ClothingProduct[] = CLOTHING_PRODUCTS
+): string[] {
+  return clothingProductByLabel(itemLabel, products)?.colours ?? ["Navy", "White"];
 }
 
-export function defaultColourForItem(itemLabel: string): string {
-  return clothingProductByLabel(itemLabel)?.defaultColour ?? "Navy";
+export function defaultColourForItem(
+  itemLabel: string,
+  products: ClothingProduct[] = CLOTHING_PRODUCTS
+): string {
+  return (
+    clothingProductByLabel(itemLabel, products)?.defaultColour ?? "Navy"
+  );
 }
 
-export function defaultBrandForItem(itemLabel: string): string {
-  return clothingProductByLabel(itemLabel)?.brand ?? "North Sails";
+export function defaultBrandForItem(
+  itemLabel: string,
+  products: ClothingProduct[] = CLOTHING_PRODUCTS
+): string {
+  return (
+    clothingProductByLabel(itemLabel, products)?.brand ?? "North Sails"
+  );
 }
 
 export function normalizeClothingLogo(value: unknown): ClothingLogo {

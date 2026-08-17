@@ -126,11 +126,18 @@ function fitLabel(fit: string) {
   return "";
 }
 
-function applyItemChange(form: EditForm, item: string): EditForm {
-  const colours = coloursForItem(item);
+function applyItemChange(
+  form: EditForm,
+  item: string,
+  products: ClothingProductCardItem[] = CLOTHING_PRODUCTS.map((p) => ({
+    ...p,
+    image_url: "",
+  }))
+): EditForm {
+  const colours = coloursForItem(item, products);
   const colour = colours.includes(form.colour)
     ? form.colour
-    : defaultColourForItem(item);
+    : defaultColourForItem(item, products);
   return { ...form, item, colour };
 }
 
@@ -324,8 +331,8 @@ function OrderFields({
   viewerContactId: string | null;
   productCards: ClothingProductCardItem[];
 }) {
-  const product = clothingProductByLabel(form.item);
-  const colours = coloursForItem(form.item);
+  const product = clothingProductByLabel(form.item, productCards);
+  const colours = coloursForItem(form.item, productCards);
   const fit = (form.fit || "male") as ClothingFit;
   const productUrl =
     fit === "female" ? product?.links?.female : product?.links?.male;
@@ -335,10 +342,13 @@ function OrderFields({
       <ClothingProductCards
         products={productCards}
         value={form.item}
-        onChange={(item) => onChange(applyItemChange(form, item))}
+        onChange={(item) => onChange(applyItemChange(form, item, productCards))}
       />
       <div className="md:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
-        Supplier: <span className="font-medium text-foreground">{CLOTHING_BRAND}</span>
+        Supplier:{" "}
+        <span className="font-medium text-foreground">
+          {product?.brand || CLOTHING_BRAND}
+        </span>
         {product?.material ? ` · ${product.material}` : ""}
         {product?.brand === "Henbury" ? " · shirt via Henbury / promotional store" : ""}
         {productUrl ? (
@@ -360,8 +370,10 @@ function OrderFields({
         <SearchSelect
           className="field"
           value={form.item}
-          onChange={(item) => onChange(applyItemChange(form, item))}
-          options={CLOTHING_PRODUCTS.map((p) => ({
+          onChange={(item) =>
+            onChange(applyItemChange(form, item, productCards))
+          }
+          options={productCards.map((p) => ({
             value: p.label,
             label: p.label,
           }))}
@@ -525,11 +537,11 @@ export function MerchClient({
 
   const itemTypes = useMemo(() => {
     const set = new Set([
-      ...CLOTHING_PRODUCTS.map((p) => p.label),
+      ...productCards.map((p) => p.label),
       ...orders.map((o) => o.item.trim()).filter(Boolean),
     ]);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [orders]);
+  }, [orders, productCards]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {

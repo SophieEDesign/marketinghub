@@ -27,7 +27,7 @@ export function PartnersHub({
     <div>
       <PageHeader
         title="Partners"
-        description="Sponsorships and industry memberships in one place — packages, renewals, and deliverables. Members can add memberships and edit ones they added."
+        description="Sponsorships, industry memberships, and directory listings in one place — packages, renewals, deliverables, and profile links."
       />
 
       <SegmentFilter

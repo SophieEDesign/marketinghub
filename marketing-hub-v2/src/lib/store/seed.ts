@@ -172,6 +172,7 @@ export function createSeedStore(): HubStore {
       {
         id: "spn_seed_1",
         kind: "sponsorship",
+        membership_type: "membership",
         partner: "Ocean Lifestyle Magazine",
         package_name: "Annual partner",
         starts_at: new Date().toISOString().slice(0, 10),
@@ -192,6 +193,7 @@ export function createSeedStore(): HubStore {
       {
         id: "spn_seed_mem_1",
         kind: "membership",
+        membership_type: "membership",
         partner: "British Marine",
         package_name: "Corporate membership",
         starts_at: new Date().toISOString().slice(0, 10),
@@ -212,6 +214,7 @@ export function createSeedStore(): HubStore {
       {
         id: "spn_seed_mem_2",
         kind: "membership",
+        membership_type: "membership",
         partner: "Logistics UK",
         package_name: "Membership",
         starts_at: new Date().toISOString().slice(0, 10),

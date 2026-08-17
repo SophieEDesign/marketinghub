@@ -116,10 +116,14 @@ export type SponsorshipStatus =
 
 /** Sponsorship packages or industry memberships — both live under Partners. */
 export type PartnerKind = "sponsorship" | "membership";
+/** A membership can be an association membership or a directory/profile listing. */
+export type MembershipType = "membership" | "directory_listing";
 
 export type Sponsorship = {
   id: string;
   kind: PartnerKind;
+  /** Only applies when kind is membership. */
+  membership_type: MembershipType;
   partner: string;
   package_name: string;
   starts_at: string | null;
@@ -296,10 +300,19 @@ export type MerchInventoryItem = {
   updated_at: string;
 };
 
-/** Catalogue preview image for a fixed clothing product (by product id). */
+/**
+ * Catalogue overrides for a fixed clothing product (by product id).
+ * Missing / empty override fields fall back to the built-in North Sails defaults.
+ */
 export type MerchCatalogueImage = {
   product_id: string;
   image_url: string;
+  /** Display name override (renames the item everywhere it is used). */
+  label?: string;
+  brand?: string;
+  material?: string;
+  colours?: string[];
+  default_colour?: string;
   updated_at: string;
 };
 

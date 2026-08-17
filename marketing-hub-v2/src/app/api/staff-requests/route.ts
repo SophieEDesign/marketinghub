@@ -7,6 +7,10 @@ import {
   listStaffRequests,
   updateStaffRequest,
 } from "@/lib/data/repos";
+import {
+  notifyMarketingAlert,
+  staffRequestAlertKind,
+} from "@/lib/email/send-marketing-alert";
 
 export async function GET() {
   const { error } = await requireStaff();
@@ -38,8 +42,9 @@ export async function POST(request: NextRequest) {
     return jsonOk({ ok: true });
   }
 
+  const kind = body.kind ?? "other";
   const item = await createStaffRequest({
-    kind: body.kind ?? "other",
+    kind,
     category: body.category ?? "",
     title: body.title ?? "Request",
     details: body.details ?? "",
@@ -48,5 +53,6 @@ export async function POST(request: NextRequest) {
     attachment_url: body.attachment_url ?? "",
     status: body.status ?? "open",
   });
+  notifyMarketingAlert({ kind: staffRequestAlertKind(kind) });
   return jsonOk({ item }, { status: 201 });
 }

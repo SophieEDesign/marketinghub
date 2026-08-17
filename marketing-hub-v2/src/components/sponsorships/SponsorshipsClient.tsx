@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PartnerKind, Sponsorship, SponsorshipStatus } from "@/lib/types";
+import type {
+  MembershipType,
+  PartnerKind,
+  Sponsorship,
+  SponsorshipStatus,
+} from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
@@ -33,6 +38,11 @@ const STATUS_COLOR: Record<SponsorshipStatus, string> = {
   declined: "#b91c1c",
 };
 
+const MEMBERSHIP_TYPES: { id: MembershipType; label: string }[] = [
+  { id: "membership", label: "Membership" },
+  { id: "directory_listing", label: "Directory listing" },
+];
+
 const VIEWS = [
   { id: "list", label: "List" },
   { id: "kanban", label: "Kanban" },
@@ -42,6 +52,7 @@ const VIEWS = [
 type ViewId = (typeof VIEWS)[number]["id"];
 
 const emptyForm = {
+  membership_type: "membership" as MembershipType,
   partner: "",
   package_name: "",
   starts_at: "",
@@ -58,6 +69,7 @@ type EditForm = typeof emptyForm;
 
 function toEditForm(item: Sponsorship): EditForm {
   return {
+    membership_type: item.membership_type,
     partner: item.partner,
     package_name: item.package_name,
     starts_at: item.starts_at ?? "",
@@ -77,6 +89,10 @@ function statusLabel(status: SponsorshipStatus) {
 
 function partnerKind(item: Sponsorship): PartnerKind {
   return item.kind === "membership" ? "membership" : "sponsorship";
+}
+
+function membershipTypeLabel(type: MembershipType) {
+  return MEMBERSHIP_TYPES.find((option) => option.id === type)?.label ?? type;
 }
 
 export function SponsorshipsClient({
@@ -105,6 +121,7 @@ export function SponsorshipsClient({
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("active");
+  const [membershipTypeFilter, setMembershipTypeFilter] = useState("all");
 
   const createKind: PartnerKind =
     kind === "membership" ? "membership" : "sponsorship";
@@ -184,14 +201,29 @@ export function SponsorshipsClient({
           plainTextFromHtml(item.notes),
           item.status,
           partnerKind(item),
+          item.membership_type,
         ])
       ) {
         return false;
       }
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (
+        kind === "membership" &&
+        membershipTypeFilter !== "all" &&
+        item.membership_type !== membershipTypeFilter
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [scoped, search, statusFilter, isAdminView]);
+  }, [
+    scoped,
+    search,
+    statusFilter,
+    membershipTypeFilter,
+    isAdminView,
+    kind,
+  ]);
 
   const dated = useMemo(
     () =>
@@ -239,6 +271,10 @@ export function SponsorshipsClient({
         ...rest,
         ...(isAdminView ? { value } : {}),
         kind: activeCreateKind,
+        membership_type:
+          activeCreateKind === "membership"
+            ? form.membership_type
+            : "membership",
         starts_at: form.starts_at || null,
         ends_at: form.ends_at || null,
       }),
@@ -364,7 +400,9 @@ export function SponsorshipsClient({
               if (!item.onedrive_url.startsWith("http")) e.preventDefault();
             }}
           >
-            Docs
+            {item.membership_type === "directory_listing"
+              ? "View profile"
+              : "Docs"}
           </a>
         ) : null}
       </div>
@@ -397,7 +435,7 @@ export function SponsorshipsClient({
           title={nounTitle}
           description={
             isMembership
-              ? "Industry associations and memberships — renewals, fees, and benefits."
+              ? "Industry memberships and directory listings — renewals, fees, benefits, and profile links."
               : "Sponsorship partners, packages, deliverables, and docs."
           }
           actions={addButton}
@@ -445,6 +483,23 @@ export function SponsorshipsClient({
               ...STATUSES.map((s) => ({ value: s.id, label: s.label })),
             ],
           },
+          ...(kind === "membership"
+            ? [
+                {
+                  id: "membership-type",
+                  label: "Membership type",
+                  value: membershipTypeFilter,
+                  onChange: setMembershipTypeFilter,
+                  options: [
+                    { value: "all", label: "All types" },
+                    ...MEMBERSHIP_TYPES.map((type) => ({
+                      value: type.id,
+                      label: type.label,
+                    })),
+                  ],
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -469,6 +524,25 @@ export function SponsorshipsClient({
               . Sponsorships are managed in Admin view.
             </div>
           ) : null}
+          {activeCreateKind === "membership" ? (
+            <div>
+              <label className="label">Membership type</label>
+              <SearchSelect
+                className="field"
+                value={form.membership_type}
+                onChange={(membership_type) =>
+                  setForm({
+                    ...form,
+                    membership_type: membership_type as MembershipType,
+                  })
+                }
+                options={MEMBERSHIP_TYPES.map((type) => ({
+                  value: type.id,
+                  label: type.label,
+                }))}
+              />
+            </div>
+          ) : null}
           {(
             [
               ["partner", nameLabel],
@@ -483,7 +557,13 @@ export function SponsorshipsClient({
                     ],
                   ] as const)
                 : []),
-              ["onedrive_url", "Docs / OneDrive URL"],
+              [
+                "onedrive_url",
+                activeCreateKind === "membership" &&
+                form.membership_type === "directory_listing"
+                  ? "Directory profile URL"
+                  : "Docs / OneDrive URL",
+              ],
             ] as const
           ).map(([key, label]) => (
             <div key={key}>
@@ -586,6 +666,9 @@ export function SponsorshipsClient({
                         {item.package_name || "No package"}
                         {isAdminView ? ` · ${item.value || "—"}` : ""} ·{" "}
                         {statusLabel(item.status)}
+                        {partnerKind(item) === "membership"
+                          ? ` · ${membershipTypeLabel(item.membership_type)}`
+                          : ""}
                       </p>
                     </div>
                   </div>
@@ -648,6 +731,9 @@ export function SponsorshipsClient({
                             {item.package_name || "No package"}
                             {isAdminView && item.value
                               ? ` · ${item.value}`
+                              : ""}
+                            {partnerKind(item) === "membership"
+                              ? ` · ${membershipTypeLabel(item.membership_type)}`
                               : ""}
                           </p>
                           <CardActions item={item} />
@@ -723,6 +809,11 @@ export function SponsorshipsClient({
                         ? "Membership"
                         : "Sponsorship"}
                     </span>
+                    {partnerKind(selected) === "membership" ? (
+                      <span className="rounded-full bg-sand px-2.5 py-0.5 text-[11px] font-medium text-muted">
+                        {membershipTypeLabel(selected.membership_type)}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
@@ -856,6 +947,25 @@ export function SponsorshipsClient({
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid gap-2">
+                {editingItem?.kind === "membership" ? (
+                  <div>
+                    <label className="label">Membership type</label>
+                    <SearchSelect
+                      className="field"
+                      value={edit.membership_type}
+                      onChange={(membership_type) =>
+                        setEdit({
+                          ...edit,
+                          membership_type: membership_type as MembershipType,
+                        })
+                      }
+                      options={MEMBERSHIP_TYPES.map((type) => ({
+                        value: type.id,
+                        label: type.label,
+                      }))}
+                    />
+                  </div>
+                ) : null}
                 {(
                   [
                     ["partner", nameLabel],
@@ -868,7 +978,12 @@ export function SponsorshipsClient({
                           ],
                         ] as const)
                       : []),
-                    ["onedrive_url", "Docs / OneDrive URL"],
+                    [
+                      "onedrive_url",
+                      editingItem?.membership_type === "directory_listing"
+                        ? "Directory profile URL"
+                        : "Docs / OneDrive URL",
+                    ],
                   ] as const
                 ).map(([key, label]) => (
                   <div key={key}>

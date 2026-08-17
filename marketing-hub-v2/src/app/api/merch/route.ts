@@ -13,6 +13,7 @@ import {
   isMerchAdmin,
   ownsMerchOrder,
 } from "@/lib/merch/access";
+import { notifyMarketingAlert } from "@/lib/email/send-marketing-alert";
 import { normalizeClothingLogo } from "@/lib/merch/north-sails";
 import { resolveMerchRequestedFor } from "@/lib/merch/requested-for";
 
@@ -151,5 +152,6 @@ export async function POST(request: NextRequest) {
         ? resolved.allocated_user_id
         : user.id,
   });
+  notifyMarketingAlert({ kind: "clothing" });
   return jsonOk({ item }, { status: 201 });
 }

@@ -94,6 +94,10 @@ function migrateSponsorships(
       item.kind === "membership" || item.kind === "sponsorship"
         ? item.kind
         : ("sponsorship" as const),
+    membership_type:
+      item.membership_type === "directory_listing"
+        ? "directory_listing"
+        : ("membership" as const),
     created_by: item.created_by ?? "",
     created_by_user_id: item.created_by_user_id ?? null,
   }));

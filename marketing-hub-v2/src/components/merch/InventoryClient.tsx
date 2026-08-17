@@ -57,15 +57,19 @@ function fitLabel(fit: string) {
   return "—";
 }
 
-function applyItemChange(form: EditForm, item: string): EditForm {
-  const colours = coloursForItem(item);
+function applyItemChange(
+  form: EditForm,
+  item: string,
+  products: ClothingProductCardItem[]
+): EditForm {
+  const colours = coloursForItem(item, products);
   const colour = colours.includes(form.colour)
     ? form.colour
-    : defaultColourForItem(item);
+    : defaultColourForItem(item, products);
   return {
     ...form,
     item,
-    brand: defaultBrandForItem(item),
+    brand: defaultBrandForItem(item, products),
     colour,
   };
 }
@@ -73,11 +77,13 @@ function applyItemChange(form: EditForm, item: string): EditForm {
 function InventoryFields({
   form,
   onChange,
+  products,
 }: {
   form: EditForm;
   onChange: (next: EditForm) => void;
+  products: ClothingProductCardItem[];
 }) {
-  const colours = coloursForItem(form.item);
+  const colours = coloursForItem(form.item, products);
 
   return (
     <>
@@ -86,8 +92,8 @@ function InventoryFields({
         <SearchSelect
           className="field"
           value={form.item}
-          onChange={(item) => onChange(applyItemChange(form, item))}
-          options={CLOTHING_PRODUCTS.map((p) => ({
+          onChange={(item) => onChange(applyItemChange(form, item, products))}
+          options={products.map((p) => ({
             value: p.label,
             label: p.label,
           }))}
@@ -166,6 +172,159 @@ function InventoryFields({
   );
 }
 
+function CatalogueProductEditor({
+  product,
+  catalogueUrl,
+  onSaved,
+}: {
+  product: ClothingProductCardItem;
+  catalogueUrl: string;
+  onSaved: (
+    products: ClothingProductCardItem[],
+    catalogueById: Record<string, string>
+  ) => void;
+}) {
+  const [label, setLabel] = useState(product.label);
+  const [brand, setBrand] = useState(product.brand);
+  const [material, setMaterial] = useState(product.material ?? "");
+  const [coloursText, setColoursText] = useState(product.colours.join(", "));
+  const [imageUrl, setImageUrl] = useState(catalogueUrl);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLabel(product.label);
+    setBrand(product.brand);
+    setMaterial(product.material ?? "");
+    setColoursText(product.colours.join(", "));
+    setImageUrl(catalogueUrl);
+    setError("");
+  }, [product.id, product.label, product.brand, product.material, product.colours, catalogueUrl]);
+
+  async function save(nextImageUrl?: string) {
+    const name = label.trim();
+    if (!name) {
+      setError("Item name is required");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const colours = coloursText
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      const res = await fetch("/api/merch/catalogue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: product.id,
+          image_url: nextImageUrl ?? imageUrl,
+          label: name,
+          brand: brand.trim(),
+          material: material.trim(),
+          colours,
+          default_colour: colours[0] || product.defaultColour,
+        }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        products?: ClothingProductCardItem[];
+        catalogue?: { product_id: string; image_url: string }[];
+      };
+      if (!res.ok) {
+        setError(data.error || "Could not save");
+        return;
+      }
+      if (nextImageUrl !== undefined) setImageUrl(nextImageUrl);
+      const map: Record<string, string> = {};
+      for (const row of data.catalogue ?? []) {
+        if (row.product_id && row.image_url) map[row.product_id] = row.image_url;
+      }
+      if (data.products) onSaved(data.products, map);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const preview = imageUrl || product.image_url;
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-3">
+      <div className="mb-3 flex items-center gap-3">
+        <ClothingThumb src={preview} label={label || product.label} />
+        <div className="min-w-0 text-xs text-muted">
+          Built-in id: <span className="font-mono">{product.id}</span>
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <div>
+          <label className="label">Item name</label>
+          <input
+            className="field"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Display name"
+          />
+        </div>
+        <div>
+          <label className="label">Brand</label>
+          <input
+            className="field"
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="label">Material</label>
+          <input
+            className="field"
+            value={material}
+            onChange={(e) => setMaterial(e.target.value)}
+            placeholder="Optional"
+          />
+        </div>
+        <div>
+          <label className="label">Colours</label>
+          <input
+            className="field"
+            value={coloursText}
+            onChange={(e) => setColoursText(e.target.value)}
+            placeholder="Navy, White"
+          />
+          <p className="mt-1 text-[11px] text-muted">
+            Comma-separated. Used on order and stock forms.
+          </p>
+        </div>
+        <AssetUploadField
+          value={imageUrl}
+          onChange={(next) => {
+            setImageUrl(next);
+            void save(next);
+          }}
+          label="Preview image"
+          hint={
+            saving
+              ? "Saving…"
+              : "Shown on order form · max 25MB."
+          }
+        />
+        {error ? (
+          <p className="text-xs text-[var(--danger)]">{error}</p>
+        ) : null}
+        <button
+          type="button"
+          className="btn-secondary w-full text-xs"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : "Save item details"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CataloguePhotosPanel({
   products,
   catalogueByProductId,
@@ -175,69 +334,22 @@ function CataloguePhotosPanel({
   catalogueByProductId: Record<string, string>;
   onSaved: (products: ClothingProductCardItem[], catalogueById: Record<string, string>) => void;
 }) {
-  const [savingId, setSavingId] = useState<string | null>(null);
-
-  async function saveImage(productId: string, image_url: string) {
-    setSavingId(productId);
-    try {
-      const res = await fetch("/api/merch/catalogue", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId, image_url }),
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        products?: ClothingProductCardItem[];
-        catalogue?: { product_id: string; image_url: string }[];
-      };
-      const map: Record<string, string> = {};
-      for (const row of data.catalogue ?? []) {
-        if (row.product_id && row.image_url) map[row.product_id] = row.image_url;
-      }
-      if (data.products) onSaved(data.products, map);
-    } finally {
-      setSavingId(null);
-    }
-  }
-
   return (
     <div className="surface-card mb-6 p-5">
-      <h3 className="font-display text-lg text-brand">Catalogue photos</h3>
+      <h3 className="font-display text-lg text-brand">Clothing catalogue</h3>
       <p className="mt-0.5 text-xs text-muted">
-        Attach a preview for each orderable item. These show as thumbnails on
-        new clothing orders (inventory photos are used as fallback).
+        Rename items and edit brand, colours, and preview photos. Renames update
+        matching orders and stock lines.
       </p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {products.map((product) => {
-          const catalogueUrl = catalogueByProductId[product.id] ?? "";
-          const preview = catalogueUrl || product.image_url;
-          return (
-            <div
-              key={product.id}
-              className="rounded-xl border border-border bg-white p-3"
-            >
-              <div className="mb-2 flex items-center gap-3">
-                <ClothingThumb src={preview} label={product.label} />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {product.label}
-                  </div>
-                  <div className="text-xs text-muted">{product.brand}</div>
-                </div>
-              </div>
-              <AssetUploadField
-                value={catalogueUrl}
-                onChange={(image_url) => void saveImage(product.id, image_url)}
-                label="Preview image"
-                hint={
-                  savingId === product.id
-                    ? "Saving…"
-                    : "Shown on order form · max 25MB."
-                }
-              />
-            </div>
-          );
-        })}
+        {products.map((product) => (
+          <CatalogueProductEditor
+            key={product.id}
+            product={product}
+            catalogueUrl={catalogueByProductId[product.id] ?? ""}
+            onSaved={onSaved}
+          />
+        ))}
       </div>
     </div>
   );
@@ -296,18 +408,18 @@ export function InventoryClient({
 
   function rowPreviewUrl(row: MerchInventoryItem) {
     if (row.image_url?.trim()) return row.image_url.trim();
-    const product = clothingProductByLabel(row.item);
+    const product = clothingProductByLabel(row.item, catalogueProducts);
     if (product) return catalogueByProductId[product.id] ?? "";
     return "";
   }
 
   const itemTypes = useMemo(() => {
     const set = new Set([
-      ...CLOTHING_PRODUCTS.map((p) => p.label),
+      ...catalogueProducts.map((p) => p.label),
       ...items.map((o) => o.item.trim()).filter(Boolean),
     ]);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+  }, [items, catalogueProducts]);
 
   const filtered = useMemo(() => {
     return items.filter((o) => {
@@ -483,7 +595,11 @@ export function InventoryClient({
 
       {showForm ? (
         <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
-          <InventoryFields form={form} onChange={setForm} />
+          <InventoryFields
+            form={form}
+            onChange={setForm}
+            products={catalogueProducts}
+          />
           <div className="flex gap-2 md:col-span-2">
             <button
               type="button"
@@ -615,7 +731,11 @@ export function InventoryClient({
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid gap-2">
-                <InventoryFields form={edit} onChange={setEdit} />
+                <InventoryFields
+                  form={edit}
+                  onChange={setEdit}
+                  products={catalogueProducts}
+                />
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
