@@ -27,7 +27,7 @@ const DEFAULT_ITEM = CLOTHING_PRODUCTS[0]!.label;
 
 const emptyForm = {
   item: DEFAULT_ITEM,
-  brand: defaultBrandForItem(DEFAULT_ITEM),
+  brand: defaultBrandForItem(DEFAULT_ITEM) as string,
   fit: "male" as ClothingFit | "",
   size: "M",
   colour: defaultColourForItem(DEFAULT_ITEM),
@@ -185,7 +185,7 @@ function CatalogueProductEditor({
   ) => void;
 }) {
   const [label, setLabel] = useState(product.label);
-  const [brand, setBrand] = useState(product.brand);
+  const [brand, setBrand] = useState<string>(product.brand);
   const [material, setMaterial] = useState(product.material ?? "");
   const [coloursText, setColoursText] = useState(product.colours.join(", "));
   const [imageUrl, setImageUrl] = useState(catalogueUrl);
