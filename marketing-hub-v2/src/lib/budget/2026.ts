@@ -1,3 +1,9 @@
+import type {
+  BudgetLine,
+  BudgetMeta,
+  BudgetQuarter,
+} from "@/lib/types";
+
 export type BudgetAmount = number | null;
 
 export type BudgetChild = {
@@ -6,7 +12,7 @@ export type BudgetChild = {
   note?: string;
 };
 
-export type BudgetLine = {
+export type DraftBudgetLine = {
   id: string;
   name: string;
   code: string;
@@ -25,7 +31,7 @@ export type BudgetNote = {
   body: string;
 };
 
-export type BudgetQuarterLine = {
+type DraftQuarterLine = {
   name: string;
   code: string;
   section?: boolean;
@@ -33,10 +39,10 @@ export type BudgetQuarterLine = {
   total?: BudgetAmount;
 };
 
-export type BudgetQuarter = {
+type DraftQuarter = {
   id: "Q1" | "Q2" | "Q3" | "Q4";
   title: string;
-  lines: BudgetQuarterLine[];
+  lines: DraftQuarterLine[];
 };
 
 export type MarketingBudget = {
@@ -51,8 +57,8 @@ export type MarketingBudget = {
   grandTotal: number;
   priorYearTotal: number;
   variance: number;
-  committed: BudgetLine[];
-  uncommitted: BudgetLine[];
+  committed: DraftBudgetLine[];
+  uncommitted: DraftBudgetLine[];
   notes: BudgetNote[];
   extraEvents: {
     name: string;
@@ -61,10 +67,10 @@ export type MarketingBudget = {
     people: string;
     cap: string;
   }[];
-  quarters: BudgetQuarter[];
+  quarters: DraftQuarter[];
 };
 
-const QUARTER_TEMPLATE: BudgetQuarterLine[] = [
+const QUARTER_TEMPLATE: DraftQuarterLine[] = [
   { name: "Committed", code: "", section: true },
   { name: "ARC World Cruising", code: "MS1" },
   { name: "Antigua Sailing Week", code: "MS2" },
@@ -105,10 +111,10 @@ const QUARTER_TEMPLATE: BudgetQuarterLine[] = [
 ];
 
 function quarter(
-  id: BudgetQuarter["id"],
-  inserts: Record<string, BudgetQuarterLine[]> = {}
-): BudgetQuarter {
-  const lines: BudgetQuarterLine[] = [];
+  id: DraftQuarter["id"],
+  inserts: Record<string, DraftQuarterLine[]> = {}
+): DraftQuarter {
+  const lines: DraftQuarterLine[] = [];
   for (const line of QUARTER_TEMPLATE) {
     lines.push(line);
     const extra = inserts[line.name];
@@ -508,3 +514,55 @@ export const BUDGET_2026: MarketingBudget = {
     quarter("Q4"),
   ],
 };
+
+function toStoredLine(
+  line: DraftBudgetLine,
+  group: BudgetLine["group"],
+  sortOrder: number,
+  now: string
+): BudgetLine {
+  return {
+    id: `bln_${line.id}`,
+    name: line.name,
+    code: line.code,
+    group,
+    planned: line.total,
+    marketing: line.marketing,
+    sponsorship: line.sponsorship,
+    travel: line.travel,
+    prior_year: line.priorYear,
+    notes: line.notes,
+    sort_order: sortOrder,
+    children: (line.children ?? []).map((child) => ({
+      name: child.name,
+      amount: child.amount,
+      note: child.note,
+    })),
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+export function createDefaultBudgetLines(): BudgetLine[] {
+  const now = new Date().toISOString();
+  return [
+    ...BUDGET_2026.committed.map((line, index) =>
+      toStoredLine(line, "committed", index, now)
+    ),
+    ...BUDGET_2026.uncommitted.map((line, index) =>
+      toStoredLine(line, "uncommitted", 100 + index, now)
+    ),
+  ];
+}
+
+export function createDefaultBudgetMeta(): BudgetMeta {
+  return {
+    year: BUDGET_2026.year,
+    title: BUDGET_2026.title,
+    source: BUDGET_2026.source,
+    currency: BUDGET_2026.currency,
+    notes: BUDGET_2026.notes,
+    extra_events: BUDGET_2026.extraEvents,
+    quarters: BUDGET_2026.quarters as BudgetQuarter[],
+  };
+}

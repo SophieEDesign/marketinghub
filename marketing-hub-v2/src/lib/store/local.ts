@@ -8,6 +8,10 @@ import type {
   MerchOrder,
   StaffRequest,
 } from "@/lib/types";
+import {
+  createDefaultBudgetLines,
+  createDefaultBudgetMeta,
+} from "@/lib/budget/2026";
 import { createSeedStore } from "@/lib/store/seed";
 import { getDataDir } from "@/lib/store/paths";
 import {
@@ -183,6 +187,9 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     access_requests: store.access_requests ?? seed.access_requests,
     page_notes: store.page_notes ?? seed.page_notes ?? {},
     field_extras: store.field_extras ?? seed.field_extras ?? {},
+    budget_lines: store.budget_lines ?? createDefaultBudgetLines(),
+    budget_payments: store.budget_payments ?? [],
+    budget_meta: store.budget_meta ?? createDefaultBudgetMeta(),
   };
   return syncThemeIdsOntoContent(base);
 }
@@ -237,7 +244,10 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.hub_users ||
     !store.access_requests ||
     !store.page_notes ||
-    store.field_extras === undefined
+    store.field_extras === undefined ||
+    !store.budget_lines ||
+    !store.budget_payments ||
+    !store.budget_meta
   );
 }
 

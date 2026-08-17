@@ -1,4 +1,8 @@
 ﻿import type { HubStore } from "@/lib/types";
+import {
+  createDefaultBudgetLines,
+  createDefaultBudgetMeta,
+} from "@/lib/budget/2026";
 import { createMerchInventorySeed } from "@/lib/merch/inventory-seed";
 
 const now = new Date().toISOString();
@@ -1203,6 +1207,9 @@ export function createSeedStore(): HubStore {
     access_requests: [],
     page_notes: {},
     field_extras: {},
+    budget_lines: createDefaultBudgetLines(),
+    budget_payments: [],
+    budget_meta: createDefaultBudgetMeta(),
   };
 }
 

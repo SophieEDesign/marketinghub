@@ -9,6 +9,9 @@ export type CollectionKey = Exclude<
   | "event_attendance"
   | "page_notes"
   | "merch_catalogue"
+  | "budget_lines"
+  | "budget_payments"
+  | "budget_meta"
 >;
 
 export type FieldType =

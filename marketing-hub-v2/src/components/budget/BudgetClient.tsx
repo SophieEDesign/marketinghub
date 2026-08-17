@@ -1,39 +1,40 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Lock } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+  Lock,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { computeBudgetTotals } from "@/lib/budget/totals";
 import type {
-  BudgetAmount,
+  BudgetGroup,
   BudgetLine,
-  MarketingBudget,
-} from "@/lib/budget/2026";
+  BudgetMeta,
+  BudgetPayment,
+  BudgetPaymentStatus,
+} from "@/lib/types";
+import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { cn } from "@/lib/utils";
 
-function gbp(value: BudgetAmount) {
+function gbp(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "GBP",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 2,
   }).format(value);
-}
-
-function varianceLabel(value: BudgetAmount) {
-  if (value == null) return "—";
-  if (value === 0) return "In line";
-  if (value > 0) return `${gbp(value)} less`;
-  return `${gbp(Math.abs(value))} more`;
-}
-
-function varianceClass(value: BudgetAmount) {
-  if (value == null || value === 0) return "text-muted";
-  if (value > 0) return "text-emerald-700";
-  return "text-amber-800";
 }
 
 const TABS = [
   { id: "overview", label: "Overview" },
+  { id: "payments", label: "Payments" },
   { id: "breakdowns", label: "Breakdowns" },
   { id: "notes", label: "Notes" },
   { id: "quarters", label: "Quarters" },
@@ -41,214 +42,361 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
+const STATUS_OPTIONS: { value: BudgetPaymentStatus; label: string }[] = [
+  { value: "paid", label: "Paid" },
+  { value: "pending", label: "Pending" },
+  { value: "committed", label: "Committed" },
+];
+
+function statusLabel(status: BudgetPaymentStatus) {
+  return STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
+}
+
+function statusClass(status: BudgetPaymentStatus) {
+  if (status === "paid") return "bg-emerald-50 text-emerald-800";
+  if (status === "committed") return "bg-sky-50 text-sky-800";
+  return "bg-amber-50 text-amber-900";
+}
+
+function groupLabel(group: BudgetGroup) {
+  return group === "committed" ? "Committed" : "Uncommitted";
+}
+
 function SummaryCard({
   label,
   value,
   hint,
+  tone,
 }: {
   label: string;
   value: string;
   hint?: string;
+  tone?: "warn" | "ok" | "muted";
 }) {
   return (
     <div className="surface-card p-4">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
         {label}
       </p>
-      <p className="mt-1 font-display text-2xl text-brand">{value}</p>
+      <p
+        className={cn(
+          "mt-1 font-display text-2xl",
+          tone === "warn"
+            ? "text-amber-800"
+            : tone === "ok"
+              ? "text-emerald-800"
+              : "text-brand"
+        )}
+      >
+        {value}
+      </p>
       {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
     </div>
   );
 }
 
-function BudgetTable({
-  title,
-  lines,
-  total,
-  priorYearTotal,
-}: {
-  title: string;
-  lines: BudgetLine[];
-  total: number;
-  priorYearTotal?: number;
-}) {
-  const [openIds, setOpenIds] = useState<string[]>([]);
-
+function SpendBar({ planned, used }: { planned: number; used: number }) {
+  const over = planned > 0 ? used > planned : used > 0;
+  const pct =
+    planned > 0 ? Math.min(100, (used / planned) * 100) : used > 0 ? 100 : 0;
   return (
-    <div className="surface-card overflow-hidden">
-      <div className="border-b border-border bg-accent-soft/40 px-5 py-3">
-        <h2 className="font-display text-xl text-brand">{title}</h2>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-sand/50 text-left text-[11px] uppercase tracking-wide text-muted">
-            <tr>
-              <th className="px-5 py-2.5 font-medium">Line</th>
-              <th className="px-3 py-2.5 font-medium">Code</th>
-              <th className="px-3 py-2.5 text-right font-medium">Marketing</th>
-              <th className="px-3 py-2.5 text-right font-medium">
-                Sponsorship
-              </th>
-              <th className="px-3 py-2.5 text-right font-medium">T&amp;E</th>
-              <th className="px-3 py-2.5 text-right font-medium">Total</th>
-              <th className="px-3 py-2.5 text-right font-medium">2025</th>
-              <th className="px-5 py-2.5 text-right font-medium">vs 2025</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {lines.map((line) => {
-              const expandable = Boolean(line.children?.length);
-              const open = openIds.includes(line.id);
-              return (
-                <tr key={line.id} className="align-top">
-                  <td className="px-5 py-3">
-                    <button
-                      type="button"
-                      className={cn(
-                        "flex items-start gap-2 text-left",
-                        expandable
-                          ? "hover:text-brand"
-                          : "cursor-default"
-                      )}
-                      onClick={() => {
-                        if (!expandable) return;
-                        setOpenIds((ids) =>
-                          ids.includes(line.id)
-                            ? ids.filter((id) => id !== line.id)
-                            : [...ids, line.id]
-                        );
-                      }}
-                      disabled={!expandable}
-                    >
-                      {expandable ? (
-                        open ? (
-                          <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />
-                        ) : (
-                          <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />
-                        )
-                      ) : (
-                        <span className="mt-0.5 w-4 shrink-0" />
-                      )}
-                      <span>
-                        <span className="font-medium">{line.name}</span>
-                        {line.notes ? (
-                          <span className="mt-1 block text-xs text-muted">
-                            {line.notes}
-                          </span>
-                        ) : null}
-                        {open && line.children ? (
-                          <ul className="mt-2 space-y-1 text-xs text-muted">
-                            {line.children.map((child) => (
-                              <li
-                                key={child.name}
-                                className="flex justify-between gap-4"
-                              >
-                                <span>
-                                  {child.name}
-                                  {child.note ? ` — ${child.note}` : ""}
-                                </span>
-                                <span className="shrink-0 tabular-nums">
-                                  {gbp(child.amount)}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </span>
-                    </button>
-                  </td>
-                  <td className="px-3 py-3 text-muted">{line.code || "—"}</td>
-                  <td className="px-3 py-3 text-right tabular-nums">
-                    {gbp(line.marketing)}
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums">
-                    {gbp(line.sponsorship)}
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums">
-                    {gbp(line.travel)}
-                  </td>
-                  <td className="px-3 py-3 text-right font-medium tabular-nums">
-                    {gbp(line.total)}
-                  </td>
-                  <td className="px-3 py-3 text-right tabular-nums text-muted">
-                    {gbp(line.priorYear)}
-                  </td>
-                  <td
-                    className={cn(
-                      "px-5 py-3 text-right tabular-nums",
-                      varianceClass(line.variance)
-                    )}
-                  >
-                    {varianceLabel(line.variance)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot>
-            <tr className="bg-sand/60 font-medium">
-              <td className="px-5 py-3" colSpan={5}>
-                {title} total
-              </td>
-              <td className="px-3 py-3 text-right tabular-nums">
-                {gbp(total)}
-              </td>
-              <td className="px-3 py-3 text-right tabular-nums text-muted">
-                {priorYearTotal != null ? gbp(priorYearTotal) : "—"}
-              </td>
-              <td className="px-5 py-3" />
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+    <div className="h-2 overflow-hidden rounded-full bg-sand">
+      <div
+        className={cn(
+          "h-full rounded-full",
+          over ? "bg-amber-600" : "bg-brand"
+        )}
+        style={{ width: `${pct}%` }}
+      />
     </div>
   );
 }
 
-export function BudgetClient({ data }: { data: MarketingBudget }) {
+type LineForm = {
+  name: string;
+  code: string;
+  group: BudgetGroup;
+  planned: string;
+  notes: string;
+};
+
+const emptyLineForm: LineForm = {
+  name: "",
+  code: "",
+  group: "uncommitted",
+  planned: "",
+  notes: "",
+};
+
+type PaymentForm = {
+  budget_line_id: string;
+  paid_at: string;
+  supplier: string;
+  description: string;
+  amount: string;
+  status: BudgetPaymentStatus;
+  invoice_url: string;
+};
+
+const emptyPaymentForm: PaymentForm = {
+  budget_line_id: "",
+  paid_at: "",
+  supplier: "",
+  description: "",
+  amount: "",
+  status: "paid",
+  invoice_url: "",
+};
+
+function toLineForm(line: BudgetLine): LineForm {
+  return {
+    name: line.name,
+    code: line.code,
+    group: line.group,
+    planned: String(line.planned),
+    notes: line.notes,
+  };
+}
+
+function toPaymentForm(payment: BudgetPayment): PaymentForm {
+  return {
+    budget_line_id: payment.budget_line_id,
+    paid_at: payment.paid_at ?? "",
+    supplier: payment.supplier,
+    description: payment.description,
+    amount: String(payment.amount),
+    status: payment.status,
+    invoice_url: payment.invoice_url,
+  };
+}
+
+export function BudgetClient({
+  lines: initialLines,
+  payments: initialPayments,
+  meta,
+}: {
+  lines: BudgetLine[];
+  payments: BudgetPayment[];
+  meta: BudgetMeta;
+}) {
+  const [lines, setLines] = useState(initialLines);
+  const [payments, setPayments] = useState(initialPayments);
   const [tab, setTab] = useState<TabId>("overview");
-  const [quarterId, setQuarterId] = useState<(typeof data.quarters)[number]["id"]>(
+  const [search, setSearch] = useState("");
+  const [groupFilter, setGroupFilter] = useState<"all" | BudgetGroup>("all");
+  const [paymentStatus, setPaymentStatus] = useState<"all" | BudgetPaymentStatus>(
+    "all"
+  );
+  const [paymentLine, setPaymentLine] = useState("all");
+  const [openLineId, setOpenLineId] = useState<string | null>(null);
+  const [showLineForm, setShowLineForm] = useState(false);
+  const [lineForm, setLineForm] = useState(emptyLineForm);
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentForm, setPaymentForm] = useState(emptyPaymentForm);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [quarterId, setQuarterId] = useState<BudgetMeta["quarters"][number]["id"]>(
     "Q1"
   );
 
-  const extraSpend = Math.abs(Math.min(data.variance, 0));
-  const quarter = useMemo(
-    () => data.quarters.find((item) => item.id === quarterId) ?? data.quarters[0],
-    [data.quarters, quarterId]
+  const totals = useMemo(
+    () => computeBudgetTotals(lines, payments),
+    [lines, payments]
   );
+
+  const lineOptions = useMemo(
+    () =>
+      lines.map((line) => ({
+        value: line.id,
+        label: line.code ? `${line.name} (${line.code})` : line.name,
+      })),
+    [lines]
+  );
+
+  const applySnapshot = useCallback(
+    (data: { lines?: BudgetLine[]; payments?: BudgetPayment[] }) => {
+      if (data.lines) setLines(data.lines);
+      if (data.payments) setPayments(data.payments);
+    },
+    []
+  );
+
+  const refresh = useCallback(async () => {
+    const res = await fetch("/api/budget");
+    if (!res.ok) return;
+    const data = await res.json();
+    applySnapshot(data);
+  }, [applySnapshot]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function post(body: Record<string, unknown>) {
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/budget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Could not save");
+        return false;
+      }
+      applySnapshot(data);
+      return true;
+    } catch {
+      setError("Could not save");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const filteredLines = useMemo(() => {
+    return lines.filter((line) => {
+      if (groupFilter !== "all" && line.group !== groupFilter) return false;
+      return matchesSearch(search, [line.name, line.code, line.notes]);
+    });
+  }, [lines, groupFilter, search]);
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+      if (paymentStatus !== "all" && payment.status !== paymentStatus) {
+        return false;
+      }
+      if (paymentLine !== "all" && payment.budget_line_id !== paymentLine) {
+        return false;
+      }
+      const line = lines.find((item) => item.id === payment.budget_line_id);
+      return matchesSearch(search, [
+        payment.supplier,
+        payment.description,
+        line?.name ?? "",
+        line?.code ?? "",
+      ]);
+    });
+  }, [payments, paymentStatus, paymentLine, search, lines]);
+
+  const quarter =
+    meta.quarters.find((item) => item.id === quarterId) ?? meta.quarters[0];
+
+  async function saveLine() {
+    const payload = {
+      name: lineForm.name,
+      code: lineForm.code,
+      group: lineForm.group,
+      planned: Number(lineForm.planned),
+      notes: lineForm.notes,
+    };
+    const ok = editingLineId
+      ? await post({ action: "update_line", id: editingLineId, patch: payload })
+      : await post({ action: "create_line", ...payload });
+    if (!ok) return;
+    setShowLineForm(false);
+    setEditingLineId(null);
+    setLineForm(emptyLineForm);
+  }
+
+  async function savePayment() {
+    const payload = {
+      budget_line_id: paymentForm.budget_line_id,
+      paid_at: paymentForm.paid_at || null,
+      supplier: paymentForm.supplier,
+      description: paymentForm.description,
+      amount: Number(paymentForm.amount),
+      status: paymentForm.status,
+      invoice_url: paymentForm.invoice_url,
+    };
+    const ok = editingPaymentId
+      ? await post({
+          action: "update_payment",
+          id: editingPaymentId,
+          patch: payload,
+        })
+      : await post({ action: "create_payment", ...payload });
+    if (!ok) return;
+    setShowPaymentForm(false);
+    setEditingPaymentId(null);
+    setPaymentForm(emptyPaymentForm);
+  }
 
   return (
     <div>
       <PageHeader
-        title={data.title}
-        description={`Draft figures from ${data.source}. Amounts are GBP.`}
+        title={meta.title}
+        description={`${meta.source} · amounts in ${meta.currency}. Add payments to track spend against each line.`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setTab("overview");
+                setEditingLineId(null);
+                setLineForm(emptyLineForm);
+                setShowLineForm(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add line
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                setTab("payments");
+                setEditingPaymentId(null);
+                setPaymentForm(emptyPaymentForm);
+                setShowPaymentForm(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Add payment
+            </button>
+          </div>
+        }
       />
 
       <p className="mb-6 inline-flex items-center gap-2 rounded-xl border border-border bg-sand/70 px-3 py-2 text-xs text-muted">
         <Lock className="h-3.5 w-3.5" />
-        Restricted to Hub admins, plus Simon, Tom, and Michael.
+        Restricted to Hub admins, plus Simon, Tom, and Michael. All of you can
+        edit budgets and log spend.
       </p>
 
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {error ? (
+        <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryCard label="Total budget" value={gbp(totals.planned)} />
         <SummaryCard
-          label="2026 total"
-          value={gbp(data.grandTotal)}
-          hint={`${gbp(extraSpend)} more than 2025`}
+          label="Paid"
+          value={gbp(totals.paid)}
+          hint="Recorded as paid"
         />
         <SummaryCard
-          label="Committed"
-          value={gbp(data.committedTotal)}
-          hint="Contracts and ongoing providers"
+          label="Committed / pending"
+          value={gbp(totals.pending)}
+          hint="Not paid yet"
         />
         <SummaryCard
-          label="Uncommitted"
-          value={gbp(data.uncommittedTotal)}
-          hint="Shows, travel, merch, and reserve"
+          label="Remaining"
+          value={gbp(totals.remaining)}
+          tone={totals.remaining < 0 ? "warn" : "ok"}
         />
         <SummaryCard
-          label="2025 total"
-          value={gbp(data.priorYearTotal)}
-          hint={varianceLabel(data.variance)}
+          label="Over budget"
+          value={String(totals.overBudgetCount)}
+          hint="Lines past planned spend"
+          tone={totals.overBudgetCount > 0 ? "warn" : "muted"}
         />
       </div>
 
@@ -272,39 +420,593 @@ export function BudgetClient({ data }: { data: MarketingBudget }) {
 
       {tab === "overview" ? (
         <div className="space-y-6">
-          <BudgetTable
-            title="Committed"
-            lines={data.committed}
-            total={data.committedTotal}
-            priorYearTotal={data.committedPriorYearTotal}
-          />
-          <BudgetTable
-            title="Uncommitted"
-            lines={data.uncommitted}
-            total={data.uncommittedTotal}
-            priorYearTotal={data.uncommittedPriorYearTotal}
-          />
+          <div className="grid gap-4 md:grid-cols-2">
+            {(
+              [
+                ["committed", "Committed"],
+                ["uncommitted", "Uncommitted"],
+              ] as const
+            ).map(([key, label]) => {
+              const group = totals.byGroup[key];
+              const used = group.paid + group.pending;
+              return (
+                <div key={key} className="surface-card p-5">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-display text-lg text-brand">{label}</h2>
+                      <p className="text-xs text-muted">
+                        {gbp(used)} of {gbp(group.planned)} used
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-medium tabular-nums",
+                        group.remaining < 0 ? "text-amber-800" : "text-muted"
+                      )}
+                    >
+                      {gbp(group.remaining)} left
+                    </span>
+                  </div>
+                  <SpendBar planned={group.planned} used={used} />
+                </div>
+              );
+            })}
+          </div>
+
+          {showLineForm ? (
+            <div className="surface-card p-5">
+              <h2 className="mb-4 font-display text-lg text-brand">
+                {editingLineId ? "Edit budget line" : "Add budget line"}
+              </h2>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-sm">
+                  <span className="label">Name</span>
+                  <input
+                    className="field mt-1 w-full"
+                    value={lineForm.name}
+                    onChange={(e) =>
+                      setLineForm((form) => ({ ...form, name: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Code</span>
+                  <input
+                    className="field mt-1 w-full"
+                    value={lineForm.code}
+                    onChange={(e) =>
+                      setLineForm((form) => ({ ...form, code: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Group</span>
+                  <select
+                    className="field mt-1 w-full"
+                    value={lineForm.group}
+                    onChange={(e) =>
+                      setLineForm((form) => ({
+                        ...form,
+                        group: e.target.value as BudgetGroup,
+                      }))
+                    }
+                  >
+                    <option value="committed">Committed</option>
+                    <option value="uncommitted">Uncommitted</option>
+                  </select>
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Planned £</span>
+                  <input
+                    className="field mt-1 w-full"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={lineForm.planned}
+                    onChange={(e) =>
+                      setLineForm((form) => ({
+                        ...form,
+                        planned: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="label">Notes</span>
+                  <textarea
+                    className="field mt-1 w-full"
+                    rows={2}
+                    value={lineForm.notes}
+                    onChange={(e) =>
+                      setLineForm((form) => ({ ...form, notes: e.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={saving}
+                  onClick={() => void saveLine()}
+                >
+                  Save line
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowLineForm(false);
+                    setEditingLineId(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="surface-card overflow-hidden">
+            <div className="border-b border-border px-5 py-3">
+              <FilterBar
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search lines…"
+                resultCount={filteredLines.length}
+                totalCount={lines.length}
+                selects={[
+                  {
+                    id: "group",
+                    label: "Group",
+                    value: groupFilter,
+                    onChange: (value) =>
+                      setGroupFilter(value as "all" | BudgetGroup),
+                    options: [
+                      { value: "all", label: "All" },
+                      { value: "committed", label: "Committed" },
+                      { value: "uncommitted", label: "Uncommitted" },
+                    ],
+                  },
+                ]}
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-sand/50 text-left text-[11px] uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Line</th>
+                    <th className="px-3 py-2.5 text-right font-medium">Planned</th>
+                    <th className="px-3 py-2.5 text-right font-medium">Paid</th>
+                    <th className="px-3 py-2.5 text-right font-medium">
+                      Pending
+                    </th>
+                    <th className="px-3 py-2.5 text-right font-medium">
+                      Remaining
+                    </th>
+                    <th className="px-5 py-2.5 font-medium" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filteredLines.map((line) => {
+                    const spend = totals.byLine[line.id];
+                    const open = openLineId === line.id;
+                    const linePayments = payments.filter(
+                      (payment) => payment.budget_line_id === line.id
+                    );
+                    return (
+                      <Fragment key={line.id}>
+                        <tr className="align-top">
+                          <td className="px-5 py-3">
+                            <button
+                              type="button"
+                              className="flex min-w-0 items-start gap-2 text-left"
+                              onClick={() =>
+                                setOpenLineId(open ? null : line.id)
+                              }
+                            >
+                              {open ? (
+                                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />
+                              ) : (
+                                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />
+                              )}
+                              <span className="min-w-0">
+                                <span className="font-medium">{line.name}</span>
+                                <span className="ml-2 text-xs text-muted">
+                                  {line.code || groupLabel(line.group)}
+                                </span>
+                                <span className="mt-2 block max-w-xs">
+                                  <SpendBar
+                                    planned={spend?.planned ?? line.planned}
+                                    used={spend?.used ?? 0}
+                                  />
+                                </span>
+                              </span>
+                            </button>
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {gbp(line.planned)}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {gbp(spend?.paid ?? 0)}
+                          </td>
+                          <td className="px-3 py-3 text-right tabular-nums">
+                            {gbp(spend?.pending ?? 0)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-3 py-3 text-right font-medium tabular-nums",
+                              (spend?.remaining ?? 0) < 0
+                                ? "text-amber-800"
+                                : ""
+                            )}
+                          >
+                            {gbp(spend?.remaining ?? line.planned)}
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex justify-end gap-1">
+                              <button
+                                type="button"
+                                className="btn-ghost px-2 py-1"
+                                aria-label="Edit line"
+                                onClick={() => {
+                                  setEditingLineId(line.id);
+                                  setLineForm(toLineForm(line));
+                                  setShowLineForm(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-ghost px-2 py-1 text-danger"
+                                aria-label="Delete line"
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Delete ${line.name} and its payments?`
+                                    )
+                                  ) {
+                                    return;
+                                  }
+                                  void post({
+                                    action: "delete_line",
+                                    id: line.id,
+                                  });
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {open ? (
+                          <tr>
+                            <td className="bg-sand/30 px-5 pb-4 pt-0" colSpan={6}>
+                              <div className="ml-6 rounded-xl border border-border bg-white p-3">
+                                {linePayments.length === 0 ? (
+                                  <p className="text-xs text-muted">
+                                    No payments yet.
+                                  </p>
+                                ) : (
+                                  <ul className="space-y-2 text-xs">
+                                    {linePayments.map((payment) => (
+                                      <li
+                                        key={payment.id}
+                                        className="flex flex-wrap items-center justify-between gap-2"
+                                      >
+                                        <span>
+                                          {payment.paid_at || "No date"} ·{" "}
+                                          {payment.supplier || "No supplier"} ·{" "}
+                                          {payment.description || "Payment"}
+                                        </span>
+                                        <span className="tabular-nums">
+                                          {gbp(payment.amount)} ·{" "}
+                                          {statusLabel(payment.status)}
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                <button
+                                  type="button"
+                                  className="btn-secondary mt-3 text-xs"
+                                  onClick={() => {
+                                    setTab("payments");
+                                    setPaymentForm({
+                                      ...emptyPaymentForm,
+                                      budget_line_id: line.id,
+                                    });
+                                    setShowPaymentForm(true);
+                                  }}
+                                >
+                                  Add payment
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {tab === "payments" ? (
+        <div className="space-y-6">
+          {showPaymentForm ? (
+            <div className="surface-card p-5">
+              <h2 className="mb-4 font-display text-lg text-brand">
+                {editingPaymentId ? "Edit payment" : "Add payment"}
+              </h2>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-sm md:col-span-2">
+                  <span className="label">Budget line</span>
+                  <SearchSelect
+                    className="mt-1"
+                    value={paymentForm.budget_line_id}
+                    onChange={(value) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        budget_line_id: value,
+                      }))
+                    }
+                    options={lineOptions}
+                    placeholder="Choose a line"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Date</span>
+                  <input
+                    className="field mt-1 w-full"
+                    type="date"
+                    value={paymentForm.paid_at}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        paid_at: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Amount £</span>
+                  <input
+                    className="field mt-1 w-full"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={paymentForm.amount}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        amount: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Supplier</span>
+                  <input
+                    className="field mt-1 w-full"
+                    value={paymentForm.supplier}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        supplier: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="label">Status</span>
+                  <select
+                    className="field mt-1 w-full"
+                    value={paymentForm.status}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        status: e.target.value as BudgetPaymentStatus,
+                      }))
+                    }
+                  >
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="label">Description</span>
+                  <input
+                    className="field mt-1 w-full"
+                    value={paymentForm.description}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        description: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm md:col-span-2">
+                  <span className="label">Invoice / receipt URL</span>
+                  <input
+                    className="field mt-1 w-full"
+                    type="url"
+                    placeholder="https://"
+                    value={paymentForm.invoice_url}
+                    onChange={(e) =>
+                      setPaymentForm((form) => ({
+                        ...form,
+                        invoice_url: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={saving}
+                  onClick={() => void savePayment()}
+                >
+                  Save payment
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setShowPaymentForm(false);
+                    setEditingPaymentId(null);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="surface-card overflow-hidden">
+            <div className="border-b border-border px-5 py-3">
+              <FilterBar
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search supplier, description, line…"
+                resultCount={filteredPayments.length}
+                totalCount={payments.length}
+                selects={[
+                  {
+                    id: "status",
+                    label: "Status",
+                    value: paymentStatus,
+                    onChange: (value) =>
+                      setPaymentStatus(value as "all" | BudgetPaymentStatus),
+                    options: [
+                      { value: "all", label: "All" },
+                      ...STATUS_OPTIONS,
+                    ],
+                  },
+                  {
+                    id: "line",
+                    label: "Line",
+                    value: paymentLine,
+                    onChange: setPaymentLine,
+                    options: [
+                      { value: "all", label: "All lines" },
+                      ...lineOptions,
+                    ],
+                  },
+                ]}
+              />
+            </div>
+            {filteredPayments.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-muted">
+                No payments yet. Add one to start tracking spend against the
+                2026 budget.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {filteredPayments.map((payment) => {
+                  const line = lines.find(
+                    (item) => item.id === payment.budget_line_id
+                  );
+                  return (
+                    <li
+                      key={payment.id}
+                      className="flex flex-wrap items-start justify-between gap-3 px-5 py-4"
+                    >
+                      <div>
+                        <p className="font-medium">
+                          {payment.supplier || "Payment"}
+                          <span
+                            className={cn(
+                              "ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                              statusClass(payment.status)
+                            )}
+                          >
+                            {statusLabel(payment.status)}
+                          </span>
+                        </p>
+                        <p className="mt-1 text-sm text-muted">
+                          {line?.name ?? "Unknown line"}
+                          {payment.paid_at ? ` · ${payment.paid_at}` : ""}
+                          {payment.description
+                            ? ` · ${payment.description}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium tabular-nums">
+                          {gbp(payment.amount)}
+                        </span>
+                        {payment.invoice_url ? (
+                          <a
+                            href={payment.invoice_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn-ghost px-2 py-1"
+                            aria-label="Open invoice"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="btn-ghost px-2 py-1"
+                          aria-label="Edit payment"
+                          onClick={() => {
+                            setEditingPaymentId(payment.id);
+                            setPaymentForm(toPaymentForm(payment));
+                            setShowPaymentForm(true);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost px-2 py-1 text-danger"
+                          aria-label="Delete payment"
+                          onClick={() => {
+                            if (!window.confirm("Delete this payment?")) return;
+                            void post({
+                              action: "delete_payment",
+                              id: payment.id,
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       ) : null}
 
       {tab === "breakdowns" ? (
         <div className="grid gap-4 lg:grid-cols-2">
-          {data.uncommitted
-            .concat(data.committed.filter((line) => line.children?.length))
-            .filter((line) => line.children?.length)
+          {lines
+            .filter((line) => line.children.length > 0)
             .map((line) => (
               <div key={line.id} className="surface-card overflow-hidden">
                 <div className="border-b border-border bg-accent-soft/40 px-5 py-3">
-                  <h2 className="font-display text-lg text-brand">
-                    {line.name}
-                  </h2>
+                  <h2 className="font-display text-lg text-brand">{line.name}</h2>
                   <p className="text-xs text-muted">
                     {line.code ? `${line.code} · ` : ""}
-                    {gbp(line.total)}
+                    {gbp(line.planned)} planned
                   </p>
                 </div>
                 <ul className="divide-y divide-border">
-                  {line.children?.map((child) => (
+                  {line.children.map((child) => (
                     <li
                       key={child.name}
                       className="flex items-start justify-between gap-4 px-5 py-3 text-sm"
@@ -331,7 +1033,7 @@ export function BudgetClient({ data }: { data: MarketingBudget }) {
       {tab === "notes" ? (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            {data.notes.map((note) => (
+            {meta.notes.map((note) => (
               <div key={note.title} className="surface-card p-5">
                 <h2 className="font-display text-lg text-brand">{note.title}</h2>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -347,7 +1049,7 @@ export function BudgetClient({ data }: { data: MarketingBudget }) {
               </h2>
             </div>
             <ul className="divide-y divide-border">
-              {data.extraEvents.map((event) => (
+              {meta.extra_events.map((event) => (
                 <li key={event.name} className="px-5 py-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="font-medium">{event.name}</h3>
@@ -370,11 +1072,11 @@ export function BudgetClient({ data }: { data: MarketingBudget }) {
       {tab === "quarters" ? (
         <div className="space-y-4">
           <p className="text-sm text-muted">
-            Quarterly sheets in the draft are mostly still empty, except the
-            £6,000 event reserve in each quarter.
+            Quarterly sheets in the original draft are mostly still empty,
+            except the £6,000 event reserve in each quarter.
           </p>
           <div className="inline-flex rounded-xl border border-border bg-sand/60 p-1">
-            {data.quarters.map((item) => (
+            {meta.quarters.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -390,42 +1092,44 @@ export function BudgetClient({ data }: { data: MarketingBudget }) {
               </button>
             ))}
           </div>
-          <div className="surface-card overflow-hidden">
-            <div className="border-b border-border bg-accent-soft/40 px-5 py-3">
-              <h2 className="font-display text-lg text-brand">
-                {quarter.title}
-              </h2>
-            </div>
-            <ul className="divide-y divide-border">
-              {quarter.lines.map((line, index) =>
-                line.section ? (
-                  <li
-                    key={`${line.name}-${index}`}
-                    className="bg-sand/50 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"
-                  >
-                    {line.name}
-                  </li>
-                ) : (
-                  <li
-                    key={`${line.name}-${index}`}
-                    className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm"
-                  >
-                    <span>
+          {quarter ? (
+            <div className="surface-card overflow-hidden">
+              <div className="border-b border-border bg-accent-soft/40 px-5 py-3">
+                <h2 className="font-display text-lg text-brand">
+                  {quarter.title}
+                </h2>
+              </div>
+              <ul className="divide-y divide-border">
+                {quarter.lines.map((line, index) =>
+                  line.section ? (
+                    <li
+                      key={`${line.name}-${index}`}
+                      className="bg-sand/50 px-5 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"
+                    >
                       {line.name}
-                      {line.code ? (
-                        <span className="ml-2 text-xs text-muted">
-                          {line.code}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="tabular-nums text-muted">
-                      {line.total != null ? gbp(line.total) : "—"}
-                    </span>
-                  </li>
-                )
-              )}
-            </ul>
-          </div>
+                    </li>
+                  ) : (
+                    <li
+                      key={`${line.name}-${index}`}
+                      className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm"
+                    >
+                      <span>
+                        {line.name}
+                        {line.code ? (
+                          <span className="ml-2 text-xs text-muted">
+                            {line.code}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="tabular-nums text-muted">
+                        {line.total != null ? gbp(line.total) : "—"}
+                      </span>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

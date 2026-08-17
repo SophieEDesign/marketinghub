@@ -9,6 +9,8 @@ import type {
   AccessRequest,
   Advertisement,
   AwardEntry,
+  BudgetLine,
+  BudgetPayment,
   Contact,
   ContentItem,
   ContentStatus,
@@ -1635,4 +1637,148 @@ export async function findPendingAccessRequestByEmail(email: string) {
   return (
     all.find((r) => r.email === normalized && r.status === "pending") ?? null
   );
+}
+
+function sortBudgetLines(lines: BudgetLine[]) {
+  return [...lines].sort((a, b) => {
+    if (a.group !== b.group) {
+      return a.group === "committed" ? -1 : 1;
+    }
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+export async function listBudgetLines() {
+  const store = await readStore();
+  return sortBudgetLines(store.budget_lines ?? []);
+}
+
+export async function getBudgetMeta() {
+  const store = await readStore();
+  return store.budget_meta;
+}
+
+export async function createBudgetLine(
+  input: Omit<BudgetLine, "id" | "created_at" | "updated_at">
+) {
+  const item: BudgetLine = {
+    ...input,
+    id: uid("bln"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    if (!s.budget_lines) s.budget_lines = [];
+    s.budget_lines.push(item);
+  });
+  return item;
+}
+
+export async function updateBudgetLine(
+  id: string,
+  patch: Partial<
+    Pick<
+      BudgetLine,
+      | "name"
+      | "code"
+      | "group"
+      | "planned"
+      | "marketing"
+      | "sponsorship"
+      | "travel"
+      | "prior_year"
+      | "notes"
+      | "sort_order"
+      | "children"
+    >
+  >
+) {
+  let updated: BudgetLine | null = null;
+  await updateStore((s) => {
+    if (!s.budget_lines) s.budget_lines = [];
+    const idx = s.budget_lines.findIndex((line) => line.id === id);
+    if (idx === -1) return;
+    s.budget_lines[idx] = {
+      ...s.budget_lines[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.budget_lines[idx];
+  });
+  return updated;
+}
+
+export async function deleteBudgetLine(id: string) {
+  await updateStore((s) => {
+    s.budget_lines = (s.budget_lines ?? []).filter((line) => line.id !== id);
+    s.budget_payments = (s.budget_payments ?? []).filter(
+      (payment) => payment.budget_line_id !== id
+    );
+  });
+}
+
+export async function listBudgetPayments() {
+  const store = await readStore();
+  return [...(store.budget_payments ?? [])].sort((a, b) => {
+    const aDate = a.paid_at ?? a.created_at;
+    const bDate = b.paid_at ?? b.created_at;
+    return bDate.localeCompare(aDate);
+  });
+}
+
+export async function createBudgetPayment(
+  input: Omit<BudgetPayment, "id" | "created_at" | "updated_at">
+) {
+  const item: BudgetPayment = {
+    ...input,
+    id: uid("pay"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    if (!s.budget_payments) s.budget_payments = [];
+    s.budget_payments.push(item);
+  });
+  return item;
+}
+
+export async function updateBudgetPayment(
+  id: string,
+  patch: Partial<
+    Pick<
+      BudgetPayment,
+      | "budget_line_id"
+      | "paid_at"
+      | "supplier"
+      | "description"
+      | "amount"
+      | "status"
+      | "invoice_url"
+    >
+  >
+) {
+  let updated: BudgetPayment | null = null;
+  await updateStore((s) => {
+    if (!s.budget_payments) s.budget_payments = [];
+    const idx = s.budget_payments.findIndex((payment) => payment.id === id);
+    if (idx === -1) return;
+    s.budget_payments[idx] = {
+      ...s.budget_payments[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.budget_payments[idx];
+  });
+  return updated;
+}
+
+export async function deleteBudgetPayment(id: string) {
+  await updateStore((s) => {
+    s.budget_payments = (s.budget_payments ?? []).filter(
+      (payment) => payment.id !== id
+    );
+  });
 }

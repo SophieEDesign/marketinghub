@@ -484,6 +484,85 @@ export type HubPageNotes = {
   social_monthly_plan?: string;
 };
 
+export type BudgetGroup = "committed" | "uncommitted";
+
+export type BudgetLineChild = {
+  name: string;
+  amount: number | null;
+  note?: string;
+};
+
+export type BudgetLine = {
+  id: string;
+  name: string;
+  code: string;
+  group: BudgetGroup;
+  planned: number;
+  marketing: number | null;
+  sponsorship: number | null;
+  travel: number | null;
+  prior_year: number | null;
+  notes: string;
+  sort_order: number;
+  children: BudgetLineChild[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetPaymentStatus = "paid" | "pending" | "committed";
+
+export type BudgetPayment = {
+  id: string;
+  budget_line_id: string;
+  paid_at: string | null;
+  supplier: string;
+  description: string;
+  amount: number;
+  status: BudgetPaymentStatus;
+  invoice_url: string;
+  created_by: string;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BudgetNote = {
+  title: string;
+  body: string;
+};
+
+export type BudgetExtraEvent = {
+  name: string;
+  when: string;
+  detail: string;
+  people: string;
+  cap: string;
+};
+
+export type BudgetQuarterLine = {
+  name: string;
+  code: string;
+  section?: boolean;
+  marketing?: number | null;
+  total?: number | null;
+};
+
+export type BudgetQuarter = {
+  id: "Q1" | "Q2" | "Q3" | "Q4";
+  title: string;
+  lines: BudgetQuarterLine[];
+};
+
+export type BudgetMeta = {
+  year: number;
+  title: string;
+  source: string;
+  currency: "GBP";
+  notes: BudgetNote[];
+  extra_events: BudgetExtraEvent[];
+  quarters: BudgetQuarter[];
+};
+
 /** Field Manager overrides (labels, types, select/tags option order). */
 export type HubStoredFieldDef = {
   key: string;
@@ -528,4 +607,10 @@ export type HubStore = {
    * option order / custom fields reach page views across deploys.
    */
   field_extras: HubFieldExtras;
+  /** Restricted 2026 marketing budget lines. */
+  budget_lines: BudgetLine[];
+  /** Spend records against budget lines. */
+  budget_payments: BudgetPayment[];
+  /** Notes, quarters, and source metadata for the budget page. */
+  budget_meta: BudgetMeta;
 };
