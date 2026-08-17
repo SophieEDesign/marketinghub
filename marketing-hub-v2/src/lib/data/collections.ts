@@ -266,6 +266,35 @@ const PAID_CAMPAIGN_STATUS: FieldOption[] = [
   { value: "complete", label: "Complete" },
 ];
 
+export const ADVERTISEMENT_STATUS: FieldOption[] = [
+  { value: "planned", label: "Planned" },
+  { value: "active", label: "Active" },
+  { value: "complete", label: "Complete" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+export const CONTACT_KINDS: FieldOption[] = [
+  { value: "person", label: "Person" },
+  { value: "company", label: "Company" },
+];
+
+export const PLATFORM_CREDENTIAL_PLATFORMS: FieldOption[] = [
+  { value: "Planable", label: "Planable" },
+  { value: "Canva", label: "Canva" },
+  { value: "LinkedIn Ads", label: "LinkedIn Ads" },
+  { value: "Google Ads", label: "Google Ads" },
+  { value: "SE Ranking", label: "SE Ranking" },
+  { value: "Looker Studio", label: "Looker Studio" },
+  { value: "HubSpot", label: "HubSpot" },
+  { value: "Prowly", label: "Prowly" },
+  { value: "Meta Business Suite", label: "Meta Business Suite" },
+  { value: "Website CMS", label: "Website CMS" },
+  { value: "Frame.io", label: "Frame.io" },
+  { value: "QR Code Generator", label: "QR Code Generator" },
+  { value: "North Sails", label: "North Sails" },
+  { value: "Other", label: "Other" },
+];
+
 const QUARTERS: FieldOption[] = [
   { value: "Q1", label: "Q1" },
   { value: "Q2", label: "Q2" },
@@ -506,14 +535,17 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
   {
     key: "contacts",
     label: "Contacts",
-    description: "Press, partners, venues",
+    description: "People, press, and supplier companies",
     fields: [
       f("id", { type: "readonly", locked: true }),
+      f("kind", { type: "select", options: CONTACT_KINDS }),
       f("name"),
       f("organisation"),
       f("role"),
       f("email", { type: "email" }),
       f("phone"),
+      f("website", { type: "url" }),
+      f("services"),
       f("tags", { type: "tags" }),
       f("notes", { type: "longtext" }),
       f("user_id", { label: "Linked user ID", type: "readonly" }),
@@ -576,6 +608,43 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
       f("theme_id", { label: "Theme", optionsSource: "themes" }),
       f("content_id", { label: "Content ID" }),
       f("event_id", { label: "Event ID" }),
+      f("created_at", { type: "readonly", locked: true }),
+      f("updated_at", { type: "readonly", locked: true }),
+    ],
+  },
+  {
+    key: "advertisements",
+    label: "Advertisements",
+    description: "Print and placement ads — artwork, agreement, run dates",
+    fields: [
+      f("id", { type: "readonly", locked: true }),
+      f("title"),
+      f("publication"),
+      f("status", { type: "select", options: ADVERTISEMENT_STATUS }),
+      f("starts_at", { type: "date", label: "Start date" }),
+      f("ends_at", { type: "date", label: "End date" }),
+      f("artwork_url", { type: "url", label: "Artwork" }),
+      f("agreement_url", { type: "url", label: "Agreement" }),
+      f("notes", { type: "longtext" }),
+      f("created_at", { type: "readonly", locked: true }),
+      f("updated_at", { type: "readonly", locked: true }),
+    ],
+  },
+  {
+    key: "platform_credentials",
+    label: "Platform logins",
+    description: "Shared marketing platform credentials (admin only)",
+    hiddenFromDataAdmin: true,
+    fields: [
+      f("id", { type: "readonly", locked: true }),
+      f("platform", {
+        type: "select",
+        options: PLATFORM_CREDENTIAL_PLATFORMS,
+      }),
+      f("url", { type: "url" }),
+      f("username"),
+      f("password"),
+      f("notes", { type: "longtext" }),
       f("created_at", { type: "readonly", locked: true }),
       f("updated_at", { type: "readonly", locked: true }),
     ],

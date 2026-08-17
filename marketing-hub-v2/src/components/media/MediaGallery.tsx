@@ -74,6 +74,7 @@ type GalleryPhoto = {
 };
 
 const UNSORTED_SUBFOLDER = "Unsorted";
+const HEADSHOTS_SUBFOLDER = "Headshots";
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 const MEDIA_ACCEPT = UPLOAD_ACCEPT;
 
@@ -692,7 +693,13 @@ export function MediaGallery({
   const gallerySubfolders = useMemo(() => {
     const names = Array.from(
       new Set(galleryItems.map((i) => itemSubfolder(i)))
-    ).sort((a, b) => {
+    );
+    if (scope === "all" && !names.includes(HEADSHOTS_SUBFOLDER)) {
+      names.push(HEADSHOTS_SUBFOLDER);
+    }
+    names.sort((a, b) => {
+      if (a === HEADSHOTS_SUBFOLDER) return -1;
+      if (b === HEADSHOTS_SUBFOLDER) return 1;
       if (a === UNSORTED_SUBFOLDER) return 1;
       if (b === UNSORTED_SUBFOLDER) return -1;
       return a.localeCompare(b);
@@ -727,14 +734,18 @@ export function MediaGallery({
   }, [galleryItems, scope]);
 
   const knownSubfolders = useMemo(() => {
-    return Array.from(
-      new Set(
-        galleryItems
-          .map((i) => i.subfolder?.trim())
-          .filter((s): s is string => !!s)
-      )
-    ).sort((a, b) => a.localeCompare(b));
-  }, [galleryItems]);
+    const names = new Set(
+      galleryItems
+        .map((i) => i.subfolder?.trim())
+        .filter((s): s is string => !!s)
+    );
+    if (scope === "all") names.add(HEADSHOTS_SUBFOLDER);
+    return Array.from(names).sort((a, b) => {
+      if (a === HEADSHOTS_SUBFOLDER) return -1;
+      if (b === HEADSHOTS_SUBFOLDER) return 1;
+      return a.localeCompare(b);
+    });
+  }, [galleryItems, scope]);
 
   const inGallery = isGalleryCategory(collection);
   const showingGallerySubfolders = inGallery && !activeSubfolder;
@@ -1382,7 +1393,7 @@ export function MediaGallery({
                   + Add new category
                 </button>
                 <p className="text-xs text-muted">
-                  Presentations, Logos, Gallery, Documents, and more
+                  Presentations, Logos, Gallery, Business Cards, Documents, and more
                 </p>
               </div>
             )}
@@ -1764,8 +1775,8 @@ export function MediaGallery({
             <p className="mt-1 text-sm text-muted">
               Choose a subfolder to browse images
               {allowManage
-                ? " — set each folder Public, Internal, or Admin only"
-                : ""}
+                ? " — Headshots is always listed; set each folder Public, Internal, or Admin only"
+                : ". Headshots live here for staff portraits."}
             </p>
           </div>
 
@@ -2194,8 +2205,18 @@ export function MediaGallery({
 
           {photos.length === 0 && docs.length === 0 ? (
             <EmptyState
-              title="Empty folder"
-              description="No photos or files in this folder yet."
+              title={
+                activeSubfolder === HEADSHOTS_SUBFOLDER
+                  ? "No headshots yet"
+                  : "Empty folder"
+              }
+              description={
+                activeSubfolder === HEADSHOTS_SUBFOLDER
+                  ? allowManage
+                    ? "Add headshots here so the team can find staff portraits in one place."
+                    : "Staff headshots will appear here once they are uploaded."
+                  : "No photos or files in this folder yet."
+              }
             />
           ) : null}
         </div>

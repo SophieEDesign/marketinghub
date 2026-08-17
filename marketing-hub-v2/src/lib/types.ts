@@ -142,13 +142,21 @@ export type Sponsorship = {
   updated_at: string;
 };
 
+export type ContactKind = "person" | "company";
+
 export type Contact = {
   id: string;
+  /** People vs supplier / vendor companies. */
+  kind: ContactKind;
   name: string;
   organisation: string;
   role: string;
   email: string;
   phone: string;
+  /** Company website (mainly for kind=company). */
+  website: string;
+  /** What the company does — e.g. clothing, print (mainly for kind=company). */
+  services: string;
   tags: string[];
   notes: string;
   /** Hub user (auth) linked to this contact — members edit only their linked record. */
@@ -207,6 +215,39 @@ export type PaidCampaign = {
   theme_id: string | null;
   content_id: string | null;
   event_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdvertisementStatus =
+  | "planned"
+  | "active"
+  | "complete"
+  | "cancelled";
+
+/** Print / placement ads (artwork, agreement, run dates) — not digital paid metrics. */
+export type Advertisement = {
+  id: string;
+  title: string;
+  publication: string;
+  status: AdvertisementStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+  artwork_url: string;
+  agreement_url: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Shared marketing-platform logins — admin-only vault. */
+export type PlatformCredential = {
+  id: string;
+  platform: string;
+  url: string;
+  username: string;
+  password: string;
+  notes: string;
   created_at: string;
   updated_at: string;
 };
@@ -464,6 +505,8 @@ export type HubStore = {
   resources: ResourceLink[];
   reports: ReportLink[];
   paid_campaigns: PaidCampaign[];
+  advertisements: Advertisement[];
+  platform_credentials: PlatformCredential[];
   themes: QuarterlyTheme[];
   theme_mains: ThemeMainContent[];
   theme_offshoots: ThemeOffshoot[];

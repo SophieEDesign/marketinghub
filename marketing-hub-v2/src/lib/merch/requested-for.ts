@@ -35,6 +35,7 @@ export function contactMerchForOptions(
   currentName?: string
 ): { value: string; label: string }[] {
   const options = contacts
+    .filter((c) => (c.kind ?? "person") !== "company")
     .map((c) => {
       const name = c.name.trim();
       if (!name) return null;

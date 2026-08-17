@@ -601,7 +601,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
     membershipsTable: membershipsTable?.name ?? null,
     tasksTable: tasksTable?.name ?? null,
     legacyContentIgnored: true,
-    localOnlyPreserved: ["merch_orders", "merch_inventory", "merch_catalogue", "staff_requests", "reports", "paid_campaigns"],
+    localOnlyPreserved: ["merch_orders", "merch_inventory", "merch_catalogue", "staff_requests", "reports", "paid_campaigns", "advertisements", "platform_credentials"],
     warnings,
   };
 }
@@ -653,11 +653,14 @@ function mapContactRows(
 
     return {
       id: `sb_${id}`,
+      kind: "person",
       name,
       organisation,
       role,
       email: asString(pickField(r, [/^email$/i, /^e-?mail$/i])),
       phone,
+      website: asString(pickField(r, [/^website$/i, /^url$/i, /^web$/i])),
+      services: "",
       tags,
       notes: stripHtml(
         asString(

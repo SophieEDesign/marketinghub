@@ -6,6 +6,7 @@ import {
   getContactByUserId,
   updateContact,
 } from "@/lib/data/repos";
+import type { Contact } from "@/lib/types";
 
 /** Member (and admin) access to their own linked contact only. */
 export async function GET() {
@@ -48,10 +49,13 @@ export async function POST(request: NextRequest) {
           .filter(Boolean);
     const item = await createContact({
       name: String(body.name ?? user.full_name ?? "Contact").trim() || "Contact",
+      kind: "person",
       organisation: body.organisation ?? "",
       role: body.role ?? "",
       email: body.email ?? user.email ?? "",
       phone: body.phone ?? "",
+      website: "",
+      services: "",
       tags,
       notes: body.notes ?? "",
       user_id: user.id,
@@ -86,7 +90,7 @@ export async function POST(request: NextRequest) {
   if (tags !== undefined) patch.tags = tags;
   if (body.notes !== undefined) patch.notes = body.notes;
 
-  const updated = await updateContact(contact.id, patch);
+  const updated = await updateContact(contact.id, patch as Partial<Contact>);
   if (!updated) return jsonError("Not found", 404);
   return jsonOk({ contact: updated });
 }

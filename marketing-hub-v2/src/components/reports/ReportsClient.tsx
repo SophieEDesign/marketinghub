@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { BarChart3, ExternalLink } from "lucide-react";
-import type { ReportLink } from "@/lib/types";
+import type { Advertisement, PaidCampaign, ReportLink } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   REPORT_CATEGORIES,
@@ -17,18 +17,22 @@ import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/sanitize";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { PaidMediaPanel } from "@/components/reports/PaidMediaPanel";
-import type { PaidCampaign } from "@/lib/types";
+import { AdvertisementsPanel } from "@/components/reports/AdvertisementsPanel";
 
 export function ReportsClient({
   initial,
   paidCampaigns: initialPaidCampaigns,
+  advertisements: initialAdvertisements,
   fieldOptions: fieldOptionsProp,
   paidFieldOptions: paidFieldOptionsProp,
+  adFieldOptions: adFieldOptionsProp,
 }: {
   initial: ReportLink[];
   paidCampaigns: PaidCampaign[];
+  advertisements: Advertisement[];
   fieldOptions?: Record<string, FieldOption[]>;
   paidFieldOptions?: Record<string, FieldOption[]>;
+  adFieldOptions?: Record<string, FieldOption[]>;
 }) {
   const fieldOptions = useManagedFieldOptions("reports", fieldOptionsProp);
   const categoryOptions = optionsForField(
@@ -119,7 +123,7 @@ export function ReportsClient({
     <div>
       <PageHeader
         title="Reporting"
-        description="One place to open the tools you already use — Analytics, Ads, SE Ranking, Looker Studio. Web enquiries live in the hub."
+        description="One place to open the tools you already use — Analytics, Ads, SE Ranking, Looker Studio. Print advertisements and paid-media snapshots sit below. Web enquiries live in the hub."
         actions={
           <button type="button" className="btn-primary" onClick={() => setShowForm(true)}>
             Add report link
@@ -210,6 +214,11 @@ export function ReportsClient({
           </div>
         </div>
       ) : null}
+
+      <AdvertisementsPanel
+        initial={initialAdvertisements}
+        fieldOptions={adFieldOptionsProp}
+      />
 
       <PaidMediaPanel
         initial={initialPaidCampaigns}

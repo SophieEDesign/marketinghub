@@ -343,6 +343,7 @@ export const MEDIA_HUB_CATEGORIES = [
   "Brand Guidelines",
   "Design Assets",
   "Templates",
+  "Business Cards",
   "Flyers",
   "Advertorial",
 ] as const;

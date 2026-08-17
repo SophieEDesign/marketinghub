@@ -7,6 +7,7 @@ import {
 import { effectiveProductLabel } from "@/lib/merch/product-images";
 import type {
   AccessRequest,
+  Advertisement,
   AwardEntry,
   Contact,
   ContentItem,
@@ -21,6 +22,7 @@ import type {
   MerchInventoryItem,
   MerchOrder,
   PaidCampaign,
+  PlatformCredential,
   QuarterlyTheme,
   ReportLink,
   ResourceLink,
@@ -322,7 +324,13 @@ export async function listContacts() {
 }
 
 function normalizeContact(c: Contact): Contact {
-  return { ...c, user_id: c.user_id ?? null };
+  return {
+    ...c,
+    kind: c.kind === "company" ? "company" : "person",
+    website: c.website ?? "",
+    services: c.services ?? "",
+    user_id: c.user_id ?? null,
+  };
 }
 
 export async function getContact(id: string) {
@@ -409,10 +417,13 @@ export async function ensureContactForUser(input: {
     (input.full_name ?? "").trim() || email.split("@")[0] || "Contact";
   return createContact({
     name,
+    kind: "person",
     organisation: input.organisation ?? "",
     role: input.role ?? "",
     email,
     phone: "",
+    website: "",
+    services: "",
     tags: [],
     notes: input.notes ?? "",
     user_id: input.userId,
@@ -424,6 +435,9 @@ export async function createContact(
 ) {
   const item: Contact = {
     ...input,
+    kind: input.kind === "company" ? "company" : "person",
+    website: input.website ?? "",
+    services: input.services ?? "",
     user_id: input.user_id ?? null,
     id: uid("ctc"),
     created_at: nowIso(),
@@ -611,6 +625,102 @@ export async function updatePaidCampaign(
 export async function deletePaidCampaign(id: string) {
   await updateStore((s) => {
     s.paid_campaigns = s.paid_campaigns.filter((c) => c.id !== id);
+  });
+}
+
+export async function listAdvertisements() {
+  const store = await readStore();
+  return [...(store.advertisements ?? [])].sort((a, b) => {
+    const aDate = a.starts_at ?? a.created_at;
+    const bDate = b.starts_at ?? b.created_at;
+    return bDate.localeCompare(aDate);
+  });
+}
+
+export async function createAdvertisement(
+  input: Omit<Advertisement, "id" | "created_at" | "updated_at">
+) {
+  const item: Advertisement = {
+    ...input,
+    id: uid("ad"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    s.advertisements.push(item);
+  });
+  return item;
+}
+
+export async function updateAdvertisement(
+  id: string,
+  patch: Partial<Advertisement>
+) {
+  let updated: Advertisement | null = null;
+  await updateStore((s) => {
+    const idx = s.advertisements.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    s.advertisements[idx] = {
+      ...s.advertisements[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.advertisements[idx];
+  });
+  return updated;
+}
+
+export async function deleteAdvertisement(id: string) {
+  await updateStore((s) => {
+    s.advertisements = s.advertisements.filter((c) => c.id !== id);
+  });
+}
+
+export async function listPlatformCredentials() {
+  const store = await readStore();
+  return [...(store.platform_credentials ?? [])].sort((a, b) =>
+    a.platform.localeCompare(b.platform)
+  );
+}
+
+export async function createPlatformCredential(
+  input: Omit<PlatformCredential, "id" | "created_at" | "updated_at">
+) {
+  const item: PlatformCredential = {
+    ...input,
+    id: uid("cred"),
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  };
+  await updateStore((s) => {
+    s.platform_credentials.push(item);
+  });
+  return item;
+}
+
+export async function updatePlatformCredential(
+  id: string,
+  patch: Partial<PlatformCredential>
+) {
+  let updated: PlatformCredential | null = null;
+  await updateStore((s) => {
+    const idx = s.platform_credentials.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    s.platform_credentials[idx] = {
+      ...s.platform_credentials[idx],
+      ...patch,
+      id,
+      updated_at: nowIso(),
+    };
+    updated = s.platform_credentials[idx];
+  });
+  return updated;
+}
+
+export async function deletePlatformCredential(id: string) {
+  await updateStore((s) => {
+    s.platform_credentials = s.platform_credentials.filter((c) => c.id !== id);
   });
 }
 

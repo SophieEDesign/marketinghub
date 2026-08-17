@@ -15,6 +15,8 @@ The legacy app lives in [`../legacy/baserow-app`](../legacy/baserow-app). See [`
 | Media gallery (Google Drive) | Ready when Drive env is set |
 | Social calendar (Planable) | Deep link + API when token is set |
 | Contacts | Ready |
+| Advertisements (Reporting) | Ready |
+| Platform logins (admin) | Ready |
 | Resources (OneDrive links) | Ready |
 | Public `/media` | Ready |
 

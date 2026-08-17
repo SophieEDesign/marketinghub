@@ -10,6 +10,7 @@ import {
   Home,
   Inbox,
   Library,
+  KeyRound,
   MessageSquarePlus,
   Settings,
   Sparkles,
@@ -74,7 +75,7 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: "/app/library",
     label: "Library",
-    description: "Media, brand guidelines, and resource links",
+    description: "Media, brand guidelines, business cards, and gallery",
     icon: Library,
     member: true,
     external: true,
@@ -102,14 +103,20 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: "/app/reports",
     label: "Reporting",
-    description: "Analytics, ads, SEO, Looker Studio links",
+    description: "Analytics, ads, SEO, Looker Studio links, and print advertisements",
     icon: BarChart3,
   },
   {
     href: "/app/contacts",
     label: "Contacts",
-    description: "Press, partners, and venues",
+    description: "People, press, and supplier companies",
     icon: Contact,
+  },
+  {
+    href: "/app/logins",
+    label: "Logins",
+    description: "Shared marketing platform credentials",
+    icon: KeyRound,
   },
   {
     href: "/app/feedback",

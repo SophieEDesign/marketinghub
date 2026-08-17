@@ -83,7 +83,7 @@ export function LibraryHub({
       {activeTab === "media" ? (
         <MediaGallery
           title="Media"
-          description="Logos, presentations, gallery, and other brand assets."
+          description="Logos, presentations, gallery, business cards, and other brand assets."
           initialCanDownload
           hideHeader
           scope="all"

@@ -6,6 +6,7 @@ import {
   listContacts,
   updateContact,
 } from "@/lib/data/repos";
+import type { Contact } from "@/lib/types";
 
 export async function GET() {
   const { error } = await requireStaff();
@@ -29,7 +30,12 @@ export async function POST(request: NextRequest) {
   if (error) return error;
 
   if (action === "update") {
-    const updated = await updateContact(body.id, body.patch ?? {});
+    const patch = { ...(body.patch ?? {}) } as Record<string, unknown>;
+    if (patch.kind !== undefined) {
+      patch.kind = patch.kind === "company" ? "company" : "person";
+      if (patch.kind === "company") patch.user_id = null;
+    }
+    const updated = await updateContact(body.id, patch as Partial<Contact>);
     if (!updated) return jsonError("Not found", 404);
     return jsonOk({ item: updated });
   }
@@ -41,15 +47,21 @@ export async function POST(request: NextRequest) {
         .map((t: string) => t.trim())
         .filter(Boolean);
 
+  const kind = body.kind === "company" ? "company" : "person";
+
   const item = await createContact({
-    name: body.name ?? "Contact",
-    organisation: body.organisation ?? "",
+    name: body.name ?? (kind === "company" ? "Company" : "Contact"),
+    kind,
+    organisation:
+      body.organisation ?? (kind === "company" ? body.name ?? "" : ""),
     role: body.role ?? "",
     email: body.email ?? "",
     phone: body.phone ?? "",
+    website: body.website ?? "",
+    services: body.services ?? "",
     tags,
     notes: body.notes ?? "",
-    user_id: body.user_id ?? null,
+    user_id: kind === "company" ? null : body.user_id ?? null,
   });
   return jsonOk({ item }, { status: 201 });
 }

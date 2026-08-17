@@ -109,6 +109,9 @@ function migrateContacts(
   if (!items) return items;
   return items.map((item) => ({
     ...item,
+    kind: item.kind === "company" ? "company" : "person",
+    website: item.website ?? "",
+    services: item.services ?? "",
     user_id: item.user_id ?? null,
   }));
 }
@@ -159,6 +162,9 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     resources: store.resources ?? seed.resources,
     reports: store.reports ?? seed.reports,
     paid_campaigns: store.paid_campaigns ?? seed.paid_campaigns,
+    advertisements: store.advertisements ?? seed.advertisements,
+    platform_credentials:
+      store.platform_credentials ?? seed.platform_credentials,
     themes: store.themes ?? seed.themes,
     theme_mains: migrateThemeMains(store.theme_mains) ?? seed.theme_mains,
     theme_offshoots: store.theme_offshoots ?? seed.theme_offshoots,
@@ -220,6 +226,8 @@ function needsKeyMigration(store: Partial<HubStore>): boolean {
     !store.theme_offshoots ||
     !store.reports ||
     !store.paid_campaigns ||
+    !store.advertisements ||
+    !store.platform_credentials ||
     !store.merch_orders ||
     !store.merch_inventory ||
     !store.merch_catalogue ||
