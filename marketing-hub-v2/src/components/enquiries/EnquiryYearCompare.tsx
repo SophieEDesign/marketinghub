@@ -91,7 +91,7 @@ export function EnquiryYearCompare({
         <div>
           <h2 className="font-display text-lg text-brand">Enquiry history</h2>
           <p className="mt-0.5 text-sm text-muted">
-            2023–2025 monthly totals + live hub years
+            2023–2025 web enquiry monthly totals + live hub years
             {data.compareYear != null && data.priorYear != null
               ? ` · Δ / % vs ${data.priorYear}`
               : null}
