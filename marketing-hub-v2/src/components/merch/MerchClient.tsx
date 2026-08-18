@@ -659,14 +659,12 @@ export function MerchClient({
   viewerName?: string;
   viewerContactId?: string | null;
 }) {
-  const emptyForm = buildEmptyForm(viewerName, viewerContactId);
   const statusOptions = canManageAll ? STATUSES : MEMBER_STATUSES;
   const [orders, setOrders] = useState(initial);
   const [productCards, setProductCards] = useState<ClothingProductCardItem[]>(
     () => CLOTHING_PRODUCTS.map((p) => ({ ...p, image_url: "" }))
   );
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
   // Multi-item new order state
   const [orderHeader, setOrderHeader] = useState<OrderHeader>(() =>
     buildEmptyOrderHeader(viewerName, viewerContactId)
@@ -714,7 +712,6 @@ export function MerchClient({
   }, [refresh, refreshCatalogue]);
 
   useEffect(() => {
-    setForm(buildEmptyForm(viewerName, viewerContactId));
     setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
   }, [viewerName, viewerContactId]);
 
@@ -782,7 +779,6 @@ export function MerchClient({
       )
     );
     setShowForm(false);
-    setForm(buildEmptyForm(viewerName, viewerContactId));
     setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
     setItemRows([buildEmptyItemRow(productCards)]);
     await refresh();
