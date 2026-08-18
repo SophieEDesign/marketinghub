@@ -9,8 +9,10 @@ import { Check, ExternalLink, Send } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
+import { SearchSelect } from "@/components/ui/SearchSelect";
 import { cn } from "@/lib/utils";
-import type { ContentItem } from "@/lib/types";
+import { CONTENT_STATUS } from "@/lib/data/collections";
+import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
   imageAssetUrls,
   isSocialContentItem,
@@ -37,6 +39,8 @@ type SocialPost = {
   /** Original caption/notes HTML for detail panel (Hub). */
   html?: string | null;
   status: string;
+  /** Raw Hub status — present on Hub posts so status can be edited. */
+  statusValue?: ContentStatus;
   scheduledAt: string | null;
   url: string | null;
   platform: string;
@@ -45,6 +49,10 @@ type SocialPost = {
   mediaUrls: string[];
   source: "planable" | "hub";
 };
+
+const HUB_STATUS_OPTIONS = CONTENT_STATUS.filter(
+  (o) => o.value !== "published"
+);
 
 function normalizePlatform(raw: string | null | undefined): string {
   const key = platformKey(raw ?? "");
@@ -202,8 +210,10 @@ export function SocialClient({
     due_date: string;
     title: string;
     caption: string;
+    status: ContentStatus;
   } | null>(null);
   const [creating, setCreating] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const createFormRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
@@ -240,6 +250,7 @@ export function SocialClient({
             text,
             html: looksLikeHtml(rawCaption) ? rawCaption : null,
             status: normalizeStatus(c.status),
+            statusValue: c.status,
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
             platform,
@@ -480,7 +491,7 @@ export function SocialClient({
     setCreateForm((prev) =>
       prev
         ? { ...prev, due_date: day }
-        : { due_date: day, title: "", caption: "" }
+        : { due_date: day, title: "", caption: "", status: "idea" }
     );
     requestAnimationFrame(() => {
       createFormRef.current?.scrollIntoView({
@@ -504,7 +515,7 @@ export function SocialClient({
           due_date: createForm.due_date,
           content_type: "Social",
           channel: ["LinkedIn"],
-          status: "idea",
+          status: createForm.status,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -519,6 +530,46 @@ export function SocialClient({
       await load();
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function updateHubStatus(id: string, status: ContentStatus) {
+    if (memberView || status === "published") return;
+    setSavingStatus(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id,
+          patch: { status },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not update status");
+        return;
+      }
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                status: normalizeStatus(status),
+                statusValue: status,
+                url: (data.item?.planable_url as string | undefined) || p.url,
+              }
+            : p
+        )
+      );
+      await load();
+      if (data.planableSyncError) {
+        setError(data.planableSyncError);
+      }
+    } finally {
+      setSavingStatus(false);
     }
   }
 
@@ -667,6 +718,26 @@ export function SocialClient({
                 setCreateForm({ ...createForm, due_date: e.target.value })
               }
             />
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <SearchSelect
+              className="field"
+              value={createForm.status}
+              onChange={(status) =>
+                setCreateForm({
+                  ...createForm,
+                  status: status as ContentStatus,
+                })
+              }
+              options={HUB_STATUS_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+            />
+            <p className="mt-1 text-xs text-muted">
+              Approved or Scheduled sends a draft to Planable.
+            </p>
           </div>
           <div className="md:col-span-2">
             <label className="label">Caption / post text</label>
@@ -978,6 +1049,33 @@ export function SocialClient({
                   {selected.status}
                 </span>
               </div>
+              {!memberView &&
+              selected.source === "hub" &&
+              selected.statusValue &&
+              selected.statusValue !== "published" ? (
+                <div>
+                  <label className="label">Status</label>
+                  <SearchSelect
+                    className="field"
+                    value={selected.statusValue}
+                    disabled={savingStatus}
+                    onChange={(status) =>
+                      void updateHubStatus(
+                        selected.id,
+                        status as ContentStatus
+                      )
+                    }
+                    options={HUB_STATUS_OPTIONS.map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                    }))}
+                  />
+                  <p className="mt-1 text-xs text-muted">
+                    Approved or Scheduled sends a draft to Planable. Then
+                    approve, add platforms, and publish there.
+                  </p>
+                </div>
+              ) : null}
               <p className="text-sm text-muted">
                 {selected.scheduledAt
                   ? format(

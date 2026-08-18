@@ -65,7 +65,7 @@ export type CollectionDef = {
   hiddenFromDataAdmin?: boolean;
 };
 
-const CONTENT_STATUS: FieldOption[] = [
+export const CONTENT_STATUS: FieldOption[] = [
   { value: "idea", label: "Idea" },
   { value: "draft", label: "Draft" },
   { value: "review", label: "Review" },

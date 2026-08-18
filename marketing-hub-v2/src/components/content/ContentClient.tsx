@@ -98,6 +98,7 @@ function emptyFormForScope(scope: "all" | "content" | "social") {
     notes: "",
     planable_url: "",
     asset_url: "",
+    status: "idea" as ContentStatus,
   };
 }
 
@@ -428,7 +429,7 @@ export function ContentClient({
         ...form,
         due_date: form.due_date || null,
         deadline_date: form.deadline_date || null,
-        status: "idea",
+        status: form.status,
       }),
     });
     const data = await res.json().catch(() => ({}));
@@ -812,6 +813,25 @@ export function ContentClient({
             <p className="mt-1 text-xs text-muted">
               Publish or go-live date — used on calendar and timeline.
             </p>
+          </div>
+          <div>
+            <label className="label">Status</label>
+            <SearchSelect
+              className="field"
+              value={form.status}
+              onChange={(status) =>
+                setForm({ ...form, status: status as ContentStatus })
+              }
+              options={HUB_EDITABLE_STATUSES.map((c) => ({
+                value: c.id,
+                label: c.label,
+              }))}
+            />
+            {formIsSocial ? (
+              <p className="mt-1 text-xs text-muted">
+                Approved or Scheduled sends a draft to Planable.
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label">Category</label>
