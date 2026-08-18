@@ -237,30 +237,49 @@ async function fetchPlanablePages(
   return map;
 }
 
-/**
- * Map Hub channel labels to Planable page ids.
- * Prefers connected pages; one page per platform key.
- */
-export function channelToPageIds(
-  channels: string[],
-  pages: PlanablePage[]
-): string[] {
-  const byPlatform = new Map<string, PlanablePage[]>();
-  for (const page of pages) {
-    const key = platformKey(page.platform ?? page.name ?? "");
-    const list = byPlatform.get(key) ?? [];
-    list.push(page);
-    byPlatform.set(key, list);
-  }
+function preferConnectedPage(candidates: PlanablePage[]): PlanablePage | undefined {
+  if (candidates.length <= 1) return candidates[0];
+  const named = candidates.find((p) =>
+    /peters\s*[&+]\s*may/i.test(p.name ?? "")
+  );
+  return named ?? candidates[0];
+}
 
-  const ids: string[] = [];
-  for (const ch of channels) {
-    const key = platformKey(ch);
-    const candidates = byPlatform.get(key) ?? [];
-    const page = candidates[0];
-    if (page && !ids.includes(page.id)) ids.push(page.id);
+/** Hub only creates on Facebook (one page = one allowance). Add LinkedIn/IG in Planable. */
+export function facebookPageId(pages: PlanablePage[]): string | null {
+  const facebook = pages.filter(
+    (p) => platformKey(p.platform ?? p.name ?? "") === "facebook"
+  );
+  return preferConnectedPage(facebook)?.id ?? null;
+}
+
+function pickGroupId(p: Record<string, unknown>): string | null {
+  if (p.groupId != null && String(p.groupId)) return String(p.groupId);
+  const group = p.group;
+  if (group && typeof group === "object" && !Array.isArray(group)) {
+    const id = (group as { id?: unknown }).id;
+    if (id != null && String(id)) return String(id);
   }
-  return ids;
+  return null;
+}
+
+function pickGroupPageIds(
+  p: Record<string, unknown>,
+  pageId: string | null
+): string[] {
+  const fromPost = Array.isArray(p.groupPageIds)
+    ? (p.groupPageIds as unknown[]).map(String).filter(Boolean)
+    : [];
+  const group = p.group;
+  const fromGroup =
+    group && typeof group === "object" && !Array.isArray(group)
+      ? Array.isArray((group as { pageIds?: unknown }).pageIds)
+        ? ((group as { pageIds: unknown[] }).pageIds).map(String).filter(Boolean)
+        : []
+      : [];
+  const ids = Array.from(new Set([...fromPost, ...fromGroup]));
+  if (ids.length) return ids;
+  return pageId ? [pageId] : [];
 }
 
 function toRawPost(
@@ -269,12 +288,8 @@ function toRawPost(
 ): PlanableRawPost {
   const id = String(p.id ?? p._id ?? "");
   const pageId = p.pageId != null ? String(p.pageId) : null;
-  const groupId = p.groupId != null ? String(p.groupId) : null;
-  const groupPageIds = Array.isArray(p.groupPageIds)
-    ? (p.groupPageIds as unknown[]).map(String).filter(Boolean)
-    : pageId
-      ? [pageId]
-      : [];
+  const groupId = pickGroupId(p);
+  const groupPageIds = pickGroupPageIds(p, pageId);
   const scheduled =
     (p.scheduledAt as string | undefined) ||
     (p.scheduled_at as string | undefined) ||
@@ -313,7 +328,8 @@ async function fetchRawPostsPage(
   token: string,
   workspaceId: string,
   offset: number,
-  limit: number
+  limit: number,
+  cache: RequestCache = "force-cache"
 ): Promise<{
   posts: Array<Record<string, unknown>>;
   hasMore: boolean;
@@ -323,7 +339,8 @@ async function fetchRawPostsPage(
     `${PLANABLE_API_BASE_URL}/posts?workspaceId=${encodeURIComponent(workspaceId)}&limit=${limit}&offset=${offset}`,
     {
       headers: authHeaders(token),
-      next: { revalidate: 120 },
+      cache,
+      ...(cache === "force-cache" ? { next: { revalidate: 120 } } : {}),
     }
   );
   if (!res.ok) {
@@ -348,6 +365,7 @@ async function fetchRawPostsPage(
 
 export async function listAllPlanablePosts(options?: {
   maxPosts?: number;
+  cache?: RequestCache;
 }): Promise<{
   configured: boolean;
   posts: PlanableRawPost[];
@@ -357,6 +375,7 @@ export async function listAllPlanablePosts(options?: {
 }> {
   const config = getPlanableConfig();
   const maxPosts = options?.maxPosts ?? PLANABLE_MAX_POSTS;
+  const cache = options?.cache ?? "force-cache";
   if (!config.configured || !config.token || !config.workspaceId) {
     return {
       configured: false,
@@ -382,7 +401,8 @@ export async function listAllPlanablePosts(options?: {
         config.token,
         config.workspaceId,
         offset,
-        limit
+        limit,
+        cache
       );
       if (page.error) {
         error = page.error;
@@ -461,18 +481,23 @@ export async function createPlanablePost(input: {
   pageId: string;
   plainText: string;
   scheduledAt?: string | null;
+  media?: string[];
 }): Promise<{ ok: true; post: PlanableRawPost } | { ok: false; error: string }> {
   const config = getPlanableConfig();
   if (!config.configured || !config.token || !config.workspaceId) {
     return { ok: false, error: "Planable is not configured." };
   }
 
+  const pageIds = [input.pageId];
   const body: Record<string, unknown> = {
     workspaceId: config.workspaceId,
     pageId: input.pageId,
+    pageIds,
+    text: input.plainText,
     plainText: input.plainText,
   };
   if (input.scheduledAt) body.scheduledAt = input.scheduledAt;
+  if (input.media?.length) body.media = input.media;
 
   try {
     const res = await fetch(`${PLANABLE_API_BASE_URL}/posts`, {
@@ -495,19 +520,35 @@ export async function createPlanablePost(input: {
         error: err || `Planable create ${res.status}: ${text.slice(0, 200)}`,
       };
     }
-    const raw = extractPostFromResponse(json);
-    if (!raw?.id) {
-      // Some responses return 201 with empty/minimal body — re-list won't help reliably.
-      return {
-        ok: false,
-        error: "Planable created the post but returned no id.",
-      };
-    }
     const pagesById = await fetchPlanablePages(
       config.token,
       config.workspaceId
     );
-    return { ok: true, post: toRawPost(raw, pagesById) };
+    const raw = extractPostFromResponse(json);
+    if (raw?.id) {
+      return { ok: true, post: toRawPost(raw, pagesById) };
+    }
+
+    // 201 with no id — look up the draft instead of creating another later.
+    const listed = await listAllPlanablePosts({
+      maxPosts: 100,
+      cache: "no-store",
+    });
+    const due = dueDateFromScheduledAt(input.scheduledAt);
+    const match = listed.posts.find(
+      (p) =>
+        !p.archived &&
+        p.plainText.trim() === input.plainText.trim() &&
+        (p.pageId === input.pageId || p.groupPageIds.includes(input.pageId)) &&
+        dueDateFromScheduledAt(p.scheduledAt) === due
+    );
+    if (match) return { ok: true, post: match };
+
+    return {
+      ok: false,
+      error:
+        "Planable may have created a draft but returned no id. Sync from Planable before approving again so we do not create a duplicate.",
+    };
   } catch (e) {
     return {
       ok: false,

@@ -614,7 +614,7 @@ export function SocialClient({
           description={
             memberView
               ? "Scheduled and published posts across channels."
-              : "Approved Hub posts sync to Planable — add platforms and publish there."
+              : "Approved Hub posts send one Facebook draft to Planable — add other platforms there."
           }
           actions={
             !memberView ? (
@@ -1070,8 +1070,8 @@ export function SocialClient({
                     }))}
                   />
                   <p className="mt-1 text-xs text-muted">
-                    Approved sends a draft to Planable. Then add platforms
-                    and publish there.
+                    Approved sends one Facebook draft to Planable. Add
+                    LinkedIn and Instagram there, then publish.
                   </p>
                 </div>
               ) : null}

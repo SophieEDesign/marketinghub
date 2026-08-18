@@ -663,7 +663,7 @@ export function ContentClient({
       ) : (
         <PageHeader
           title="Content planner"
-          description="Draft social in the Hub; set Approved to send to Planable. Add platforms and publish there. Published posts are locked."
+          description="Draft social in the Hub; Approved sends one Facebook draft to Planable. Add LinkedIn and Instagram there, then publish. Published posts are locked."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {scope !== "content" ? (

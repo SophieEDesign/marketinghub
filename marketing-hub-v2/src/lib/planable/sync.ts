@@ -15,9 +15,9 @@ import { plainTextFromHtml } from "@/lib/sanitize";
 import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
   archivePlanablePost,
-  channelToPageIds,
   createPlanablePost,
   dueDateFromScheduledAt,
+  facebookPageId,
   getPlanableConfig,
   getPlanablePost,
   hubStatusFromPlanable,
@@ -47,11 +47,19 @@ type PostGroup = {
   posts: PlanableRawPost[];
 };
 
+function groupKey(post: PlanableRawPost): string {
+  if (post.groupId) return `g:${post.groupId}`;
+  const day = dueDateFromScheduledAt(post.scheduledAt) ?? "";
+  const text = post.plainText.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 180);
+  if (text && day) return `t:${text}|${day}`;
+  return `id:${post.id}`;
+}
+
 function groupPlanablePosts(posts: PlanableRawPost[]): PostGroup[] {
   const map = new Map<string, PlanableRawPost[]>();
   for (const post of posts) {
     if (post.archived) continue;
-    const key = post.groupId || post.id;
+    const key = groupKey(post);
     if (!key) continue;
     const list = map.get(key) ?? [];
     list.push(post);
@@ -59,7 +67,7 @@ function groupPlanablePosts(posts: PlanableRawPost[]): PostGroup[] {
   }
   return Array.from(map.entries()).map(([key, groupPosts]) => ({
     key,
-    groupId: groupPosts[0]?.groupId || "",
+    groupId: groupPosts.find((p) => p.groupId)?.groupId || "",
     posts: groupPosts,
   }));
 }
@@ -229,6 +237,10 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
       group.posts.map((p) => p.scheduledAt).find(Boolean) ?? null
     );
     const asset_url = mediaFromGroup(group.posts);
+    if (!caption && !asset_url) {
+      skipped += 1;
+      continue;
+    }
     const pageIds = Array.from(
       new Set(
         group.posts.flatMap((p) =>
@@ -387,12 +399,29 @@ export async function removeContentFromPlanable(
   return { ok: true };
 }
 
-function plainCaption(item: ContentItem): string {
+function pushableCaption(item: ContentItem): string {
   const caption = plainTextFromHtml(item.caption || "").trim();
   if (caption) return caption;
   const notes = plainTextFromHtml(item.notes || "").trim();
   if (notes) return notes;
-  return (item.title || "").trim() || "Untitled post";
+  return (item.title || "").trim();
+}
+
+async function linkHubToPlanablePost(
+  item: ContentItem,
+  post: { id: string; groupId: string | null },
+  pageId: string,
+  now: string
+): Promise<ContentItem> {
+  const patched = await updateContent(item.id, {
+    planable_post_id: post.id,
+    planable_group_id: post.groupId || "",
+    planable_page_ids: [pageId],
+    planable_url: planableDeepLink(post.id),
+    last_synced_at: now,
+    sync_source: "hub",
+  });
+  return patched ?? item;
 }
 
 /** Push a Hub social ContentItem to Planable (create or update). */
@@ -420,20 +449,17 @@ export async function pushContentToPlanable(
     };
   }
 
-  const matchedIds =
-    current.planable_page_ids.length > 0
-      ? current.planable_page_ids
-      : channelToPageIds(current.channel, pagesResult.pages);
-  const pageId = matchedIds[0] ?? pagesResult.pages[0]?.id;
+  // One Facebook page only — 3 LinkedIn pages would use 3 allowance slots.
+  const pageId = facebookPageId(pagesResult.pages);
   if (!pageId) {
     return {
       item: current,
-      error: "No Planable pages available.",
+      error:
+        "No Facebook page found in Planable. Hub sends one Facebook draft so you can add LinkedIn and Instagram there.",
     };
   }
-  const pageIds = matchedIds.length > 0 ? matchedIds : [pageId];
 
-  const plainText = plainCaption(current);
+  const plainText = pushableCaption(current);
   const scheduledAt = scheduledAtFromDueDate(current.due_date);
   const imageUrls = imageAssetUrls(current.asset_url);
   let mediaUrls: string[] | undefined;
@@ -446,12 +472,21 @@ export async function pushContentToPlanable(
     mediaUrls = uploaded;
   }
 
+  if (!plainText && !mediaUrls?.length) {
+    return {
+      item: current,
+      error:
+        "Add a caption or image before sending to Planable. Empty drafts still use your post allowance.",
+    };
+  }
+
   const now = new Date().toISOString();
+  const caption = plainText || "Untitled post";
 
   if (current.planable_post_id) {
     let lastError: string | undefined;
     const result = await updatePlanablePost(current.planable_post_id, {
-      plainText,
+      plainText: caption,
       scheduledAt,
       ...(mediaUrls ? { media: mediaUrls } : {}),
     });
@@ -471,7 +506,6 @@ export async function pushContentToPlanable(
     }
 
     const patched = await updateContent(current.id, {
-      planable_page_ids: pageIds,
       planable_url:
         current.planable_url || planableDeepLink(current.planable_post_id),
       last_synced_at: now,
@@ -483,10 +517,32 @@ export async function pushContentToPlanable(
     };
   }
 
+  // Reuse an existing draft instead of creating another allowance slot.
+  const listed = await listAllPlanablePosts({
+    maxPosts: 200,
+    cache: "no-store",
+  });
+  const due = dueDateFromScheduledAt(scheduledAt);
+  const existing = listed.posts.find(
+    (p) =>
+      !p.archived &&
+      p.plainText.trim() === caption &&
+      dueDateFromScheduledAt(p.scheduledAt) === due
+  );
+  if (existing) {
+    if (mediaUrls?.length) {
+      await updatePlanablePost(existing.id, { media: mediaUrls });
+    }
+    return {
+      item: await linkHubToPlanablePost(current, existing, pageId, now),
+    };
+  }
+
   const created = await createPlanablePost({
     pageId,
-    plainText,
+    plainText: caption,
     scheduledAt,
+    ...(mediaUrls ? { media: mediaUrls } : {}),
   });
   if (!created.ok) {
     return {
@@ -495,20 +551,7 @@ export async function pushContentToPlanable(
     };
   }
 
-  if (mediaUrls?.length) {
-    await updatePlanablePost(created.post.id, { media: mediaUrls });
-  }
-
-  const patched = await updateContent(current.id, {
-    planable_post_id: created.post.id,
-    planable_group_id: created.post.groupId || "",
-    planable_page_ids: [pageId],
-    planable_url: planableDeepLink(created.post.id),
-    last_synced_at: now,
-    sync_source: "hub",
-  });
-
   return {
-    item: patched ?? current,
+    item: await linkHubToPlanablePost(current, created.post, pageId, now),
   };
 }
