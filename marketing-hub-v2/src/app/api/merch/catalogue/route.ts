@@ -24,16 +24,20 @@ function parseColourList(value: unknown): string[] | undefined {
   return undefined;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { error } = await requireStaff();
   if (error) return error;
+  const includeHidden =
+    request.nextUrl.searchParams.get("include_hidden") === "1";
   const [catalogue, inventory] = await Promise.all([
     listMerchCatalogue(),
     listMerchInventory(),
   ]);
   return jsonOk({
     catalogue,
-    products: clothingProductsWithImages(catalogue, inventory),
+    products: clothingProductsWithImages(catalogue, inventory, {
+      includeHidden,
+    }),
   });
 }
 
@@ -64,6 +68,7 @@ export async function POST(request: NextRequest) {
       typeof body.default_colour === "string"
         ? body.default_colour
         : undefined,
+    hidden: typeof body.hidden === "boolean" ? body.hidden : undefined,
   });
   const [catalogue, inventory] = await Promise.all([
     listMerchCatalogue(),
@@ -72,6 +77,8 @@ export async function POST(request: NextRequest) {
   return jsonOk({
     item,
     catalogue,
-    products: clothingProductsWithImages(catalogue, inventory),
+    products: clothingProductsWithImages(catalogue, inventory, {
+      includeHidden: true,
+    }),
   });
 }

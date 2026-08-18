@@ -1,7 +1,7 @@
 /** Shared clean-up for hub store + Supabase import. */
 
 import { normalizeRichTextStorage } from "@/lib/sanitize";
-import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
+import { isCanvaUrl, isImageUrl, isPreviewableImageUrl } from "@/lib/social/platforms";
 
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
   { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
@@ -88,11 +88,18 @@ export function primaryAssetUrl(
   return parseAssetUrls(raw)[0] ?? "";
 }
 
+/** Image URLs among assets (skips Canva / PDF / other links). */
+export function imageAssetUrls(
+  raw: string | string[] | null | undefined
+): string[] {
+  return parseAssetUrls(raw).filter((u) => isPreviewableImageUrl(u));
+}
+
 /** First image URL among assets (skips Canva / PDF / other links). */
 export function primaryImageUrl(
   raw: string | string[] | null | undefined
 ): string {
-  return parseAssetUrls(raw).find((u) => isImageUrl(u)) ?? "";
+  return imageAssetUrls(raw)[0] ?? "";
 }
 
 /** First Canva design URL among assets. */

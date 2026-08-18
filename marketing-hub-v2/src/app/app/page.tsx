@@ -45,7 +45,7 @@ export default async function AppHomePage() {
     )
     .slice(0, 3);
   const inFlight = content.filter((c) =>
-    ["idea", "draft", "review", "scheduled"].includes(c.status)
+    ["idea", "draft", "review", "approved", "scheduled"].includes(c.status)
   ).length;
   const activeSponsors = sponsorships.filter((s) =>
     ["confirmed", "active", "negotiating"].includes(s.status)

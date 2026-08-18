@@ -5,19 +5,20 @@ import { cn } from "@/lib/utils";
 import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
   formatChannels,
+  imageAssetUrls,
   isSocialContentItem,
   parseChannels,
   primaryCanvaUrl,
-  primaryImageUrl,
 } from "@/lib/data/normalize";
+import { CompactMultiImageThumb } from "@/components/social/PlatformPostPreview";
 import { PLATFORM_META, platformKey } from "@/lib/social/platforms";
 import { plainTextFromHtml } from "@/lib/sanitize";
-import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   idea: "Idea",
   draft: "Draft",
   review: "Review",
+  approved: "Approved",
   scheduled: "Scheduled",
   published: "Published",
 };
@@ -28,6 +29,8 @@ function statusTone(status: ContentStatus) {
       return "bg-emerald-50 text-emerald-800 border-emerald-200";
     case "scheduled":
       return "bg-sky-50 text-sky-800 border-sky-200";
+    case "approved":
+      return "bg-teal-50 text-teal-800 border-teal-200";
     case "review":
       return "bg-amber-50 text-amber-900 border-amber-200";
     case "draft":
@@ -60,8 +63,8 @@ export function ContentCalendarCard({
 }) {
   const social = isSocialContentItem(item);
   const channels = parseChannels(item.channel);
-  const image = primaryImageUrl(item.asset_url);
-  const canva = !image ? primaryCanvaUrl(item.asset_url) : "";
+  const images = imageAssetUrls(item.asset_url);
+  const canva = images.length === 0 ? primaryCanvaUrl(item.asset_url) : "";
   const notesPreview = plainTextFromHtml(item.notes).slice(0, 120);
   const preview = item.title?.trim() || notesPreview || "Untitled";
 
@@ -91,18 +94,8 @@ export function ContentCalendarCard({
         </div>
       </div>
 
-      {image ? (
-        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={image}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      ) : canva ? (
-        <CanvaPreviewTile url={canva} compact />
+      {images.length > 0 || canva ? (
+        <CompactMultiImageThumb images={images} canvaUrl={canva || null} />
       ) : (
         <div
           className={cn(
@@ -184,6 +177,13 @@ export const HUB_CALENDAR_CSS = `
   .hub-fc th { border-color: #e8ecf0 !important; }
   .hub-fc .fc-event { cursor: grab; }
   .hub-fc .fc-event:active { cursor: grabbing; }
+  .hub-fc.hub-fc--day-create .fc-daygrid-day-frame { cursor: pointer; }
+  .hub-fc.hub-fc--day-create .fc-daygrid-day-frame:hover {
+    background: #f1f5f9;
+  }
+  .hub-fc.hub-fc--day-create .fc-day-today .fc-daygrid-day-frame:hover {
+    background: #f1f5f9 !important;
+  }
   /* "+N more" popover: keep card stack readable (no full-bleed images) */
   .hub-fc .fc-more-popover {
     max-width: min(280px, 90vw) !important;

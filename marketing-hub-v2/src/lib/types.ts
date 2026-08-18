@@ -65,6 +65,7 @@ export type ContentStatus =
   | "idea"
   | "draft"
   | "review"
+  | "approved"
   | "scheduled"
   | "published";
 
@@ -370,6 +371,8 @@ export type MerchCatalogueImage = {
   material?: string;
   colours?: string[];
   default_colour?: string;
+  /** When true, the item is removed from the live order catalogue. Admins can restore it. */
+  hidden?: boolean;
   updated_at: string;
 };
 

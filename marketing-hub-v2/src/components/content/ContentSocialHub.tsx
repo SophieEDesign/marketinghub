@@ -69,7 +69,7 @@ export function ContentSocialHub({
     <div>
       <PageHeader
         title="Content & Social"
-        description="Draft in the Hub; approve and publish in Planable. Published posts lock in the Hub."
+        description="Draft and review in the Hub. Set Approved or Scheduled to send to Planable — then approve, add platforms, and publish there. Published posts lock in the Hub."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <button

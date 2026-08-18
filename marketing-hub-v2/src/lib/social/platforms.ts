@@ -60,6 +60,24 @@ export function isImageUrl(url: string | null | undefined): boolean {
   return /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u) || u.includes("image");
 }
 
+/** Images plus CDN/signed media URLs with no file extension (Planable, Drive). */
+export function isPreviewableImageUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (isImageUrl(url)) return true;
+  if (isCanvaUrl(url)) return false;
+  const u = url.toLowerCase();
+  if (/\.(pdf|docx?|xlsx?|pptx?|csv|zip|mp4|mov|webm|m4v)(\?|$)/i.test(u)) {
+    return false;
+  }
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    return !/\.[a-z0-9]{2,5}$/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** True for Canva design / share links (not CDN image exports). */
 export function isCanvaUrl(url: string | null | undefined): boolean {
   if (!url) return false;

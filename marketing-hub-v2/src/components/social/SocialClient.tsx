@@ -1,33 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, startOfDay } from "date-fns";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { Check, ExternalLink, ImageIcon, Send } from "lucide-react";
+import { Check, ExternalLink, Send } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import type { ContentItem } from "@/lib/types";
 import {
+  imageAssetUrls,
   isSocialContentItem,
   normalizeChannels,
   primaryCanvaUrl,
-  primaryImageUrl,
   stripHtml,
 } from "@/lib/data/normalize";
 import {
   PLATFORM_META,
   isCanvaUrl,
-  isImageUrl,
+  isPreviewableImageUrl,
   platformKey,
 } from "@/lib/social/platforms";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
-import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
-import { RichTextView } from "@/components/ui/RichTextView";
+import {
+  CompactMultiImageThumb,
+  PlatformPostPreview,
+} from "@/components/social/PlatformPostPreview";
 
 type SocialPost = {
   id: string;
@@ -40,6 +42,7 @@ type SocialPost = {
   platform: string;
   platforms: string[];
   mediaUrl: string | null;
+  mediaUrls: string[];
   source: "planable" | "hub";
 };
 
@@ -116,8 +119,9 @@ function PostCard({
   const platforms = post.platforms.length
     ? post.platforms
     : [post.platform];
-  const hasMedia = isImageUrl(post.mediaUrl);
-  const hasCanva = !hasMedia && isCanvaUrl(post.mediaUrl);
+  const images = post.mediaUrls.filter(isPreviewableImageUrl);
+  const canvaUrl =
+    images.length === 0 && isCanvaUrl(post.mediaUrl) ? post.mediaUrl : null;
   const time =
     post.scheduledAt && !Number.isNaN(parseISO(post.scheduledAt).getTime())
       ? format(parseISO(post.scheduledAt), "HH:mm")
@@ -145,23 +149,7 @@ function PostCard({
         ) : null}
       </div>
 
-      {hasMedia ? (
-        <div className="relative aspect-[16/10] w-full overflow-hidden rounded-md bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={post.mediaUrl!}
-            alt=""
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      ) : hasCanva ? (
-        <CanvaPreviewTile url={post.mediaUrl!} compact />
-      ) : (
-        <div className="flex aspect-[16/10] w-full items-center justify-center rounded-md bg-gradient-to-br from-sky-50 to-slate-100 text-sky-200">
-          <ImageIcon className="h-5 w-5" />
-        </div>
-      )}
+      <CompactMultiImageThumb images={images} canvaUrl={canvaUrl} />
 
       <p className="line-clamp-2 text-[10px] font-medium leading-snug text-slate-800">
         {post.text || "Untitled post"}
@@ -210,6 +198,13 @@ export function SocialClient({
     posts: SocialPost[];
   } | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [createForm, setCreateForm] = useState<{
+    due_date: string;
+    title: string;
+    caption: string;
+  } | null>(null);
+  const [creating, setCreating] = useState(false);
+  const createFormRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -238,6 +233,8 @@ export function SocialClient({
           const text =
             stripHtml(c.caption || c.title || c.notes || "Untitled post") ||
             "Untitled post";
+          const images = imageAssetUrls(c.asset_url);
+          const canva = primaryCanvaUrl(c.asset_url);
           return {
             id: c.id,
             text,
@@ -247,10 +244,8 @@ export function SocialClient({
             url: c.planable_url || null,
             platform,
             platforms: unique,
-            mediaUrl:
-              primaryImageUrl(c.asset_url) ||
-              primaryCanvaUrl(c.asset_url) ||
-              null,
+            mediaUrl: images[0] || canva || null,
+            mediaUrls: images,
             source: "hub" as const,
           };
         })
@@ -277,6 +272,7 @@ export function SocialClient({
               url: string | null;
               pageName: string | null;
               mediaUrl?: string | null;
+              mediaUrls?: string[];
               platforms?: string[];
             }>).map((p) => {
               const platforms = (p.platforms?.length
@@ -285,6 +281,13 @@ export function SocialClient({
                   ? [p.pageName]
                   : ["Social"]
               ).map(normalizePlatform);
+              const mediaUrls = (p.mediaUrls?.length
+                ? p.mediaUrls
+                : p.mediaUrl
+                  ? [p.mediaUrl]
+                  : []
+              ).filter(Boolean);
+              const images = mediaUrls.filter(isPreviewableImageUrl);
               return {
                 id: `pl_${p.id}`,
                 text: stripHtml(p.text),
@@ -294,7 +297,8 @@ export function SocialClient({
                 url: p.url,
                 platform: platforms[0] ?? "Social",
                 platforms,
-                mediaUrl: p.mediaUrl ?? null,
+                mediaUrl: images[0] ?? mediaUrls[0] ?? null,
+                mediaUrls: images.length ? images : mediaUrls,
                 source: "planable" as const,
               };
             });
@@ -467,6 +471,57 @@ export function SocialClient({
     });
   }
 
+  function openCreateOnDate(dateStr: string) {
+    if (memberView) return;
+    const day = dateStr.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+    setSelectedId(null);
+    setOverflowDay(null);
+    setCreateForm((prev) =>
+      prev
+        ? { ...prev, due_date: day }
+        : { due_date: day, title: "", caption: "" }
+    );
+    requestAnimationFrame(() => {
+      createFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
+  async function createPostFromDay() {
+    if (memberView || !createForm) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: createForm.title.trim() || "Untitled post",
+          caption: createForm.caption,
+          due_date: createForm.due_date,
+          content_type: "Social",
+          channel: ["LinkedIn"],
+          status: "idea",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not create post");
+        return;
+      }
+      if (data.planableSyncError) {
+        setError(data.planableSyncError);
+      }
+      setCreateForm(null);
+      await load();
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const selected = selectedId
     ? posts.find((p) => p.id === selectedId) ?? null
     : null;
@@ -509,7 +564,7 @@ export function SocialClient({
           description={
             memberView
               ? "Scheduled and published posts across channels."
-              : "Hub social drafts synced with Planable — approve and publish in Planable."
+              : "Approved or Scheduled Hub posts sync to Planable — approve, add platforms, and publish there."
           }
           actions={
             !memberView ? (
@@ -581,6 +636,69 @@ export function SocialClient({
         ]}
       />
 
+      {createForm && !memberView ? (
+        <div
+          ref={createFormRef}
+          className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2"
+        >
+          <div className="md:col-span-2">
+            <p className="text-sm font-semibold text-brand">New post</p>
+            <p className="mt-0.5 text-xs text-muted">
+              Date is set from the calendar day you clicked.
+            </p>
+          </div>
+          <div>
+            <label className="label">Title</label>
+            <input
+              className="field"
+              value={createForm.title}
+              onChange={(e) =>
+                setCreateForm({ ...createForm, title: e.target.value })
+              }
+            />
+          </div>
+          <div>
+            <label className="label">Date</label>
+            <input
+              className="field"
+              type="date"
+              value={createForm.due_date}
+              onChange={(e) =>
+                setCreateForm({ ...createForm, due_date: e.target.value })
+              }
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="label">Caption / post text</label>
+            <textarea
+              className="field min-h-[88px]"
+              value={createForm.caption}
+              onChange={(e) =>
+                setCreateForm({ ...createForm, caption: e.target.value })
+              }
+            />
+          </div>
+          <div className="md:col-span-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={creating}
+              onClick={() => void createPostFromDay()}
+            >
+              {creating ? "Saving…" : "Save post"}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={creating}
+              onClick={() => setCreateForm(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {loading ? (
         <p className="text-sm text-muted">Loading social calendar…</p>
       ) : (
@@ -590,7 +708,17 @@ export function SocialClient({
             {error ? ` · ${error}` : ""}
           </p>
 
-          <div className="hub-fc surface-card overflow-hidden p-3 md:p-4">
+          <div
+            className={cn(
+              "hub-fc surface-card overflow-hidden p-3 md:p-4",
+              !memberView && "hub-fc--day-create"
+            )}
+          >
+            {!memberView ? (
+              <p className="mb-3 text-xs text-muted">
+                Click an empty day to add a post. Drag Hub drafts to reschedule.
+              </p>
+            ) : null}
             <FullCalendar
               plugins={[dayGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -616,6 +744,22 @@ export function SocialClient({
               editable={!memberView}
               eventStartEditable={!memberView}
               eventDurationEditable={false}
+              eventDragMinDistance={8}
+              dateClick={
+                memberView
+                  ? undefined
+                  : (info) => {
+                      const target = info.jsEvent.target as HTMLElement | null;
+                      if (
+                        target?.closest(
+                          ".fc-more-link, .fc-daygrid-more-link, .fc-event"
+                        )
+                      ) {
+                        return;
+                      }
+                      openCreateOnDate(info.dateStr);
+                    }
+              }
               headerToolbar={{
                 left: "prev,next today",
                 center: "title",
@@ -788,7 +932,7 @@ export function SocialClient({
             aria-label="Social post detail"
           >
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Post detail</h2>
+              <h2 className="text-sm font-semibold text-brand">Post preview</h2>
               <button
                 type="button"
                 className="btn-ghost px-2.5 py-1.5 text-xs"
@@ -798,31 +942,19 @@ export function SocialClient({
               </button>
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              {isImageUrl(selected.mediaUrl) ? (
-                <div className="overflow-hidden rounded-lg border border-border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={selected.mediaUrl!}
-                    alt=""
-                    className="max-h-56 w-full object-cover"
-                  />
-                </div>
-              ) : isCanvaUrl(selected.mediaUrl) ? (
-                <div className="overflow-hidden rounded-lg border border-border">
-                  <CanvaPreviewTile url={selected.mediaUrl!} compact={false} />
-                </div>
-              ) : null}
-              {selected.html && looksLikeHtml(selected.html) ? (
-                <RichTextView
-                  html={selected.html}
-                  className="text-base font-medium leading-relaxed"
-                  empty="Untitled post"
-                />
-              ) : (
-                <p className="whitespace-pre-wrap break-words text-base font-medium leading-relaxed">
-                  {selected.text}
-                </p>
-              )}
+              <PlatformPostPreview
+                platforms={
+                  selected.platforms.length
+                    ? selected.platforms
+                    : [selected.platform]
+                }
+                caption={selected.text}
+                captionHtml={selected.html}
+                images={selected.mediaUrls.filter(isPreviewableImageUrl)}
+                canvaUrl={
+                  isCanvaUrl(selected.mediaUrl) ? selected.mediaUrl : null
+                }
+              />
               <div className="flex flex-wrap gap-2">
                 {selected.platforms.map((p) => (
                   <span

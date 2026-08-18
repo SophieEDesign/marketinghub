@@ -69,6 +69,7 @@ const CONTENT_STATUS: FieldOption[] = [
   { value: "idea", label: "Idea" },
   { value: "draft", label: "Draft" },
   { value: "review", label: "Review" },
+  { value: "approved", label: "Approved" },
   { value: "scheduled", label: "Scheduled" },
   { value: "published", label: "Published" },
 ];
@@ -228,6 +229,7 @@ export const RESOURCE_CATEGORIES: FieldOption[] = [
 export const ASSET_REQUEST_CATEGORIES: FieldOption[] = [
   { value: "Presentation", label: "Presentation / deck" },
   { value: "Brochure", label: "Brochure" },
+  { value: "Business Cards", label: "Business Cards" },
   { value: "Image", label: "Image / photo" },
   { value: "Logo", label: "Logo" },
   { value: "Video", label: "Video" },

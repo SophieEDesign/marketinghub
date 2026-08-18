@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addDays,
   parseISO,
@@ -18,18 +18,22 @@ import { TimelineChart } from "@/components/ui/TimelineChart";
 import { cn } from "@/lib/utils";
 import {
   formatChannels,
+  imageAssetUrls,
   isSocialContentItem,
   parseChannels,
   primaryCanvaUrl,
-  primaryImageUrl,
+  stripHtml,
 } from "@/lib/data/normalize";
 import {
   ContentCalendarCard,
   HUB_CALENDAR_CSS,
 } from "@/components/content/ContentCalendarCard";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
-import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 import { FileText, ImageIcon } from "lucide-react";
+import {
+  CompactMultiImageThumb,
+  PlatformPostPreview,
+} from "@/components/social/PlatformPostPreview";
 import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import {
   CHANNELS,
@@ -54,6 +58,7 @@ const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
   { id: "draft", label: "Draft" },
   { id: "review", label: "Review" },
+  { id: "approved", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
 ];
@@ -73,6 +78,7 @@ const STATUS_COLOR: Record<ContentStatus, string> = {
   idea: "#94a3b8",
   draft: "#2a8f9e",
   review: "#c47b3a",
+  approved: "#0d9488",
   scheduled: "#5b6ee1",
   published: "#3d8b5c",
 };
@@ -218,6 +224,7 @@ export function ContentClient({
   const [view, setView] = useState<ContentView>("calendar");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(() => emptyFormForScope(scope));
+  const formRef = useRef<HTMLDivElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -438,6 +445,20 @@ export function ContentClient({
     setEdit(toEditForm(item));
   }
 
+  function openCreateOnDate(dateStr: string) {
+    const day = dateStr.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+    closeEdit();
+    setForm((prev) => ({
+      ...(showForm ? prev : emptyFormForScope(scope)),
+      due_date: day,
+    }));
+    setShowForm(true);
+    requestAnimationFrame(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function closeEdit() {
     setEditingId(null);
     setEdit(null);
@@ -538,24 +559,14 @@ export function ContentClient({
 
   function CardSummary({ item }: { item: ContentItem }) {
     const social = isSocialContentItem(item);
-    const image = primaryImageUrl(item.asset_url);
-    const canva = !image ? primaryCanvaUrl(item.asset_url) : "";
+    const images = imageAssetUrls(item.asset_url);
+    const canva = images.length === 0 ? primaryCanvaUrl(item.asset_url) : "";
 
     return (
       <>
-        {image ? (
-          <div className="mb-2 aspect-[16/10] w-full overflow-hidden rounded-lg bg-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={image}
-              alt=""
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          </div>
-        ) : canva ? (
+        {images.length > 0 || canva ? (
           <div className="mb-2">
-            <CanvaPreviewTile url={canva} compact={false} />
+            <CompactMultiImageThumb images={images} canvaUrl={canva || null} />
           </div>
         ) : social ? (
           <div className="mb-2 flex aspect-[16/10] w-full items-center justify-center rounded-lg bg-gradient-to-br from-sky-50 to-slate-100 text-sky-200">
@@ -651,7 +662,7 @@ export function ContentClient({
       ) : (
         <PageHeader
           title="Content planner"
-          description="Draft social in the Hub; approve and publish in Planable. Published posts are locked."
+          description="Draft social in the Hub; set Approved or Scheduled to send to Planable. Approve, add platforms, and publish there. Published posts are locked."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {scope !== "content" ? (
@@ -759,7 +770,10 @@ export function ContentClient({
       />
 
       {showForm ? (
-        <div className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2">
+        <div
+          ref={formRef}
+          className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2"
+        >
           <div className="md:col-span-2">
             <label className="label">Title</label>
             <input
@@ -939,11 +953,11 @@ export function ContentClient({
           ) : null}
 
           {view === "calendar" ? (
-            <div className="hub-fc surface-card overflow-hidden p-3 md:p-4">
+            <div className="hub-fc hub-fc--day-create surface-card overflow-hidden p-3 md:p-4">
               <p className="mb-3 text-xs text-muted">
                 {scope === "all"
-                  ? "Content and Social on one calendar. Drag cards to reschedule, or click to edit."
-                  : "Drag cards to reschedule, or click to edit."}
+                  ? "Content and Social on one calendar. Click an empty day to add a piece, drag cards to reschedule, or click a card to edit."
+                  : "Click an empty day to add a piece, drag cards to reschedule, or click a card to edit."}
               </p>
               <FullCalendar
                 plugins={[dayGridPlugin, interactionPlugin, listPlugin]}
@@ -960,8 +974,20 @@ export function ContentClient({
                 editable
                 eventStartEditable
                 eventDurationEditable={false}
+                eventDragMinDistance={8}
                 events={calendarEvents}
                 eventClassNames="!border-0 !bg-transparent cursor-grab active:cursor-grabbing"
+                dateClick={(info) => {
+                  const target = info.jsEvent.target as HTMLElement | null;
+                  if (
+                    target?.closest(
+                      ".fc-more-link, .fc-daygrid-more-link, .fc-event"
+                    )
+                  ) {
+                    return;
+                  }
+                  openCreateOnDate(info.dateStr);
+                }}
                 eventClick={(info) => {
                   info.jsEvent.preventDefault();
                   const item = items.find((i) => i.id === info.event.id);
@@ -1058,6 +1084,20 @@ export function ContentClient({
               </p>
             ) : null}
             <div className="flex-1 overflow-y-auto p-4">
+              {editIsSocial ? (
+                <div className="mb-4">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">
+                    Platform preview
+                  </p>
+                  <PlatformPostPreview
+                    platforms={edit.channel}
+                    caption={stripHtml(edit.caption || edit.title)}
+                    captionHtml={edit.caption}
+                    images={imageAssetUrls(edit.asset_url)}
+                    canvaUrl={primaryCanvaUrl(edit.asset_url) || null}
+                  />
+                </div>
+              ) : null}
               <fieldset disabled={editLocked} className="grid gap-2 disabled:opacity-80">
                 <div>
                   <label className="label">Title</label>
@@ -1189,7 +1229,8 @@ export function ContentClient({
                   />
                   {editIsSocial ? (
                     <p className="mt-1 text-xs text-muted">
-                      Publish only happens in Planable — then Sync from Planable
+                      Approved or Scheduled sends a draft to Planable. Approve,
+                      add platforms, and publish there — then Sync from Planable
                       locks this piece.
                     </p>
                   ) : null}

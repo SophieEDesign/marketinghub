@@ -1093,6 +1093,7 @@ export type MerchCataloguePatch = {
   material?: string;
   colours?: string[];
   default_colour?: string;
+  hidden?: boolean;
 };
 
 function normalizeOptionalText(value: unknown): string | undefined {
@@ -1112,7 +1113,8 @@ function normalizeColourList(value: unknown): string[] | undefined {
 /** True when the row still carries any stored override / image. */
 function catalogueRowHasContent(row: MerchCatalogueImage): boolean {
   return Boolean(
-    row.image_url?.trim() ||
+    row.hidden ||
+      row.image_url?.trim() ||
       row.label?.trim() ||
       row.brand?.trim() ||
       row.material?.trim() ||
@@ -1182,6 +1184,12 @@ export async function upsertMerchCatalogue(
       if (defaultColour) next.default_colour = defaultColour;
     } else if (prev?.default_colour?.trim()) {
       next.default_colour = prev.default_colour.trim();
+    }
+
+    if (patch.hidden !== undefined) {
+      if (patch.hidden) next.hidden = true;
+    } else if (prev?.hidden) {
+      next.hidden = true;
     }
 
     const newLabel = next.label?.trim() || base.label;

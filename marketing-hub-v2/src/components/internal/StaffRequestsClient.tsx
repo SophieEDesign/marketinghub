@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
 import { ASSET_REQUEST_CATEGORIES } from "@/lib/data/collections";
+import { parseAssetUrls } from "@/lib/data/normalize";
 import type {
   StaffRequest,
   StaffRequestKind,
@@ -42,6 +43,28 @@ function isAssetKind(kind: StaffRequestKind) {
 
 function allowsUpload(kind: StaffRequestKind) {
   return kind === "asset" || kind === "social_form";
+}
+
+function AttachmentLinks({ raw }: { raw: string }) {
+  const attachments = parseAssetUrls(raw);
+  if (attachments.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+      {attachments.map((url, index) => (
+        <a
+          key={`${url}-${index}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-sm text-brand underline-offset-2 hover:underline"
+        >
+          {attachments.length === 1
+            ? "View attachment"
+            : `View attachment ${index + 1}`}
+        </a>
+      ))}
+    </div>
+  );
 }
 
 export function StaffRequestsClient({
@@ -257,6 +280,7 @@ export function StaffRequestsClient({
           {allowsUpload(activeKind) ? (
             <div className="md:col-span-2">
               <AssetUploadField
+                multiple
                 value={form.attachment_url}
                 onChange={(url) =>
                   setForm({ ...form, attachment_url: url })
@@ -264,12 +288,12 @@ export function StaffRequestsClient({
                 label={
                   activeKind === "social_form"
                     ? "Reference / draft media"
-                    : "Reference file"
+                    : "Reference files"
                 }
                 hint={
                   activeKind === "social_form"
-                    ? "Optional image, PDF or short video for the social request · max 25MB."
-                    : "Optional brief, draft, or example file · images, PDF or short video · max 25MB."
+                    ? "Optional images, PDF or short video for the social request · drop several at once · max 25MB each."
+                    : "Optional brief, draft, or example files · drop several at once · max 25MB each."
                 }
               />
             </div>
@@ -319,16 +343,7 @@ export function StaffRequestsClient({
                     <RichTextView html={item.details} />
                   </div>
                 ) : null}
-                {item.attachment_url ? (
-                  <a
-                    href={item.attachment_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 inline-block text-sm text-brand underline-offset-2 hover:underline"
-                  >
-                    View attachment
-                  </a>
-                ) : null}
+                <AttachmentLinks raw={item.attachment_url} />
                 <p className="mt-2 text-xs text-muted">
                   {item.requested_by || "Staff"}
                   {item.needed_by ? ` · needed ${item.needed_by}` : ""}

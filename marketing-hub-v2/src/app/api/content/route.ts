@@ -11,16 +11,17 @@ import {
   isSocialContentItem,
   normalizeChannels,
 } from "@/lib/data/normalize";
-import { pushContentToPlanable, removeContentFromPlanable } from "@/lib/planable/sync";
+import {
+  pushContentToPlanable,
+  removeContentFromPlanable,
+  shouldPushSocialToPlanable,
+} from "@/lib/planable/sync";
 import type { ContentItem } from "@/lib/types";
 
 async function maybePushPlanable(
   item: ContentItem
 ): Promise<{ item: ContentItem; planableSyncError?: string }> {
-  if (!isSocialContentItem(item)) {
-    return { item };
-  }
-  if (item.status === "published") {
+  if (!shouldPushSocialToPlanable(item)) {
     return { item };
   }
   const result = await pushContentToPlanable(item);

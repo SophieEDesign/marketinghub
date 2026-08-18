@@ -45,7 +45,8 @@ function mapStatus(raw: string): ContentStatus {
   const s = raw.toLowerCase();
   if (s.includes("publish")) return "published";
   if (s.includes("schedul")) return "scheduled";
-  if (s.includes("review") || s.includes("approv")) return "review";
+  if (s.includes("approv")) return "approved";
+  if (s.includes("review")) return "review";
   if (s.includes("draft")) return "draft";
   return "idea";
 }

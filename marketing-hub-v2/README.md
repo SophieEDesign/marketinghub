@@ -45,7 +45,7 @@ See [`.env.example`](.env.example).
 
 - **Auth:** Set Supabase URL/keys and turn off `AUTH_BYPASS` for real staff login.
 - **Drive:** Service account with Viewer on the gallery folder + `DRIVE_GALLERY_ROOT_FOLDER_ID`.
-- **Planable:** `PLANABLE_API_TOKEN` (Write scope) + `PLANABLE_WORKSPACE_ID`. Two-way sync: **Sync from Planable** pulls drafts into Hub social content; saving Social pieces pushes drafts back. Status stays linked (idea → scheduled); **publish only in Planable**, then sync to lock the Hub piece.
+- **Planable:** `PLANABLE_API_TOKEN` (Write scope) + `PLANABLE_WORKSPACE_ID`. Draft and review Social in the Hub; **Approved** or **Scheduled** pushes an unapproved Planable draft. Approve, add platforms, and **publish only in Planable**, then **Sync from Planable** to lock the Hub piece.
 - **Alerts:** Set `RESEND_API_KEY` (and optional `RESEND_FROM_EMAIL`, `MARKETING_ALERT_EMAIL`) so marketing gets a short email when a clothing/asset/social request or feedback is submitted — type only, no details.
 
 SQL for a dedicated Supabase project: [`supabase/migrations/001_hub_v2_schema.sql`](supabase/migrations/001_hub_v2_schema.sql).

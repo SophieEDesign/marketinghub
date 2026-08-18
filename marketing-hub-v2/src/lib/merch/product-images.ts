@@ -54,12 +54,15 @@ export function applyCatalogueOverrides(
 
 /** Built-in products with any catalogue name/brand/colour overrides applied. */
 export function resolvedClothingProducts(
-  catalogue: MerchCatalogueImage[]
+  catalogue: MerchCatalogueImage[],
+  options?: { includeHidden?: boolean }
 ): ClothingProduct[] {
   const byId = catalogueByProductId(catalogue);
-  return CLOTHING_PRODUCTS.map((p) =>
-    applyCatalogueOverrides(p, byId[p.id] ?? null)
-  );
+  return CLOTHING_PRODUCTS.flatMap((p) => {
+    const row = byId[p.id] ?? null;
+    if (!options?.includeHidden && row?.hidden) return [];
+    return [applyCatalogueOverrides(p, row)];
+  });
 }
 
 /** Effective display label for a product id (override or built-in). */
@@ -107,7 +110,7 @@ export function clothingProductImageForLabel(
   catalogue: MerchCatalogueImage[],
   inventory: MerchInventoryItem[]
 ): string {
-  const products = resolvedClothingProducts(catalogue);
+  const products = resolvedClothingProducts(catalogue, { includeHidden: true });
   const product = clothingProductByLabel(label, products);
   if (!product) {
     return inventoryImageByItemLabel(inventory)[label.trim()] ?? "";
@@ -121,12 +124,15 @@ export function clothingProductImageForLabel(
 
 export function clothingProductsWithImages(
   catalogue: MerchCatalogueImage[],
-  inventory: MerchInventoryItem[]
-): Array<ClothingProduct & { image_url: string }> {
+  inventory: MerchInventoryItem[],
+  options?: { includeHidden?: boolean }
+): Array<ClothingProduct & { image_url: string; hidden?: boolean }> {
   const byId = catalogueImageMap(catalogue);
   const byLabel = inventoryImageByItemLabel(inventory);
-  return resolvedClothingProducts(catalogue).map((p) => ({
+  const rows = catalogueByProductId(catalogue);
+  return resolvedClothingProducts(catalogue, options).map((p) => ({
     ...p,
     image_url: resolveClothingProductImage(p, byId, byLabel),
+    hidden: Boolean(rows[p.id]?.hidden),
   }));
 }

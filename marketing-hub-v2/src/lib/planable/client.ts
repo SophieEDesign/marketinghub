@@ -34,6 +34,7 @@ export type PlanablePost = {
   url: string | null;
   pageName: string | null;
   mediaUrl: string | null;
+  mediaUrls: string[];
   platforms: string[];
 };
 
@@ -80,7 +81,7 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
         const m = item as { url?: string; thumbnailUrl?: string };
-        push(m.thumbnailUrl || m.url);
+        push(m.url || m.thumbnailUrl);
       }
     }
   }
@@ -92,15 +93,19 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
     for (const item of attachments) {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
-        push(item.thumbnail || item.url);
+        push(item.url || item.thumbnail);
       }
     }
   }
 
-  push(p.thumbnailUrl as string | undefined);
-  push(p.thumbnail as string | undefined);
-  push(p.imageUrl as string | undefined);
-  push(p.coverUrl as string | undefined);
+  // Cover/thumbnail only when the post has no media array — otherwise they
+  // duplicate the first slide as a different resized URL.
+  if (out.length === 0) {
+    push(p.thumbnailUrl as string | undefined);
+    push(p.thumbnail as string | undefined);
+    push(p.imageUrl as string | undefined);
+    push(p.coverUrl as string | undefined);
+  }
   return out;
 }
 
@@ -424,6 +429,7 @@ export async function fetchPlanablePosts(): Promise<{
         const hub = hubStatusFromPlanable(p);
         if (hub === "published") return "Published";
         if (hub === "scheduled") return "Scheduled";
+        if (hub === "approved") return "Approved";
         if (hub === "review") return "Review";
         return "Draft";
       })(),
@@ -431,6 +437,7 @@ export async function fetchPlanablePosts(): Promise<{
       url: p.url,
       pageName: p.pageName,
       mediaUrl: p.mediaUrls[0] ?? null,
+      mediaUrls: p.mediaUrls,
       platforms: p.platforms,
     })),
     openUrl: result.openUrl,
@@ -734,10 +741,9 @@ export function hubStatusFromPlanable(post: {
   scheduledSet?: boolean;
 }): ContentStatus {
   if (post.published) return "published";
-  // Planable drafts often include a date with scheduledSet=false — stay Draft.
   // Scheduled in the Hub only when approved AND actually scheduled.
   if (post.approved && post.scheduledSet === true) return "scheduled";
-  if (post.approved) return "review";
+  if (post.approved) return "approved";
   return "draft";
 }
 

@@ -43,6 +43,7 @@ const CONTENT_STATUS_OPTIONS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
   { id: "draft", label: "Draft" },
   { id: "review", label: "Review" },
+  { id: "approved", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
 ];

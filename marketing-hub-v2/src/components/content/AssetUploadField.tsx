@@ -1,7 +1,15 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ExternalLink, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  GripVertical,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   joinAssetUrls,
   parseAssetUrls,
@@ -10,7 +18,11 @@ import {
 } from "@/lib/data/normalize";
 import { isCanvaUrl, isImageUrl } from "@/lib/social/platforms";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
-import { UPLOAD_ACCEPT } from "@/lib/upload/allowed-types";
+import {
+  isAllowedUpload,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_ACCEPT,
+} from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
 import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 
@@ -26,6 +38,24 @@ type MultiProps = {
   onChange: (urlsJoined: string) => void;
 };
 
+function filesFromList(list: FileList | File[] | null | undefined): File[] {
+  if (!list) return [];
+  return Array.from(list).filter((file) => isAllowedUpload(file.name, file.type));
+}
+
+function filesFromDrop(dt: DataTransfer): File[] {
+  if (dt.files?.length) return filesFromList(dt.files);
+  const fromItems: File[] = [];
+  for (const item of Array.from(dt.items ?? [])) {
+    if (item.kind !== "file") continue;
+    const file = item.getAsFile();
+    if (file) fromItems.push(file);
+  }
+  return filesFromList(fromItems);
+}
+
+const MAX_MB = Math.round(MAX_UPLOAD_BYTES / (1024 * 1024));
+
 export function AssetUploadField({
   value,
   onChange,
@@ -38,6 +68,12 @@ export function AssetUploadField({
 } & (SingleProps | MultiProps)) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
+  const [dragActive, setDragActive] = useState(false);
+  const [reorderFrom, setReorderFrom] = useState<number | null>(null);
+  const [reorderOver, setReorderOver] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pasteUrl, setPasteUrl] = useState("");
 
@@ -49,8 +85,10 @@ export function AssetUploadField({
   const resolvedHint =
     hint ??
     (needsPreviewImage
-      ? "Canva link saved — also upload/paste a PNG or JPG so the calendar can show the real design."
-      : "Images, PDF, Word, Excel, PowerPoint, CSV or short video · max 25MB. Shows on the calendar card. Paste a Canva link and a preview image together.");
+      ? "Canva link saved — also drop, upload, or paste a PNG or JPG so the calendar can show the real design."
+      : multiple
+        ? `Drop several files at once, click to pick, or paste (Ctrl+V). Drag to reorder — 1 is first in the carousel. Images, PDF, Word, Excel, PowerPoint, CSV or short video · max ${MAX_MB}MB each.`
+        : `Drop a file, click to pick, or paste (Ctrl+V). Images, PDF, Word, Excel, PowerPoint, CSV or short video · max ${MAX_MB}MB.`);
 
   function commit(next: string[]) {
     const cleaned = parseAssetUrls(next);
@@ -61,32 +99,80 @@ export function AssetUploadField({
     }
   }
 
-  async function onFile(file: File | null) {
-    if (!file) return;
+  async function onFiles(incoming: File[]) {
+    if (uploading) return;
+    const accepted = filesFromList(incoming);
+    if (accepted.length === 0) {
+      if (incoming.length > 0) {
+        setError(
+          "Use images, PDF, Word, Excel, PowerPoint, CSV or short video"
+        );
+      }
+      return;
+    }
+
+    const toUpload = multiple ? accepted : accepted.slice(0, 1);
     setUploading(true);
-    setError(null);
+    setError(
+      !multiple && accepted.length > 1
+        ? "This field takes one file — using the first dropped file."
+        : null
+    );
+    setProgress({ current: 0, total: toUpload.length });
     try {
-      const data = await uploadAssetDirect(file);
-      commit(multiple ? [...urls, data.url] : [data.url]);
+      const added: string[] = [];
+      for (let i = 0; i < toUpload.length; i++) {
+        setProgress({ current: i + 1, total: toUpload.length });
+        const data = await uploadAssetDirect(toUpload[i]);
+        added.push(data.url);
+      }
+      commit(multiple ? [...urls, ...added] : added);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
       setUploading(false);
+      setProgress(null);
+      setDragActive(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
 
-  async function onPasteImage(e: React.ClipboardEvent) {
+  function onDragOver(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (uploading || reorderFrom !== null) return;
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    e.dataTransfer.dropEffect = "copy";
+    setDragActive(true);
+  }
+
+  function onDragLeave(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+  }
+
+  function onDropFiles(e: DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (uploading || reorderFrom !== null) return;
+    void onFiles(filesFromDrop(e.dataTransfer));
+  }
+
+  async function onPasteImage(e: ClipboardEvent) {
+    if (uploading) return;
     const items = e.clipboardData?.items;
     if (!items) return;
+    const images: File[] = [];
     for (const item of Array.from(items)) {
       if (!item.type.startsWith("image/")) continue;
       const file = item.getAsFile();
-      if (!file) continue;
-      e.preventDefault();
-      await onFile(file);
-      return;
+      if (file) images.push(file);
     }
+    if (images.length === 0) return;
+    e.preventDefault();
+    await onFiles(images);
   }
 
   function addPastedUrl() {
@@ -99,6 +185,98 @@ export function AssetUploadField({
   function removeAt(index: number) {
     commit(urls.filter((_, i) => i !== index));
   }
+
+  function moveAt(from: number, to: number) {
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= urls.length ||
+      to >= urls.length
+    ) {
+      return;
+    }
+    const next = [...urls];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    commit(next);
+  }
+
+  function clearReorder() {
+    setReorderFrom(null);
+    setReorderOver(null);
+  }
+
+  function openPicker() {
+    if (uploading) return;
+    inputRef.current?.click();
+  }
+
+  const dropTitle = uploading
+    ? progress && progress.total > 1
+      ? `Uploading ${progress.current} of ${progress.total}…`
+      : "Uploading…"
+    : needsPreviewImage
+      ? "Drop, click, or paste (Ctrl+V) a preview image"
+      : multiple
+        ? urls.length
+          ? "Drop files here or click to add"
+          : "Drop files here, click, or paste (Ctrl+V)"
+        : urls.length
+          ? "Drop to replace, click, or paste (Ctrl+V)"
+          : "Drop a file here, click, or paste (Ctrl+V)";
+
+  const dropHint = multiple
+    ? `Images, PDF, or documents · max ${MAX_MB}MB each · several files at once`
+    : `Images, PDF, or documents · max ${MAX_MB}MB`;
+
+  const dropZone = (
+    <div
+      role="button"
+      tabIndex={0}
+      className={cn(
+        "cursor-pointer rounded-2xl border-2 border-dashed px-3 py-5 text-center transition",
+        dragActive
+          ? "border-brand bg-brand/5"
+          : "border-border bg-sand/30 hover:border-brand/40 hover:bg-sand/50",
+        uploading && "pointer-events-none opacity-70"
+      )}
+      onClick={openPicker}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openPicker();
+        }
+      }}
+      onDragEnter={onDragOver}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDropFiles}
+    >
+      {uploading ? (
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand" />
+      ) : (
+        <Upload
+          className={cn("mx-auto h-6 w-6", dragActive ? "text-brand" : "text-muted")}
+        />
+      )}
+      <p className="mt-1.5 text-sm font-medium text-brand">{dropTitle}</p>
+      <p className="mt-1 text-xs text-muted">{dropHint}</p>
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        accept={UPLOAD_ACCEPT}
+        multiple={multiple}
+        disabled={uploading}
+        onChange={(e) => {
+          void onFiles(filesFromList(e.target.files));
+          e.target.value = "";
+        }}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
 
   if (!multiple) {
     const single = urls[0] ?? "";
@@ -144,51 +322,24 @@ export function AssetUploadField({
 
         {needsPreviewImage ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
-            Private Canva links can’t be previewed automatically. Upload or paste
-            (Ctrl+V) a PNG/JPG export for the calendar thumbnail.
+            Private Canva links can’t be previewed automatically. Drop, upload or
+            paste (Ctrl+V) a PNG/JPG export for the calendar thumbnail.
           </p>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
+        {dropZone}
+
+        {single ? (
           <button
             type="button"
-            className={cn("btn-secondary", uploading && "opacity-70")}
+            className="btn-ghost text-[var(--danger)]"
             disabled={uploading}
-            onClick={() => inputRef.current?.click()}
+            onClick={() => commit([])}
           >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ImagePlus className="h-4 w-4" />
-            )}
-            {uploading
-              ? "Uploading…"
-              : needsPreviewImage
-                ? "Upload preview image"
-                : single
-                  ? "Replace asset"
-                  : "Upload asset"}
+            <Trash2 className="h-4 w-4" />
+            Remove
           </button>
-          {single ? (
-            <button
-              type="button"
-              className="btn-ghost text-[var(--danger)]"
-              disabled={uploading}
-              onClick={() => commit([])}
-            >
-              <Trash2 className="h-4 w-4" />
-              Remove
-            </button>
-          ) : null}
-        </div>
-
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          accept={UPLOAD_ACCEPT}
-          onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-        />
+        ) : null}
 
         <input
           className="field text-xs"
@@ -213,18 +364,68 @@ export function AssetUploadField({
       {needsPreviewImage ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
           Private Canva links can’t be previewed automatically. Keep the Canva
-          link and also upload or paste (Ctrl+V) a PNG/JPG — the calendar uses
-          the image.
+          link and also drop, upload, or paste (Ctrl+V) a PNG/JPG — the calendar
+          uses the image.
         </p>
       ) : null}
 
       {urls.length > 0 ? (
         <ul className="space-y-2">
-          {urls.map((url, index) => (
+          {urls.map((url, index) => {
+            const canReorder = urls.length > 1 && !uploading;
+            return (
             <li
               key={`${url}-${index}`}
-              className="flex items-start gap-2 rounded-xl border border-border bg-sand/40 p-2"
+              className={cn(
+                "flex items-start gap-2 rounded-xl border border-border bg-sand/40 p-2",
+                reorderOver === index &&
+                  reorderFrom !== index &&
+                  "ring-2 ring-brand/30 bg-brand/5",
+                reorderFrom === index && "opacity-50"
+              )}
+              onDragOver={(e) => {
+                if (!canReorder || reorderFrom === null) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "move";
+                if (reorderOver !== index) setReorderOver(index);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!canReorder) return;
+                const fromStr = e.dataTransfer.getData("text/plain");
+                const from = Number.parseInt(fromStr, 10);
+                if (Number.isFinite(from)) moveAt(from, index);
+                clearReorder();
+              }}
+              onDragLeave={() => {
+                if (reorderOver === index) setReorderOver(null);
+              }}
             >
+              {canReorder ? (
+                <button
+                  type="button"
+                  className="mt-3 shrink-0 cursor-grab select-none rounded p-1 text-muted hover:bg-white hover:text-foreground active:cursor-grabbing"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("text/plain", String(index));
+                    e.dataTransfer.effectAllowed = "move";
+                    setReorderFrom(index);
+                  }}
+                  onDragEnd={clearReorder}
+                  aria-label={`Drag to reorder asset ${index + 1}`}
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="h-4 w-4" />
+                </button>
+              ) : null}
+              <span
+                className="mt-4 w-4 shrink-0 text-center text-[11px] font-semibold text-muted"
+                title={index === 0 ? "First in carousel" : `Position ${index + 1}`}
+              >
+                {index + 1}
+              </span>
               {isImageUrl(url) ? (
                 <a
                   href={url}
@@ -274,6 +475,30 @@ export function AssetUploadField({
               >
                 {url}
               </a>
+              {canReorder ? (
+                <div className="flex shrink-0 flex-col">
+                  <button
+                    type="button"
+                    className="rounded p-0.5 text-muted hover:bg-white hover:text-foreground disabled:opacity-30"
+                    disabled={index === 0}
+                    onClick={() => moveAt(index, index - 1)}
+                    title="Move up"
+                    aria-label={`Move asset ${index + 1} up`}
+                  >
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded p-0.5 text-muted hover:bg-white hover:text-foreground disabled:opacity-30"
+                    disabled={index === urls.length - 1}
+                    onClick={() => moveAt(index, index + 1)}
+                    title="Move down"
+                    aria-label={`Move asset ${index + 1} down`}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="btn-ghost shrink-0 text-[var(--danger)]"
@@ -284,41 +509,12 @@ export function AssetUploadField({
                 <Trash2 className="h-4 w-4" />
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={cn("btn-secondary", uploading && "opacity-70")}
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          {uploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : urls.length > 0 ? (
-            <Plus className="h-4 w-4" />
-          ) : (
-            <ImagePlus className="h-4 w-4" />
-          )}
-          {uploading
-            ? "Uploading…"
-            : needsPreviewImage
-              ? "Add preview image"
-              : urls.length
-                ? "Add asset"
-                : "Upload asset"}
-        </button>
-      </div>
-
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        accept={UPLOAD_ACCEPT}
-        onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
-      />
+      {dropZone}
 
       <div className="flex gap-2">
         <input

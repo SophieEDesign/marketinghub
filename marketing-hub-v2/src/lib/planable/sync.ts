@@ -6,13 +6,13 @@ import {
   withContentPlanableDefaults,
 } from "@/lib/data/repos";
 import {
+  imageAssetUrls,
   isSocialContentItem,
   joinAssetUrls,
   normalizeChannels,
-  primaryImageUrl,
 } from "@/lib/data/normalize";
 import { plainTextFromHtml } from "@/lib/sanitize";
-import type { ContentItem } from "@/lib/types";
+import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
   archivePlanablePost,
   channelToPageIds,
@@ -138,6 +138,27 @@ function isHubDirty(item: ContentItem): boolean {
   );
 }
 
+/** Hub Approved/Scheduled is the send-to-Planable gate. Idea/Draft/Review stay local. */
+export function shouldPushSocialToPlanable(item: ContentItem): boolean {
+  if (!isSocialContentItem(item)) return false;
+  return item.status === "approved" || item.status === "scheduled";
+}
+
+/** Keep Hub Approved/Scheduled when Planable still has an unapproved draft. */
+function inboundStatusForExisting(
+  existing: ContentStatus,
+  mapped: ContentStatus
+): ContentStatus {
+  if (mapped === "published") return "published";
+  if (
+    mapped === "draft" &&
+    (existing === "approved" || existing === "scheduled")
+  ) {
+    return existing;
+  }
+  return mapped;
+}
+
 /** Pull Planable → Hub social ContentItems. */
 export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
   const config = getPlanableConfig();
@@ -251,7 +272,9 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
         channel: channels.length ? channels : match.channel,
         content_type: "Social",
         due_date: due_date ?? match.due_date,
-        status: published ? "published" : status,
+        status: published
+          ? "published"
+          : inboundStatusForExisting(match.status, status),
         asset_url: asset_url || match.asset_url,
         planable_url: planable_url || match.planable_url,
         planable_post_id: primary.id,
@@ -371,10 +394,7 @@ export async function pushContentToPlanable(
   item: ContentItem
 ): Promise<{ item: ContentItem; error?: string }> {
   const current = withContentPlanableDefaults(item);
-  if (!isSocialContentItem(current)) {
-    return { item: current };
-  }
-  if (current.status === "published") {
+  if (!shouldPushSocialToPlanable(current)) {
     return { item: current };
   }
 
@@ -394,56 +414,53 @@ export async function pushContentToPlanable(
     };
   }
 
-  const pageIds =
+  const matchedIds =
     current.planable_page_ids.length > 0
       ? current.planable_page_ids
       : channelToPageIds(current.channel, pagesResult.pages);
-
-  if (pageIds.length === 0) {
+  const pageId = matchedIds[0] ?? pagesResult.pages[0]?.id;
+  if (!pageId) {
     return {
       item: current,
-      error:
-        "No Planable page matches the selected channels. Connect pages in Planable or pick LinkedIn/Instagram/etc.",
+      error: "No Planable pages available.",
     };
   }
+  const pageIds = matchedIds.length > 0 ? matchedIds : [pageId];
 
   const plainText = plainCaption(current);
   const scheduledAt = scheduledAtFromDueDate(current.due_date);
-  const imageUrl = primaryImageUrl(current.asset_url);
+  const imageUrls = imageAssetUrls(current.asset_url);
   let mediaUrls: string[] | undefined;
-  if (imageUrl) {
-    const uploaded = await uploadPlanableMediaFromUrl(imageUrl);
-    if (uploaded.ok) mediaUrls = [uploaded.mediaUrl];
-    else mediaUrls = [imageUrl];
+  if (imageUrls.length) {
+    const uploaded: string[] = [];
+    for (const url of imageUrls) {
+      const result = await uploadPlanableMediaFromUrl(url);
+      uploaded.push(result.ok ? result.mediaUrl : url);
+    }
+    mediaUrls = uploaded;
   }
 
   const now = new Date().toISOString();
 
-  // Update existing linked post(s)
   if (current.planable_post_id) {
-    const idsToPatch = [current.planable_post_id];
-    // Best-effort: also patch sibling ids stored via page list if we only have primary
     let lastError: string | undefined;
-    for (const id of idsToPatch) {
-      const result = await updatePlanablePost(id, {
-        plainText,
-        scheduledAt,
-        ...(mediaUrls ? { media: mediaUrls } : {}),
-      });
-      if (!result.ok) {
-        lastError = result.error;
-        // Published posts cannot be patched — treat as lock
-        if (/publish/i.test(result.error)) {
-          const locked = await updateContent(current.id, {
-            status: "published",
-            sync_source: "planable",
-            last_synced_at: now,
-          });
-          return {
-            item: locked ?? current,
-            error: "Post is published in Planable and is locked in the Hub.",
-          };
-        }
+    const result = await updatePlanablePost(current.planable_post_id, {
+      plainText,
+      scheduledAt,
+      ...(mediaUrls ? { media: mediaUrls } : {}),
+    });
+    if (!result.ok) {
+      lastError = result.error;
+      if (/publish/i.test(result.error)) {
+        const locked = await updateContent(current.id, {
+          status: "published",
+          sync_source: "planable",
+          last_synced_at: now,
+        });
+        return {
+          item: locked ?? current,
+          error: "Post is published in Planable and is locked in the Hub.",
+        };
       }
     }
 
@@ -460,55 +477,32 @@ export async function pushContentToPlanable(
     };
   }
 
-  // Create one post per mapped page (Planable multi-page grouping is best-effort)
-  const createdIds: string[] = [];
-  let groupId = "";
-  let primaryId = "";
-  let lastError: string | undefined;
-
-  for (const pageId of pageIds) {
-    const created = await createPlanablePost({
-      pageId,
-      plainText,
-      scheduledAt,
-    });
-    if (!created.ok) {
-      lastError = created.error;
-      continue;
-    }
-    createdIds.push(created.post.id);
-    if (!primaryId) primaryId = created.post.id;
-    if (created.post.groupId) groupId = created.post.groupId;
-
-    if (mediaUrls?.length) {
-      await updatePlanablePost(created.post.id, { media: mediaUrls });
-    }
-  }
-
-  if (!primaryId) {
+  const created = await createPlanablePost({
+    pageId,
+    plainText,
+    scheduledAt,
+  });
+  if (!created.ok) {
     return {
       item: current,
-      error: lastError || "Failed to create Planable draft.",
+      error: created.error || "Failed to create Planable draft.",
     };
   }
 
+  if (mediaUrls?.length) {
+    await updatePlanablePost(created.post.id, { media: mediaUrls });
+  }
+
   const patched = await updateContent(current.id, {
-    planable_post_id: primaryId,
-    planable_group_id: groupId,
-    planable_page_ids: pageIds,
-    planable_url: planableDeepLink(primaryId),
+    planable_post_id: created.post.id,
+    planable_group_id: created.post.groupId || "",
+    planable_page_ids: [pageId],
+    planable_url: planableDeepLink(created.post.id),
     last_synced_at: now,
     sync_source: "hub",
-    status:
-      current.status === "idea" || current.status === "draft"
-        ? current.due_date
-          ? "scheduled"
-          : "draft"
-        : current.status,
   });
 
   return {
     item: patched ?? current,
-    ...(lastError ? { error: lastError } : {}),
   };
 }
