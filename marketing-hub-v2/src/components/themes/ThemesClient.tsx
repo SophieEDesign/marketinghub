@@ -42,8 +42,7 @@ const STATUS_LABEL: Record<ThemeStatus, string> = {
 const CONTENT_STATUS_OPTIONS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
   { id: "draft", label: "Draft" },
-  { id: "review", label: "Review" },
-  { id: "approved", label: "Approved" },
+  { id: "review", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
 ];

@@ -429,8 +429,7 @@ export async function fetchPlanablePosts(): Promise<{
         const hub = hubStatusFromPlanable(p);
         if (hub === "published") return "Published";
         if (hub === "scheduled") return "Scheduled";
-        if (hub === "approved") return "Approved";
-        if (hub === "review") return "Review";
+        if (hub === "review" || hub === "approved") return "Approved";
         return "Draft";
       })(),
       scheduledAt: p.scheduledAt,
@@ -743,7 +742,7 @@ export function hubStatusFromPlanable(post: {
   if (post.published) return "published";
   // Scheduled in the Hub only when approved AND actually scheduled.
   if (post.approved && post.scheduledSet === true) return "scheduled";
-  if (post.approved) return "approved";
+  if (post.approved) return "review";
   return "draft";
 }
 

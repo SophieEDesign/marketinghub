@@ -57,8 +57,7 @@ import { SearchSelect } from "@/components/ui/SearchSelect";
 const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "idea", label: "Idea" },
   { id: "draft", label: "Draft" },
-  { id: "review", label: "Review" },
-  { id: "approved", label: "Approved" },
+  { id: "review", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
 ];
@@ -77,7 +76,7 @@ type ContentView = (typeof VIEWS)[number]["id"];
 const STATUS_COLOR: Record<ContentStatus, string> = {
   idea: "#94a3b8",
   draft: "#2a8f9e",
-  review: "#c47b3a",
+  review: "#0d9488",
   approved: "#0d9488",
   scheduled: "#5b6ee1",
   published: "#3d8b5c",
@@ -132,7 +131,7 @@ function toEditForm(item: ContentItem): EditForm {
     notes: item.notes,
     planable_url: item.planable_url,
     asset_url: item.asset_url,
-    status: item.status,
+    status: item.status === "approved" ? "review" : item.status,
   };
 }
 
@@ -295,7 +294,8 @@ export function ContentClient({
       }
       if (
         statusFilter.length > 0 &&
-        !statusFilter.includes(item.status)
+        !statusFilter.includes(item.status) &&
+        !(item.status === "approved" && statusFilter.includes("review"))
       ) {
         return false;
       }
@@ -603,7 +603,7 @@ export function ContentClient({
           </button>
           <SearchSelect
             className="field !w-auto py-1.5 text-xs"
-            value={item.status}
+            value={item.status === "approved" ? "review" : item.status}
             disabled={item.status === "published"}
             onChange={(value) =>
               void move(item.id, value as ContentStatus)
@@ -663,7 +663,7 @@ export function ContentClient({
       ) : (
         <PageHeader
           title="Content planner"
-          description="Draft social in the Hub; set Approved or Scheduled to send to Planable. Approve, add platforms, and publish there. Published posts are locked."
+          description="Draft social in the Hub; set Approved to send to Planable. Add platforms and publish there. Published posts are locked."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {scope !== "content" ? (
@@ -829,7 +829,7 @@ export function ContentClient({
             />
             {formIsSocial ? (
               <p className="mt-1 text-xs text-muted">
-                Approved or Scheduled sends a draft to Planable.
+                Approved sends a draft to Planable.
               </p>
             ) : null}
           </div>
@@ -946,7 +946,11 @@ export function ContentClient({
           {view === "kanban" ? (
             <div className="flex gap-4 overflow-x-auto pb-2">
               {COLUMNS.map((col) => {
-                const colItems = listItems.filter((i) => i.status === col.id);
+                const colItems = listItems.filter((i) =>
+                  col.id === "review"
+                    ? i.status === "review" || i.status === "approved"
+                    : i.status === col.id
+                );
                 return (
                   <div
                     key={col.id}
@@ -1249,9 +1253,8 @@ export function ContentClient({
                   />
                   {editIsSocial ? (
                     <p className="mt-1 text-xs text-muted">
-                      Approved or Scheduled sends a draft to Planable. Approve,
-                      add platforms, and publish there — then Sync from Planable
-                      locks this piece.
+                      Approved sends a draft to Planable. Add platforms and
+                      publish there — then Sync from Planable locks this piece.
                     </p>
                   ) : null}
                 </div>

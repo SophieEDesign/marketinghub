@@ -68,8 +68,7 @@ export type CollectionDef = {
 export const CONTENT_STATUS: FieldOption[] = [
   { value: "idea", label: "Idea" },
   { value: "draft", label: "Draft" },
-  { value: "review", label: "Review" },
-  { value: "approved", label: "Approved" },
+  { value: "review", label: "Approved" },
   { value: "scheduled", label: "Scheduled" },
   { value: "published", label: "Published" },
 ];

@@ -17,7 +17,7 @@ import { plainTextFromHtml } from "@/lib/sanitize";
 const STATUS_LABEL: Record<ContentStatus, string> = {
   idea: "Idea",
   draft: "Draft",
-  review: "Review",
+  review: "Approved",
   approved: "Approved",
   scheduled: "Scheduled",
   published: "Published",
@@ -30,9 +30,8 @@ function statusTone(status: ContentStatus) {
     case "scheduled":
       return "bg-sky-50 text-sky-800 border-sky-200";
     case "approved":
-      return "bg-teal-50 text-teal-800 border-teal-200";
     case "review":
-      return "bg-amber-50 text-amber-900 border-amber-200";
+      return "bg-teal-50 text-teal-800 border-teal-200";
     case "draft":
       return "bg-teal-50 text-teal-800 border-teal-200";
     default:

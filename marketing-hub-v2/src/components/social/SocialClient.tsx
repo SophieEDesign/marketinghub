@@ -77,9 +77,8 @@ function platformsFromChannel(
 function normalizeStatus(raw: string): string {
   const s = raw.toLowerCase();
   if (s.includes("publish")) return "Published";
-  if (s.includes("approv")) return "Approved";
   if (s.includes("schedul")) return "Scheduled";
-  if (s.includes("review")) return "Review";
+  if (s.includes("approv") || s.includes("review")) return "Approved";
   if (s.includes("draft")) return "Draft";
   if (s.includes("idea")) return "Idea";
   if (!raw.trim()) return "Draft";
@@ -250,7 +249,7 @@ export function SocialClient({
             text,
             html: looksLikeHtml(rawCaption) ? rawCaption : null,
             status: normalizeStatus(c.status),
-            statusValue: c.status,
+            statusValue: c.status === "approved" ? "review" : c.status,
             scheduledAt: c.due_date ? `${c.due_date}T09:00:00.000Z` : null,
             url: c.planable_url || null,
             platform,
@@ -615,7 +614,7 @@ export function SocialClient({
           description={
             memberView
               ? "Scheduled and published posts across channels."
-              : "Approved or Scheduled Hub posts sync to Planable — approve, add platforms, and publish there."
+              : "Approved Hub posts sync to Planable — add platforms and publish there."
           }
           actions={
             !memberView ? (
@@ -736,7 +735,7 @@ export function SocialClient({
               }))}
             />
             <p className="mt-1 text-xs text-muted">
-              Approved or Scheduled sends a draft to Planable.
+              Approved sends a draft to Planable.
             </p>
           </div>
           <div className="md:col-span-2">
@@ -1071,8 +1070,8 @@ export function SocialClient({
                     }))}
                   />
                   <p className="mt-1 text-xs text-muted">
-                    Approved or Scheduled sends a draft to Planable. Then
-                    approve, add platforms, and publish there.
+                    Approved sends a draft to Planable. Then add platforms
+                    and publish there.
                   </p>
                 </div>
               ) : null}

@@ -138,10 +138,14 @@ function isHubDirty(item: ContentItem): boolean {
   );
 }
 
-/** Hub Approved/Scheduled is the send-to-Planable gate. Idea/Draft/Review stay local. */
+/** Hub Approved (`review`) or Scheduled sends social to Planable. */
 export function shouldPushSocialToPlanable(item: ContentItem): boolean {
   if (!isSocialContentItem(item)) return false;
-  return item.status === "approved" || item.status === "scheduled";
+  return (
+    item.status === "review" ||
+    item.status === "approved" ||
+    item.status === "scheduled"
+  );
 }
 
 /** Keep Hub Approved/Scheduled when Planable still has an unapproved draft. */
@@ -152,9 +156,11 @@ function inboundStatusForExisting(
   if (mapped === "published") return "published";
   if (
     mapped === "draft" &&
-    (existing === "approved" || existing === "scheduled")
+    (existing === "review" ||
+      existing === "approved" ||
+      existing === "scheduled")
   ) {
-    return existing;
+    return existing === "approved" ? "review" : existing;
   }
   return mapped;
 }
