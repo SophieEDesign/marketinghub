@@ -51,6 +51,52 @@ const DEFAULT_ITEM = CLOTHING_PRODUCTS[0]!.label;
 
 type ForMode = "me" | "other";
 
+/** A single item line within a multi-item new order form. */
+export type OrderItemRow = {
+  id: string;
+  item: string;
+  fit: ClothingFit | "";
+  size: string;
+  quantity: string;
+  colour: string;
+  logo: ClothingLogo;
+};
+
+function buildEmptyItemRow(
+  products: ClothingProductCardItem[] = CLOTHING_PRODUCTS.map((p) => ({
+    ...p,
+    image_url: "",
+  }))
+): OrderItemRow {
+  return {
+    id: Math.random().toString(36).slice(2),
+    item: DEFAULT_ITEM,
+    fit: "male",
+    size: "M",
+    quantity: "1",
+    colour: defaultColourForItem(DEFAULT_ITEM, products),
+    logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
+  };
+}
+
+/** Shared fields for the whole order (header). */
+function buildEmptyOrderHeader(
+  viewerName = "",
+  viewerContactId: string | null = null
+) {
+  return {
+    requested_for: viewerName,
+    requested_for_contact_id: viewerContactId,
+    for_mode: "me" as ForMode,
+    office: "Southampton",
+    needed_by: "",
+    notes: "",
+    created_by: viewerName,
+  };
+}
+
+type OrderHeader = ReturnType<typeof buildEmptyOrderHeader>;
+
 function buildEmptyForm(viewerName = "", viewerContactId: string | null = null) {
   return {
     item: DEFAULT_ITEM,
@@ -470,6 +516,135 @@ function OrderFields({
   );
 }
 
+/** Fields for a single item row in the multi-item new order form. */
+function ItemRowFields({
+  row,
+  onChange,
+  onRemove,
+  canRemove,
+  productCards,
+}: {
+  row: OrderItemRow;
+  onChange: (next: OrderItemRow) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+  productCards: ClothingProductCardItem[];
+}) {
+  const product = clothingProductByLabel(row.item, productCards);
+  const colours = coloursForItem(row.item, productCards);
+  const fit = (row.fit || "male") as ClothingFit;
+  const productUrl = fit === "female" ? product?.links?.female : product?.links?.male;
+
+  function applyItem(item: string) {
+    const cs = coloursForItem(item, productCards);
+    const colour = cs.includes(row.colour) ? row.colour : defaultColourForItem(item, productCards);
+    onChange({ ...row, item, colour });
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-white p-3 grid gap-2 sm:grid-cols-2 relative">
+      {canRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="absolute right-3 top-3 text-xs text-muted hover:text-danger transition"
+          aria-label="Remove item"
+          title="Remove this item"
+        >
+          ✕ Remove
+        </button>
+      )}
+      <div className="sm:col-span-2">
+        <ClothingProductCards
+          products={productCards}
+          value={row.item}
+          onChange={applyItem}
+        />
+      </div>
+      <div className="sm:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
+        Supplier:{" "}
+        <span className="font-medium text-foreground">
+          {product?.brand || CLOTHING_BRAND}
+        </span>
+        {product?.material ? ` · ${product.material}` : ""}
+        {product?.brand === "Henbury" ? " · shirt via Henbury / promotional store" : ""}
+        {productUrl ? (
+          <>
+            {" · "}
+            <a
+              href={productUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-brand underline-offset-2 hover:underline"
+            >
+              View product
+            </a>
+          </>
+        ) : null}
+      </div>
+      <div>
+        <label className="label">Item</label>
+        <SearchSelect
+          className="field"
+          value={row.item}
+          onChange={applyItem}
+          options={productCards.map((p) => ({ value: p.label, label: p.label }))}
+        />
+      </div>
+      <div>
+        <label className="label">Fit</label>
+        <SearchSelect
+          className="field"
+          value={row.fit || "male"}
+          onChange={(f) => onChange({ ...row, fit: f as ClothingFit })}
+          options={CLOTHING_FITS.map((f) => ({ value: f.id, label: f.label }))}
+        />
+      </div>
+      <div>
+        <label className="label">Size</label>
+        <SearchSelect
+          className="field"
+          value={row.size}
+          onChange={(size) => onChange({ ...row, size })}
+          options={CLOTHING_SIZES.map((s) => ({ value: s, label: s }))}
+        />
+      </div>
+      <div>
+        <label className="label">Colour</label>
+        <SearchSelect
+          className="field"
+          value={row.colour}
+          onChange={(colour) => onChange({ ...row, colour })}
+          options={colours.map((c) => ({ value: c, label: c }))}
+        />
+      </div>
+      <div>
+        <label className="label">Logo</label>
+        <SearchSelect
+          className="field"
+          value={row.logo}
+          onChange={(logo) => onChange({ ...row, logo: logo as ClothingLogo })}
+          options={CLOTHING_LOGOS.map((l) => ({ value: l.id, label: l.label }))}
+        />
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          {clothingLogoHint(row.logo) ??
+            "Use Bespoke Logistics when unsure; pick a division logo only when the item is clearly for that team."}
+        </p>
+      </div>
+      <div>
+        <label className="label">Quantity</label>
+        <input
+          className="field"
+          type="number"
+          min={1}
+          value={row.quantity}
+          onChange={(e) => onChange({ ...row, quantity: e.target.value })}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function MerchClient({
   initial,
   hideHeader = false,
@@ -492,6 +667,13 @@ export function MerchClient({
   );
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  // Multi-item new order state
+  const [orderHeader, setOrderHeader] = useState<OrderHeader>(() =>
+    buildEmptyOrderHeader(viewerName, viewerContactId)
+  );
+  const [itemRows, setItemRows] = useState<OrderItemRow[]>(() => [
+    buildEmptyItemRow(),
+  ]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [itemFilter, setItemFilter] = useState("all");
@@ -533,6 +715,7 @@ export function MerchClient({
 
   useEffect(() => {
     setForm(buildEmptyForm(viewerName, viewerContactId));
+    setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
   }, [viewerName, viewerContactId]);
 
   const itemTypes = useMemo(() => {
@@ -572,21 +755,36 @@ export function MerchClient({
     : null;
 
   async function create() {
-    const { for_mode, ...payload } = form;
+    const { for_mode, ...header } = orderHeader;
     void for_mode;
-    await fetch("/api/merch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        quantity: Number(form.quantity) || 1,
-        needed_by: form.needed_by || null,
-        requested_for_contact_id: form.requested_for_contact_id,
-        created_by: form.created_by || form.requested_for || "Staff",
-      }),
-    });
+    const sharedPayload = {
+      ...header,
+      needed_by: orderHeader.needed_by || null,
+      requested_for_contact_id: orderHeader.requested_for_contact_id,
+      created_by: orderHeader.created_by || orderHeader.requested_for || "Staff",
+      status: "requested" as MerchStatus,
+    };
+    await Promise.all(
+      itemRows.map((row) =>
+        fetch("/api/merch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...sharedPayload,
+            item: row.item,
+            fit: row.fit || "male",
+            size: row.size,
+            quantity: Number(row.quantity) || 1,
+            colour: row.colour,
+            logo: row.logo,
+          }),
+        })
+      )
+    );
     setShowForm(false);
     setForm(buildEmptyForm(viewerName, viewerContactId));
+    setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
+    setItemRows([buildEmptyItemRow(productCards)]);
     await refresh();
   }
 
@@ -729,29 +927,120 @@ export function MerchClient({
 
       {showForm ? (
         <div
-          className="surface-card mb-6 grid gap-3 p-5 md:grid-cols-2"
+          className="surface-card mb-6 p-5 space-y-4"
           data-tour="requests-order-form"
         >
-          <OrderFields
-            form={form}
-            onChange={setForm}
-            canManageAll={canManageAll}
-            viewerName={viewerName}
-            viewerContactId={viewerContactId}
-            productCards={productCards}
-          />
-          <div className="flex gap-2 md:col-span-2">
+          {/* Shared order details */}
+          <div className="grid gap-3 md:grid-cols-2">
+            <RequestedForField
+              form={{
+                ...buildEmptyForm(viewerName, viewerContactId),
+                ...orderHeader,
+                item: DEFAULT_ITEM,
+                fit: "male",
+                size: "M",
+                quantity: "1",
+                colour: "",
+                logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
+                status: "requested",
+              }}
+              onChange={(next) =>
+                setOrderHeader((h) => ({
+                  ...h,
+                  requested_for: next.requested_for,
+                  requested_for_contact_id: next.requested_for_contact_id,
+                  for_mode: next.for_mode,
+                }))
+              }
+              canManageAll={canManageAll}
+              viewerName={viewerName}
+              viewerContactId={viewerContactId}
+            />
+            <div>
+              <label className="label">Office</label>
+              <input
+                className="field"
+                value={orderHeader.office}
+                onChange={(e) =>
+                  setOrderHeader((h) => ({ ...h, office: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Needed by</label>
+              <input
+                className="field"
+                type="date"
+                value={orderHeader.needed_by}
+                onChange={(e) =>
+                  setOrderHeader((h) => ({ ...h, needed_by: e.target.value }))
+                }
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="label">Notes</label>
+              <RichTextEditor
+                value={orderHeader.notes}
+                onChange={(notes) =>
+                  setOrderHeader((h) => ({ ...h, notes }))
+                }
+                placeholder="Any additional notes for this order…"
+                minHeight="70px"
+              />
+            </div>
+          </div>
+
+          {/* Item rows */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted uppercase tracking-wide">
+              Items ({itemRows.length})
+            </p>
+            {itemRows.map((row) => (
+              <ItemRowFields
+                key={row.id}
+                row={row}
+                onChange={(next) =>
+                  setItemRows((rows) =>
+                    rows.map((r) => (r.id === row.id ? next : r))
+                  )
+                }
+                onRemove={() =>
+                  setItemRows((rows) => rows.filter((r) => r.id !== row.id))
+                }
+                canRemove={itemRows.length > 1}
+                productCards={productCards}
+              />
+            ))}
+            <button
+              type="button"
+              className="btn-secondary text-xs"
+              onClick={() =>
+                setItemRows((rows) => [
+                  ...rows,
+                  buildEmptyItemRow(productCards),
+                ])
+              }
+            >
+              + Add another item
+            </button>
+          </div>
+
+          <div className="flex gap-2 pt-1">
             <button
               type="button"
               className="btn-primary"
               onClick={() => void create()}
             >
-              Submit request
+              Submit {itemRows.length > 1 ? `${itemRows.length} items` : "request"}
             </button>
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => setShowForm(false)}
+              onClick={() => {
+                setShowForm(false);
+                setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
+                setItemRows([buildEmptyItemRow(productCards)]);
+              }}
             >
               Cancel
             </button>
