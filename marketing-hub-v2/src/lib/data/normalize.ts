@@ -1,7 +1,7 @@
 /** Shared clean-up for hub store + Supabase import. */
 
 import { normalizeRichTextStorage } from "@/lib/sanitize";
-import { isCanvaUrl, isImageUrl, isPreviewableImageUrl } from "@/lib/social/platforms";
+import { isCanvaUrl, isPreviewableImageUrl } from "@/lib/social/platforms";
 
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
   { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
