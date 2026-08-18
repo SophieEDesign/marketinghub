@@ -1,9 +1,6 @@
 import { uid } from "@/lib/utils";
 import { readStore, updateStore } from "@/lib/store/local";
-import {
-  clothingProductById,
-  normalizeClothingLogo,
-} from "@/lib/merch/north-sails";
+import { clothingProductById } from "@/lib/merch/north-sails";
 import {
   normalizeMerchOrderItems,
   syncMerchOrderPrimaryFields,
