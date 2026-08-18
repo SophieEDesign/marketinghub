@@ -4,6 +4,10 @@ import {
   clothingProductById,
   normalizeClothingLogo,
 } from "@/lib/merch/north-sails";
+import {
+  normalizeMerchOrderItems,
+  syncMerchOrderPrimaryFields,
+} from "@/lib/merch/order-items";
 import { effectiveProductLabel } from "@/lib/merch/product-images";
 import type {
   AccessRequest,
@@ -1016,9 +1020,13 @@ export async function getMerchOrder(id: string) {
 export async function createMerchOrder(
   input: Omit<MerchOrder, "id" | "created_at" | "updated_at">
 ) {
+  const items = normalizeMerchOrderItems(input);
+  const primary = syncMerchOrderPrimaryFields(items);
   const item: MerchOrder = {
     ...input,
-    logo: normalizeClothingLogo(input.logo),
+    ...primary,
+    items,
+    logo: primary.logo,
     requested_for_contact_id: input.requested_for_contact_id ?? null,
     created_by_user_id: input.created_by_user_id ?? null,
     id: uid("mrc"),
@@ -1041,6 +1049,14 @@ export async function updateMerchOrder(
     if (idx === -1) return;
     const nextPatch = { ...patch };
     delete nextPatch.id;
+    if (nextPatch.items !== undefined) {
+      const items = normalizeMerchOrderItems({
+        ...s.merch_orders[idx],
+        ...nextPatch,
+        items: nextPatch.items as MerchOrder["items"],
+      });
+      Object.assign(nextPatch, syncMerchOrderPrimaryFields(items), { items });
+    }
     const nextOwner =
       nextPatch.created_by_user_id !== undefined
         ? nextPatch.created_by_user_id

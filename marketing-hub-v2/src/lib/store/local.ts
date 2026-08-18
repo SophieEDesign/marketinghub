@@ -77,6 +77,8 @@ function migrateEvents(items: EventItem[] | undefined): EventItem[] | undefined 
   }));
 }
 
+import { getMerchOrderItems } from "@/lib/merch/order-items";
+
 function migrateMerch(items: MerchOrder[] | undefined): MerchOrder[] | undefined {
   if (!items) return items;
   return items.map((item) => ({
@@ -85,6 +87,7 @@ function migrateMerch(items: MerchOrder[] | undefined): MerchOrder[] | undefined
     logo: item.logo ?? "Commercial",
     requested_for_contact_id: item.requested_for_contact_id ?? null,
     created_by_user_id: item.created_by_user_id ?? null,
+    items: item.items?.length ? item.items : getMerchOrderItems(item),
   }));
 }
 

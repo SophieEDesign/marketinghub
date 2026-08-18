@@ -237,6 +237,7 @@ export async function exportStoreToSupabase(
       quantity: m.quantity ?? 1,
       colour: m.colour ?? "",
       logo: m.logo ?? DEFAULT_CLOTHING_LOGO,
+      items: m.items ?? [],
       requested_for: m.requested_for ?? "",
       requested_for_contact_id: m.requested_for_contact_id ?? null,
       office: m.office ?? "",

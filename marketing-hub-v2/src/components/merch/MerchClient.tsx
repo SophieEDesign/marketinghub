@@ -29,6 +29,12 @@ import {
   contactMerchForOptions,
 } from "@/lib/merch/requested-for";
 import {
+  getMerchOrderItems,
+  merchOrderItemLabels,
+  merchOrderSearchText,
+  OTHER_ITEM_LABEL,
+} from "@/lib/merch/order-items";
+import {
   ClothingProductCards,
   type ClothingProductCardItem,
 } from "@/components/merch/ClothingProductCards";
@@ -51,7 +57,7 @@ const DEFAULT_ITEM = CLOTHING_PRODUCTS[0]!.label;
 
 type ForMode = "me" | "other";
 
-/** A single item line within a multi-item new order form. */
+/** A single item line within a multi-item order form. */
 export type OrderItemRow = {
   id: string;
   item: string;
@@ -60,7 +66,39 @@ export type OrderItemRow = {
   quantity: string;
   colour: string;
   logo: ClothingLogo;
+  is_other: boolean;
+  other_description: string;
 };
+
+function itemRowsToPayload(rows: OrderItemRow[]) {
+  return rows
+    .map((row) => ({
+      id: row.id,
+      item: row.is_other ? OTHER_ITEM_LABEL : row.item,
+      fit: row.is_other ? ("" as const) : ((row.fit || "male") as ClothingFit),
+      size: row.is_other ? "" : row.size,
+      quantity: Number(row.quantity) || 1,
+      colour: row.is_other ? "" : row.colour,
+      logo: row.is_other ? "" : row.logo,
+      is_other: row.is_other,
+      other_description: row.is_other ? row.other_description.trim() : "",
+    }))
+    .filter((line) => (line.is_other ? line.other_description : line.item));
+}
+
+function orderToItemRows(order: MerchOrder): OrderItemRow[] {
+  return getMerchOrderItems(order).map((line) => ({
+    id: line.id,
+    item: line.is_other ? OTHER_ITEM_LABEL : line.item,
+    fit: (line.fit as ClothingFit | "") || "male",
+    size: line.size,
+    quantity: String(line.quantity),
+    colour: line.colour,
+    logo: normalizeClothingLogo(line.logo) as ClothingLogo,
+    is_other: Boolean(line.is_other),
+    other_description: line.other_description ?? "",
+  }));
+}
 
 function buildEmptyItemRow(
   products: ClothingProductCardItem[] = CLOTHING_PRODUCTS.map((p) => ({
@@ -76,6 +114,8 @@ function buildEmptyItemRow(
     quantity: "1",
     colour: defaultColourForItem(DEFAULT_ITEM, products),
     logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
+    is_other: false,
+    other_description: "",
   };
 }
 
@@ -96,33 +136,19 @@ function buildEmptyOrderHeader(
 }
 
 type OrderHeader = ReturnType<typeof buildEmptyOrderHeader>;
+type OrderHeaderWithStatus = OrderHeader & { status: MerchStatus };
 
-function buildEmptyForm(viewerName = "", viewerContactId: string | null = null) {
-  return {
-    item: DEFAULT_ITEM,
-    fit: "male" as ClothingFit | "",
-    size: "M",
-    quantity: "1",
-    colour: defaultColourForItem(DEFAULT_ITEM),
-    logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
-    requested_for: viewerName,
-    requested_for_contact_id: viewerContactId,
-    for_mode: "me" as ForMode,
-    office: "Southampton",
-    needed_by: "",
-    status: "requested" as MerchStatus,
-    notes: "",
-    created_by: viewerName,
-  };
-}
+type RequestedForForm = {
+  requested_for: string;
+  requested_for_contact_id: string | null;
+  for_mode: ForMode;
+};
 
-type EditForm = ReturnType<typeof buildEmptyForm>;
-
-function toEditForm(
+function orderToEditHeader(
   order: MerchOrder,
   viewerName: string,
   viewerContactId: string | null
-): EditForm {
+): OrderHeaderWithStatus {
   const isMe =
     (viewerContactId &&
       order.requested_for_contact_id === viewerContactId) ||
@@ -130,20 +156,14 @@ function toEditForm(
       order.requested_for.trim().toLowerCase() ===
         viewerName.trim().toLowerCase());
   return {
-    item: order.item,
-    fit: (order.fit as ClothingFit | "") || "male",
-    size: order.size,
-    quantity: String(order.quantity),
-    colour: order.colour,
-    logo: normalizeClothingLogo(order.logo),
     requested_for: order.requested_for,
     requested_for_contact_id: order.requested_for_contact_id ?? null,
     for_mode: isMe ? "me" : "other",
     office: order.office,
     needed_by: order.needed_by ?? "",
-    status: order.status,
     notes: order.notes,
     created_by: order.created_by,
+    status: order.status,
   };
 }
 
@@ -172,30 +192,15 @@ function fitLabel(fit: string) {
   return "";
 }
 
-function applyItemChange(
-  form: EditForm,
-  item: string,
-  products: ClothingProductCardItem[] = CLOTHING_PRODUCTS.map((p) => ({
-    ...p,
-    image_url: "",
-  }))
-): EditForm {
-  const colours = coloursForItem(item, products);
-  const colour = colours.includes(form.colour)
-    ? form.colour
-    : defaultColourForItem(item, products);
-  return { ...form, item, colour };
-}
-
-function RequestedForField({
+function RequestedForField<T extends RequestedForForm>({
   form,
   onChange,
   canManageAll,
   viewerName,
   viewerContactId,
 }: {
-  form: EditForm;
-  onChange: (next: EditForm) => void;
+  form: T;
+  onChange: (next: T) => void;
   canManageAll: boolean;
   viewerName: string;
   viewerContactId: string | null;
@@ -362,160 +367,6 @@ function RequestedForField({
   );
 }
 
-function OrderFields({
-  form,
-  onChange,
-  canManageAll,
-  viewerName,
-  viewerContactId,
-  productCards,
-}: {
-  form: EditForm;
-  onChange: (next: EditForm) => void;
-  canManageAll: boolean;
-  viewerName: string;
-  viewerContactId: string | null;
-  productCards: ClothingProductCardItem[];
-}) {
-  const product = clothingProductByLabel(form.item, productCards);
-  const colours = coloursForItem(form.item, productCards);
-  const fit = (form.fit || "male") as ClothingFit;
-  const productUrl =
-    fit === "female" ? product?.links?.female : product?.links?.male;
-
-  return (
-    <>
-      <ClothingProductCards
-        products={productCards}
-        value={form.item}
-        onChange={(item) => onChange(applyItemChange(form, item, productCards))}
-      />
-      <div className="md:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
-        Supplier:{" "}
-        <span className="font-medium text-foreground">
-          {product?.brand || CLOTHING_BRAND}
-        </span>
-        {product?.material ? ` · ${product.material}` : ""}
-        {product?.brand === "Henbury" ? " · shirt via Henbury / promotional store" : ""}
-        {productUrl ? (
-          <>
-            {" · "}
-            <a
-              href={productUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-brand underline-offset-2 hover:underline"
-            >
-              View product
-            </a>
-          </>
-        ) : null}
-      </div>
-      <div>
-        <label className="label">Item</label>
-        <SearchSelect
-          className="field"
-          value={form.item}
-          onChange={(item) =>
-            onChange(applyItemChange(form, item, productCards))
-          }
-          options={productCards.map((p) => ({
-            value: p.label,
-            label: p.label,
-          }))}
-        />
-      </div>
-      <div>
-        <label className="label">Fit</label>
-        <SearchSelect
-          className="field"
-          value={form.fit || "male"}
-          onChange={(fit) =>
-            onChange({ ...form, fit: fit as ClothingFit })
-          }
-          options={CLOTHING_FITS.map((f) => ({ value: f.id, label: f.label }))}
-        />
-      </div>
-      <div>
-        <label className="label">Size</label>
-        <SearchSelect
-          className="field"
-          value={form.size}
-          onChange={(size) => onChange({ ...form, size })}
-          options={CLOTHING_SIZES.map((s) => ({ value: s, label: s }))}
-        />
-      </div>
-      <div>
-        <label className="label">Colour</label>
-        <SearchSelect
-          className="field"
-          value={form.colour}
-          onChange={(colour) => onChange({ ...form, colour })}
-          options={colours.map((c) => ({ value: c, label: c }))}
-        />
-      </div>
-      <div>
-        <label className="label">Logo</label>
-        <SearchSelect
-          className="field"
-          value={form.logo}
-          onChange={(logo) =>
-            onChange({ ...form, logo: logo as ClothingLogo })
-          }
-          options={CLOTHING_LOGOS.map((l) => ({ value: l.id, label: l.label }))}
-        />
-        <p className="mt-1.5 text-xs leading-relaxed text-muted">
-          {clothingLogoHint(form.logo) ??
-            "Use Bespoke Logistics when unsure; pick a division logo only when the item is clearly for that team."}
-        </p>
-      </div>
-      <div>
-        <label className="label">Quantity</label>
-        <input
-          className="field"
-          type="number"
-          min={1}
-          value={form.quantity}
-          onChange={(e) => onChange({ ...form, quantity: e.target.value })}
-        />
-      </div>
-      <RequestedForField
-        form={form}
-        onChange={onChange}
-        canManageAll={canManageAll}
-        viewerName={viewerName}
-        viewerContactId={viewerContactId}
-      />
-      <div>
-        <label className="label">Office</label>
-        <input
-          className="field"
-          value={form.office}
-          onChange={(e) => onChange({ ...form, office: e.target.value })}
-        />
-      </div>
-      <div>
-        <label className="label">Needed by</label>
-        <input
-          className="field"
-          type="date"
-          value={form.needed_by}
-          onChange={(e) => onChange({ ...form, needed_by: e.target.value })}
-        />
-      </div>
-      <div className="md:col-span-2">
-        <label className="label">Notes</label>
-        <RichTextEditor
-          value={form.notes}
-          onChange={(notes) => onChange({ ...form, notes })}
-          placeholder="Notes…"
-          minHeight="70px"
-        />
-      </div>
-    </>
-  );
-}
-
 /** Fields for a single item row in the multi-item new order form. */
 function ItemRowFields({
   row,
@@ -536,10 +387,36 @@ function ItemRowFields({
   const productUrl = fit === "female" ? product?.links?.female : product?.links?.male;
 
   function applyItem(item: string) {
+    if (item === OTHER_ITEM_LABEL) {
+      onChange({
+        ...row,
+        item: OTHER_ITEM_LABEL,
+        is_other: true,
+        fit: "",
+        size: "",
+        colour: "",
+        logo: DEFAULT_CLOTHING_LOGO,
+      });
+      return;
+    }
     const cs = coloursForItem(item, productCards);
-    const colour = cs.includes(row.colour) ? row.colour : defaultColourForItem(item, productCards);
-    onChange({ ...row, item, colour });
+    const colour = cs.includes(row.colour)
+      ? row.colour
+      : defaultColourForItem(item, productCards);
+    onChange({
+      ...row,
+      item,
+      is_other: false,
+      other_description: "",
+      colour,
+      fit: row.fit || "male",
+    });
   }
+
+  const itemOptions = [
+    ...productCards.map((p) => ({ value: p.label, label: p.label })),
+    { value: OTHER_ITEM_LABEL, label: OTHER_ITEM_LABEL },
+  ];
 
   return (
     <div className="rounded-xl border border-border bg-white p-3 grid gap-2 sm:grid-cols-2 relative">
@@ -554,94 +431,168 @@ function ItemRowFields({
           ✕ Remove
         </button>
       )}
-      <div className="sm:col-span-2">
-        <ClothingProductCards
-          products={productCards}
-          value={row.item}
-          onChange={applyItem}
-        />
-      </div>
-      <div className="sm:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
-        Supplier:{" "}
-        <span className="font-medium text-foreground">
-          {product?.brand || CLOTHING_BRAND}
-        </span>
-        {product?.material ? ` · ${product.material}` : ""}
-        {product?.brand === "Henbury" ? " · shirt via Henbury / promotional store" : ""}
-        {productUrl ? (
-          <>
-            {" · "}
-            <a
-              href={productUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-brand underline-offset-2 hover:underline"
-            >
-              View product
-            </a>
-          </>
-        ) : null}
-      </div>
-      <div>
+      {!row.is_other ? (
+        <div className="sm:col-span-2">
+          <ClothingProductCards
+            products={productCards}
+            value={row.item}
+            onChange={applyItem}
+          />
+        </div>
+      ) : null}
+      {!row.is_other ? (
+        <div className="sm:col-span-2 rounded-xl border border-border bg-sand/40 px-3 py-2 text-xs text-muted">
+          Supplier:{" "}
+          <span className="font-medium text-foreground">
+            {product?.brand || CLOTHING_BRAND}
+          </span>
+          {product?.material ? ` · ${product.material}` : ""}
+          {product?.brand === "Henbury"
+            ? " · shirt via Henbury / promotional store"
+            : ""}
+          {productUrl ? (
+            <>
+              {" · "}
+              <a
+                href={productUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-brand underline-offset-2 hover:underline"
+              >
+                View product
+              </a>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      <div className={row.is_other ? "sm:col-span-2" : ""}>
         <label className="label">Item</label>
         <SearchSelect
           className="field"
-          value={row.item}
+          value={row.is_other ? OTHER_ITEM_LABEL : row.item}
           onChange={applyItem}
-          options={productCards.map((p) => ({ value: p.label, label: p.label }))}
+          options={itemOptions}
         />
       </div>
-      <div>
-        <label className="label">Fit</label>
-        <SearchSelect
-          className="field"
-          value={row.fit || "male"}
-          onChange={(f) => onChange({ ...row, fit: f as ClothingFit })}
-          options={CLOTHING_FITS.map((f) => ({ value: f.id, label: f.label }))}
-        />
-      </div>
-      <div>
-        <label className="label">Size</label>
-        <SearchSelect
-          className="field"
-          value={row.size}
-          onChange={(size) => onChange({ ...row, size })}
-          options={CLOTHING_SIZES.map((s) => ({ value: s, label: s }))}
-        />
-      </div>
-      <div>
-        <label className="label">Colour</label>
-        <SearchSelect
-          className="field"
-          value={row.colour}
-          onChange={(colour) => onChange({ ...row, colour })}
-          options={colours.map((c) => ({ value: c, label: c }))}
-        />
-      </div>
-      <div>
-        <label className="label">Logo</label>
-        <SearchSelect
-          className="field"
-          value={row.logo}
-          onChange={(logo) => onChange({ ...row, logo: logo as ClothingLogo })}
-          options={CLOTHING_LOGOS.map((l) => ({ value: l.id, label: l.label }))}
-        />
-        <p className="mt-1.5 text-xs leading-relaxed text-muted">
-          {clothingLogoHint(row.logo) ??
-            "Use Bespoke Logistics when unsure; pick a division logo only when the item is clearly for that team."}
-        </p>
-      </div>
-      <div>
-        <label className="label">Quantity</label>
-        <input
-          className="field"
-          type="number"
-          min={1}
-          value={row.quantity}
-          onChange={(e) => onChange({ ...row, quantity: e.target.value })}
-        />
-      </div>
+      {row.is_other ? (
+        <>
+          <div className="sm:col-span-2">
+            <label className="label">Description</label>
+            <textarea
+              className="field min-h-[88px] resize-y"
+              placeholder="Describe the item — e.g. Navy jumper ordered externally for show season"
+              value={row.other_description}
+              onChange={(e) =>
+                onChange({ ...row, other_description: e.target.value })
+              }
+            />
+            <p className="mt-1.5 text-xs text-muted">
+              Use this for clothing ordered outside the standard catalogue.
+            </p>
+          </div>
+          <div>
+            <label className="label">Quantity</label>
+            <input
+              className="field"
+              type="number"
+              min={1}
+              value={row.quantity}
+              onChange={(e) => onChange({ ...row, quantity: e.target.value })}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div>
+            <label className="label">Fit</label>
+            <SearchSelect
+              className="field"
+              value={row.fit || "male"}
+              onChange={(f) => onChange({ ...row, fit: f as ClothingFit })}
+              options={CLOTHING_FITS.map((f) => ({
+                value: f.id,
+                label: f.label,
+              }))}
+            />
+          </div>
+          <div>
+            <label className="label">Size</label>
+            <SearchSelect
+              className="field"
+              value={row.size}
+              onChange={(size) => onChange({ ...row, size })}
+              options={CLOTHING_SIZES.map((s) => ({ value: s, label: s }))}
+            />
+          </div>
+          <div>
+            <label className="label">Colour</label>
+            <SearchSelect
+              className="field"
+              value={row.colour}
+              onChange={(colour) => onChange({ ...row, colour })}
+              options={colours.map((c) => ({ value: c, label: c }))}
+            />
+          </div>
+          <div>
+            <label className="label">Logo</label>
+            <SearchSelect
+              className="field"
+              value={row.logo}
+              onChange={(logo) =>
+                onChange({ ...row, logo: logo as ClothingLogo })
+              }
+              options={CLOTHING_LOGOS.map((l) => ({
+                value: l.id,
+                label: l.label,
+              }))}
+            />
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              {clothingLogoHint(row.logo) ??
+                "Use Bespoke Logistics when unsure; pick a division logo only when the item is clearly for that team."}
+            </p>
+          </div>
+          <div>
+            <label className="label">Quantity</label>
+            <input
+              className="field"
+              type="number"
+              min={1}
+              value={row.quantity}
+              onChange={(e) => onChange({ ...row, quantity: e.target.value })}
+            />
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function OrderItemsList({ order }: { order: MerchOrder }) {
+  const lines = getMerchOrderItems(order);
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {lines.map((line) => (
+        <li key={line.id} className="text-sm text-muted">
+          {line.is_other ? (
+            <span className="text-foreground">
+              {line.other_description || OTHER_ITEM_LABEL}
+              {line.quantity > 1 ? ` · ×${line.quantity}` : ""}
+            </span>
+          ) : (
+            <span className="text-foreground">
+              {line.item}
+              {line.fit ? ` · ${fitLabel(line.fit)}` : ""}
+              {line.size ? ` · ${line.size}` : ""}
+              {line.quantity > 1 ? ` · ×${line.quantity}` : ""}
+              {line.colour ? ` · ${line.colour}` : ""}
+              {line.logo
+                ? ` · ${normalizeClothingLogo(line.logo)} logo`
+                : ""}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -676,7 +627,10 @@ export function MerchClient({
   const [statusFilter, setStatusFilter] = useState("all");
   const [itemFilter, setItemFilter] = useState("all");
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [edit, setEdit] = useState<EditForm | null>(null);
+  const [editHeader, setEditHeader] = useState<OrderHeaderWithStatus | null>(
+    null
+  );
+  const [editItemRows, setEditItemRows] = useState<OrderItemRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -718,31 +672,22 @@ export function MerchClient({
   const itemTypes = useMemo(() => {
     const set = new Set([
       ...productCards.map((p) => p.label),
-      ...orders.map((o) => o.item.trim()).filter(Boolean),
+      OTHER_ITEM_LABEL,
+      ...orders.flatMap((o) => merchOrderItemLabels(o)),
     ]);
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [orders, productCards]);
 
   const filtered = useMemo(() => {
     return orders.filter((o) => {
-      if (
-        !matchesSearch(search, [
-          o.item,
-          o.fit,
-          o.size,
-          o.colour,
-          o.logo,
-          o.requested_for,
-          o.office,
-          plainTextFromHtml(o.notes),
-          o.created_by,
-          o.status,
-        ])
-      ) {
+      if (!matchesSearch(search, merchOrderSearchText(o))) {
         return false;
       }
       if (statusFilter !== "all" && o.status !== statusFilter) return false;
-      if (itemFilter !== "all" && o.item !== itemFilter) return false;
+      if (itemFilter !== "all") {
+        const labels = merchOrderItemLabels(o);
+        if (!labels.includes(itemFilter)) return false;
+      }
       return true;
     });
   }, [orders, search, statusFilter, itemFilter]);
@@ -752,32 +697,25 @@ export function MerchClient({
     : null;
 
   async function create() {
+    const items = itemRowsToPayload(itemRows);
+    if (items.length === 0) {
+      window.alert("Add at least one item to the order.");
+      return;
+    }
     const { for_mode, ...header } = orderHeader;
     void for_mode;
-    const sharedPayload = {
-      ...header,
-      needed_by: orderHeader.needed_by || null,
-      requested_for_contact_id: orderHeader.requested_for_contact_id,
-      created_by: orderHeader.created_by || orderHeader.requested_for || "Staff",
-      status: "requested" as MerchStatus,
-    };
-    await Promise.all(
-      itemRows.map((row) =>
-        fetch("/api/merch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...sharedPayload,
-            item: row.item,
-            fit: row.fit || "male",
-            size: row.size,
-            quantity: Number(row.quantity) || 1,
-            colour: row.colour,
-            logo: row.logo,
-          }),
-        })
-      )
-    );
+    await fetch("/api/merch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...header,
+        items,
+        needed_by: orderHeader.needed_by || null,
+        requested_for_contact_id: orderHeader.requested_for_contact_id,
+        created_by: orderHeader.created_by || orderHeader.requested_for || "Staff",
+        status: "requested",
+      }),
+    });
     setShowForm(false);
     setOrderHeader(buildEmptyOrderHeader(viewerName, viewerContactId));
     setItemRows([buildEmptyItemRow(productCards)]);
@@ -786,19 +724,26 @@ export function MerchClient({
 
   function openEdit(order: MerchOrder) {
     setEditingId(order.id);
-    setEdit(toEditForm(order, viewerName, viewerContactId));
+    setEditHeader(orderToEditHeader(order, viewerName, viewerContactId));
+    setEditItemRows(orderToItemRows(order));
   }
 
   function closeEdit() {
     setEditingId(null);
-    setEdit(null);
+    setEditHeader(null);
+    setEditItemRows([]);
   }
 
   async function saveEdit() {
-    if (!editingId || !edit) return;
+    if (!editingId || !editHeader) return;
+    const items = itemRowsToPayload(editItemRows);
+    if (items.length === 0) {
+      window.alert("Add at least one item to the order.");
+      return;
+    }
     setSaving(true);
     try {
-      const { for_mode, ...payload } = edit;
+      const { for_mode, status, ...header } = editHeader;
       void for_mode;
       await fetch("/api/merch", {
         method: "POST",
@@ -807,11 +752,11 @@ export function MerchClient({
           action: "update",
           id: editingId,
           patch: {
-            ...payload,
-            item: edit.item.trim() || DEFAULT_ITEM,
-            quantity: Number(edit.quantity) || 1,
-            needed_by: edit.needed_by || null,
-            requested_for_contact_id: edit.requested_for_contact_id,
+            ...header,
+            items,
+            status,
+            needed_by: editHeader.needed_by || null,
+            requested_for_contact_id: editHeader.requested_for_contact_id,
           },
         }),
       });
@@ -828,7 +773,9 @@ export function MerchClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update", id, patch: { status } }),
     });
-    if (editingId === id && edit) setEdit({ ...edit, status });
+    if (editingId === id && editHeader) {
+      setEditHeader({ ...editHeader, status });
+    }
     await refresh();
   }
 
@@ -929,17 +876,7 @@ export function MerchClient({
           {/* Shared order details */}
           <div className="grid gap-3 md:grid-cols-2">
             <RequestedForField
-              form={{
-                ...buildEmptyForm(viewerName, viewerContactId),
-                ...orderHeader,
-                item: DEFAULT_ITEM,
-                fit: "male",
-                size: "M",
-                quantity: "1",
-                colour: "",
-                logo: DEFAULT_CLOTHING_LOGO as ClothingLogo,
-                status: "requested",
-              }}
+              form={orderHeader}
               onChange={(next) =>
                 setOrderHeader((h) => ({
                   ...h,
@@ -1027,7 +964,7 @@ export function MerchClient({
               className="btn-primary"
               onClick={() => void create()}
             >
-              Submit {itemRows.length > 1 ? `${itemRows.length} items` : "request"}
+              Submit order
             </button>
             <button
               type="button"
@@ -1045,26 +982,24 @@ export function MerchClient({
       ) : null}
 
       <div className="space-y-3">
-        {filtered.map((order) => (
+        {filtered.map((order) => {
+          const lineCount = getMerchOrderItems(order).length;
+          return (
           <article key={order.id} className="surface-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h2 className="font-display text-xl text-brand">
-                  {order.item}
+                  {order.requested_for || "Clothing order"}
                   <span className="ml-2 text-base font-sans font-normal text-muted">
-                    · {fitLabel(order.fit) || "—"} · {order.size} · ×
-                    {order.quantity}
+                    · {lineCount} item{lineCount === 1 ? "" : "s"}
                   </span>
                 </h2>
                 <p className="mt-1 text-sm text-muted">
-                  {order.colour || "—"}
-                  {order.logo
-                    ? ` · ${normalizeClothingLogo(order.logo)} logo`
-                    : ""}
-                  {order.requested_for ? ` · for ${order.requested_for}` : ""}
-                  {order.office ? ` · ${order.office}` : ""}
+                  {order.office ? `${order.office}` : "—"}
                   {order.needed_by ? ` · needed ${order.needed_by}` : ""}
+                  {order.created_by ? ` · requested by ${order.created_by}` : ""}
                 </p>
+                <OrderItemsList order={order} />
               </div>
               <span
                 className={cn(
@@ -1116,7 +1051,7 @@ export function MerchClient({
               ) : null}
             </div>
           </article>
-        ))}
+        )})}
         {filtered.length === 0 ? (
           <p className="text-sm text-muted">
             {canManageAll
@@ -1126,7 +1061,7 @@ export function MerchClient({
         ) : null}
       </div>
 
-      {edit && editingOrder ? (
+      {editHeader && editingOrder ? (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
@@ -1134,7 +1069,7 @@ export function MerchClient({
             aria-hidden
           />
           <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
+            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-border bg-white shadow-soft"
             role="dialog"
             aria-modal="true"
             aria-label="Edit clothing order"
@@ -1149,33 +1084,58 @@ export function MerchClient({
                 Close
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid gap-2 md:grid-cols-1">
-                <OrderFields
-                  form={edit}
-                  onChange={setEdit}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <RequestedForField
+                  form={editHeader}
+                  onChange={setEditHeader}
                   canManageAll={canManageAll}
                   viewerName={viewerName}
                   viewerContactId={viewerContactId}
-                  productCards={productCards}
                 />
+                <div>
+                  <label className="label">Office</label>
+                  <input
+                    className="field"
+                    value={editHeader.office}
+                    onChange={(e) =>
+                      setEditHeader((h) =>
+                        h ? { ...h, office: e.target.value } : h
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label">Needed by</label>
+                  <input
+                    className="field"
+                    type="date"
+                    value={editHeader.needed_by}
+                    onChange={(e) =>
+                      setEditHeader((h) =>
+                        h ? { ...h, needed_by: e.target.value } : h
+                      )
+                    }
+                  />
+                </div>
                 <div>
                   <label className="label">Status</label>
                   <SearchSelect
                     className="field"
-                    value={edit.status}
+                    value={editHeader.status}
                     onChange={(status) =>
-                      setEdit({
-                        ...edit,
-                        status: status as MerchStatus,
-                      })
+                      setEditHeader((h) =>
+                        h ? { ...h, status: status as MerchStatus } : h
+                      )
                     }
                     options={[
-                      ...(!statusOptions.some((s) => s.id === edit.status)
+                      ...(!statusOptions.some(
+                        (s) => s.id === editHeader.status
+                      )
                         ? [
                             {
-                              value: edit.status,
-                              label: statusLabel(edit.status),
+                              value: editHeader.status,
+                              label: statusLabel(editHeader.status),
                             },
                           ]
                         : []),
@@ -1186,6 +1146,52 @@ export function MerchClient({
                     ]}
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="label">Notes</label>
+                  <RichTextEditor
+                    value={editHeader.notes}
+                    onChange={(notes) =>
+                      setEditHeader((h) => (h ? { ...h, notes } : h))
+                    }
+                    placeholder="Any additional notes for this order…"
+                    minHeight="70px"
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                  Items ({editItemRows.length})
+                </p>
+                {editItemRows.map((row) => (
+                  <ItemRowFields
+                    key={row.id}
+                    row={row}
+                    onChange={(next) =>
+                      setEditItemRows((rows) =>
+                        rows.map((r) => (r.id === row.id ? next : r))
+                      )
+                    }
+                    onRemove={() =>
+                      setEditItemRows((rows) =>
+                        rows.filter((r) => r.id !== row.id)
+                      )
+                    }
+                    canRemove={editItemRows.length > 1}
+                    productCards={productCards}
+                  />
+                ))}
+                <button
+                  type="button"
+                  className="btn-secondary text-xs"
+                  onClick={() =>
+                    setEditItemRows((rows) => [
+                      ...rows,
+                      buildEmptyItemRow(productCards),
+                    ])
+                  }
+                >
+                  + Add another item
+                </button>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">

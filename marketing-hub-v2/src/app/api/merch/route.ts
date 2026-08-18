@@ -8,6 +8,7 @@ import {
   listMerchOrders,
   updateMerchOrder,
 } from "@/lib/data/repos";
+import type { MerchOrder } from "@/lib/types";
 import {
   filterMerchOrdersForUser,
   isMerchAdmin,
@@ -15,6 +16,10 @@ import {
 } from "@/lib/merch/access";
 import { notifyMarketingAlert } from "@/lib/email/send-marketing-alert";
 import { normalizeClothingLogo } from "@/lib/merch/north-sails";
+import {
+  normalizeMerchOrderItems,
+  syncMerchOrderPrimaryFields,
+} from "@/lib/merch/order-items";
 import { resolveMerchRequestedFor } from "@/lib/merch/requested-for";
 
 export async function GET() {
@@ -95,6 +100,18 @@ export async function POST(request: NextRequest) {
         patch.created_by_user_id = resolved.allocated_user_id;
       }
     }
+    if (patch.items !== undefined) {
+      const items = normalizeMerchOrderItems({
+        ...existing,
+        items: Array.isArray(patch.items)
+          ? (patch.items as MerchOrder["items"])
+          : undefined,
+      });
+      if (items.length === 0) {
+        return jsonError("Add at least one item to the order", 400);
+      }
+      Object.assign(patch, syncMerchOrderPrimaryFields(items), { items });
+    }
     const updated = await updateMerchOrder(body.id, patch);
     if (!updated) return jsonError("Not found", 404);
     return jsonOk({ item: updated });
@@ -131,13 +148,22 @@ export async function POST(request: NextRequest) {
     fallbackName,
   });
 
-  const item = await createMerchOrder({
-    item: body.item ?? "Polo — Regatta (polyester)",
+  const items = normalizeMerchOrderItems({
+    items: Array.isArray(body.items) ? body.items : undefined,
+    item: typeof body.item === "string" ? body.item : "",
     fit: body.fit === "female" || body.fit === "male" ? body.fit : "",
-    size: body.size ?? "",
+    size: typeof body.size === "string" ? body.size : "",
     quantity: Number(body.quantity) > 0 ? Number(body.quantity) : 1,
-    colour: body.colour ?? "",
+    colour: typeof body.colour === "string" ? body.colour : "",
     logo: normalizeClothingLogo(body.logo),
+  });
+  if (items.length === 0) {
+    return jsonError("Add at least one item to the order", 400);
+  }
+
+  const item = await createMerchOrder({
+    ...syncMerchOrderPrimaryFields(items),
+    items,
     requested_for: resolved.requested_for,
     requested_for_contact_id: resolved.requested_for_contact_id,
     office: body.office ?? "",

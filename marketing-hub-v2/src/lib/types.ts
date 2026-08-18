@@ -300,8 +300,22 @@ export type MerchStatus =
   | "delivered"
   | "cancelled";
 
+export type MerchOrderLineItem = {
+  id: string;
+  item: string;
+  fit: "male" | "female" | "";
+  size: string;
+  quantity: number;
+  colour: string;
+  logo: string;
+  /** Manual / non-catalogue line (e.g. jumper ordered elsewhere). */
+  is_other?: boolean;
+  other_description?: string;
+};
+
 export type MerchOrder = {
   id: string;
+  /** Primary line summary — kept for search/filter; see items for full order. */
   item: string;
   /** Male or female cut */
   fit: "male" | "female" | "";
@@ -310,6 +324,8 @@ export type MerchOrder = {
   colour: string;
   /** Embroidered / printed logo variant */
   logo: string;
+  /** All clothing lines in this order (one order per person). */
+  items?: MerchOrderLineItem[];
   requested_for: string;
   /** Contact this order is for (from Contacts). When that contact has user_id, ownership is allocated to them. */
   requested_for_contact_id: string | null;
