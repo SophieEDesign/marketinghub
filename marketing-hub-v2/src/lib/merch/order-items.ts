@@ -69,7 +69,7 @@ export function syncMerchOrderPrimaryFields(
     };
   }
   if (first.is_other) {
-    const label = first.other_description.trim() || OTHER_ITEM_LABEL;
+    const label = (first.other_description ?? "").trim() || OTHER_ITEM_LABEL;
     return {
       item: label,
       fit: "",
@@ -96,7 +96,7 @@ export function normalizeMerchOrderItems(
 ): MerchOrderLineItem[] {
   if (Array.isArray(input.items) && input.items.length > 0) {
     return input.items.map(normalizeLineItem).filter((line) => {
-      if (line.is_other) return Boolean(line.other_description.trim());
+      if (line.is_other) return Boolean((line.other_description ?? "").trim());
       return Boolean(line.item.trim());
     });
   }
@@ -111,7 +111,7 @@ export function normalizeMerchOrderItems(
 export function merchOrderItemLabels(order: MerchOrder): string[] {
   return getMerchOrderItems(order).map((line) => {
     if (line.is_other) {
-      return line.other_description.trim() || OTHER_ITEM_LABEL;
+      return (line.other_description ?? "").trim() || OTHER_ITEM_LABEL;
     }
     return line.item;
   });
