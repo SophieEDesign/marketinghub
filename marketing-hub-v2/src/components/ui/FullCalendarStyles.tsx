@@ -12,19 +12,15 @@ export function FullCalendarStyles() {
       `https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@${FC_VERSION}/index.global.min.css`,
       `https://cdn.jsdelivr.net/npm/@fullcalendar/list@${FC_VERSION}/index.global.min.css`,
     ];
-    const links = hrefs.map((href) => {
-      const existing = document.querySelector(`link[data-fc="${href}"]`);
-      if (existing) return null;
+    for (const href of hrefs) {
+      if (document.querySelector(`link[data-fc="${href}"]`)) continue;
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = href;
       link.setAttribute("data-fc", href);
       document.head.appendChild(link);
-      return link;
-    });
-    return () => {
-      // Keep styles mounted — other calendar pages may still need them.
-    };
+    }
+    // Keep styles mounted — other calendar pages may still need them.
   }, []);
   return null;
 }
