@@ -9,8 +9,13 @@ import type {
   StaffRequest,
 } from "@/lib/types";
 import {
+  applyDroneFilmingBudget,
+  applyDroneFilmingMeta,
   createDefaultBudgetLines,
   createDefaultBudgetMeta,
+  mergeDefaultBudgetPayments,
+  needsDefaultBudgetPaymentMigration,
+  needsDroneFilmingBudgetMigration,
 } from "@/lib/budget/2026";
 import { createSeedStore } from "@/lib/store/seed";
 import { getDataDir } from "@/lib/store/paths";
@@ -160,6 +165,12 @@ function withDefaults(store: Partial<HubStore>): HubStore {
   // Only fill missing collections with demo rows when the snapshot itself is seed.
   // Real Core snapshots must not get mrc_seed_* orders planted on migration.
   const fillMissingFromSeed = looksLikeSeedStore(store);
+  const budgetLines = applyDroneFilmingBudget(
+    store.budget_lines ?? createDefaultBudgetLines()
+  );
+  const budgetMeta = applyDroneFilmingMeta(
+    store.budget_meta ?? createDefaultBudgetMeta()
+  );
   const base: HubStore = {
     events: migrateEvents(store.events) ?? seed.events,
     event_attendance: store.event_attendance ?? seed.event_attendance,
@@ -191,9 +202,12 @@ function withDefaults(store: Partial<HubStore>): HubStore {
     access_requests: store.access_requests ?? seed.access_requests,
     page_notes: store.page_notes ?? seed.page_notes ?? {},
     field_extras: store.field_extras ?? seed.field_extras ?? {},
-    budget_lines: store.budget_lines ?? createDefaultBudgetLines(),
-    budget_payments: store.budget_payments ?? [],
-    budget_meta: store.budget_meta ?? createDefaultBudgetMeta(),
+    budget_lines: budgetLines,
+    budget_payments: mergeDefaultBudgetPayments(
+      store.budget_payments ?? [],
+      budgetLines
+    ),
+    budget_meta: budgetMeta,
   };
   return syncThemeIdsOntoContent(base);
 }
@@ -400,7 +414,12 @@ async function ensureStore(): Promise<StoreRead> {
     // Do NOT write remote on every read — that races with restores and can
     // push stale /tmp seed back over a good hub_store snapshot.
     // Migration writes use CAS; on conflict another writer already persisted.
-    if (upgradingFromSeed || needsKeyMigration(preferred)) {
+    if (
+      upgradingFromSeed ||
+      needsKeyMigration(preferred) ||
+      needsDefaultBudgetPaymentMigration(preferred.budget_payments) ||
+      needsDroneFilmingBudgetMigration(preferred.budget_lines, preferred.budget_meta)
+    ) {
       const result = await writeRemoteStore(merged, remote.updatedAt);
       if (result === "ok") {
         await writeLocalFile(merged);
@@ -440,7 +459,11 @@ async function ensureStore(): Promise<StoreRead> {
     return { store: seed, remoteUpdatedAt: null };
   }
   const merged = withDefaults(parsed);
-  if (needsKeyMigration(parsed)) {
+  if (
+    needsKeyMigration(parsed) ||
+    needsDefaultBudgetPaymentMigration(parsed.budget_payments) ||
+    needsDroneFilmingBudgetMigration(parsed.budget_lines, parsed.budget_meta)
+  ) {
     await writeLocalFile(merged);
   }
   return { store: merged, remoteUpdatedAt: null };

@@ -1,6 +1,8 @@
 import type {
   BudgetLine,
   BudgetMeta,
+  BudgetPayment,
+  BudgetPaymentStatus,
   BudgetQuarter,
 } from "@/lib/types";
 
@@ -132,13 +134,13 @@ export const BUDGET_2026: MarketingBudget = {
   title: "Marketing Budget 2026",
   source: "Budget draft 2026.xlsx",
   currency: "GBP",
-  committedTotal: 175676,
+  committedTotal: 178076,
   uncommittedTotal: 151400,
   committedPriorYearTotal: 191478,
   uncommittedPriorYearTotal: 79000,
-  grandTotal: 327076,
+  grandTotal: 329476,
   priorYearTotal: 270478,
-  variance: -56598,
+  variance: -58998,
   committed: [
     {
       id: "ms1",
@@ -223,19 +225,25 @@ export const BUDGET_2026: MarketingBudget = {
       total: 7500,
       priorYear: null,
       variance: -7500,
-      notes: "Distribution of our own press releases via an agency like Prowly",
+      notes: "Prowly £299 a month. Distribution of our own press releases.",
     },
     {
       id: "video",
       name: "Video / Photography",
       code: "",
-      marketing: 12000,
+      marketing: 14400,
       sponsorship: null,
       travel: null,
-      total: 12000,
+      total: 14400,
       priorYear: null,
-      variance: -12000,
-      notes: "",
+      variance: -14400,
+      notes: "Drone filming £1,200 a month (maritime filming retainer).",
+      children: [
+        {
+          name: "Drone filming £1,200 a month",
+          amount: 14400,
+        },
+      ],
     },
     {
       id: "google-ads",
@@ -449,6 +457,10 @@ export const BUDGET_2026: MarketingBudget = {
       body: "Double the budget — double the leads. Recommendation: double the monthly budget and use any remainder for LinkedIn, social media, and Performance Max campaigns (pop-up ads on other websites). Google Ads and digital presence is trial and error.",
     },
     {
+      title: "Drone filming",
+      body: "£1,200 a month for drone filming (maritime filming retainer). £14,400 for the year, under Video / Photography.",
+    },
+    {
       title: "Yachtworld Ad",
       body: "Sophie looking into where the clicks came from and possibly a digital ad there.",
     },
@@ -565,4 +577,280 @@ export function createDefaultBudgetMeta(): BudgetMeta {
     extra_events: BUDGET_2026.extraEvents,
     quarters: BUDGET_2026.quarters as BudgetQuarter[],
   };
+}
+
+export const GOOGLE_ADS_LINE_ID = "bln_google-ads";
+
+type GoogleAdsStatementMonth = {
+  id: string;
+  paid_at: string;
+  netCost: number;
+  payments: number;
+  status: BudgetPaymentStatus;
+  description: string;
+};
+
+/** Google Ads billing statement — amount posted is monthly net cost (ad spend). */
+const GOOGLE_ADS_2026_STATEMENTS: GoogleAdsStatementMonth[] = [
+  {
+    id: "pay_google_ads_2026_01",
+    paid_at: "2026-01-31",
+    netCost: 3087.51,
+    payments: 3385.93,
+    status: "paid",
+    description: "January 2026 statement. Net cost £3,087.51. Payments £3,385.93.",
+  },
+  {
+    id: "pay_google_ads_2026_02",
+    paid_at: "2026-02-28",
+    netCost: 3109.12,
+    payments: 3087.51,
+    status: "paid",
+    description: "February 2026 statement. Net cost £3,109.12. Payments £3,087.51.",
+  },
+  {
+    id: "pay_google_ads_2026_03",
+    paid_at: "2026-03-31",
+    netCost: 3147.19,
+    payments: 3109.12,
+    status: "paid",
+    description: "March 2026 statement. Net cost £3,147.19. Payments £3,109.12.",
+  },
+  {
+    id: "pay_google_ads_2026_04",
+    paid_at: "2026-04-30",
+    netCost: 3168.91,
+    payments: 3147.19,
+    status: "paid",
+    description: "April 2026 statement. Net cost £3,168.91. Payments £3,147.19.",
+  },
+  {
+    id: "pay_google_ads_2026_05",
+    paid_at: "2026-05-31",
+    netCost: 4145.06,
+    payments: 4168.91,
+    status: "paid",
+    description: "May 2026 statement. Net cost £4,145.06. Payments £4,168.91.",
+  },
+  {
+    id: "pay_google_ads_2026_06",
+    paid_at: "2026-06-30",
+    netCost: 4292.27,
+    payments: 4145.06,
+    status: "paid",
+    description: "June 2026 statement. Net cost £4,292.27. Payments £4,145.06.",
+  },
+  {
+    id: "pay_google_ads_2026_07",
+    paid_at: "2026-07-31",
+    netCost: 4417.06,
+    payments: 4292.27,
+    status: "paid",
+    description: "July 2026 statement. Net cost £4,417.06. Payments £4,292.27.",
+  },
+  {
+    id: "pay_google_ads_2026_08",
+    paid_at: "2026-08-20",
+    netCost: 2725.98,
+    payments: 2917.06,
+    status: "pending",
+    description:
+      "August 2026 snapshot — figures are not updated in real time. Balance from July £417.06 + net cost £2,725.98 − payments £2,917.06 = current balance £225.98.",
+  },
+];
+
+export function resolveGoogleAdsLineId(lines: BudgetLine[]): string {
+  return (
+    lines.find((line) => line.id === GOOGLE_ADS_LINE_ID)?.id ??
+    lines.find(
+      (line) =>
+        line.code === "MP3" && /google ad spend/i.test(line.name)
+    )?.id ??
+    lines.find((line) => /google ad spend/i.test(line.name))?.id ??
+    GOOGLE_ADS_LINE_ID
+  );
+}
+
+export const PRESS_LINE_ID = "bln_press";
+
+const PRESS_SERVICE_2026_INVOICES = [
+  {
+    id: "pay_press_vat_508910283",
+    paid_at: "2026-05-29",
+    invoice: "VAT/508910283",
+    amount: 299,
+  },
+  {
+    id: "pay_press_vat_523893873",
+    paid_at: "2026-06-29",
+    invoice: "VAT/523893873",
+    amount: 299,
+  },
+  {
+    id: "pay_press_vat_541849987",
+    paid_at: "2026-08-03",
+    invoice: "VAT/541849987",
+    amount: 299,
+  },
+] as const;
+
+export function resolvePressLineId(lines: BudgetLine[]): string {
+  return (
+    lines.find((line) => line.id === PRESS_LINE_ID)?.id ??
+    lines.find((line) => /^press service$/i.test(line.name))?.id ??
+    PRESS_LINE_ID
+  );
+}
+
+function createGoogleAdsPayments(
+  lines: BudgetLine[],
+  now: string
+): BudgetPayment[] {
+  const lineId = resolveGoogleAdsLineId(lines);
+  return GOOGLE_ADS_2026_STATEMENTS.map((month) => ({
+    id: month.id,
+    budget_line_id: lineId,
+    paid_at: month.paid_at,
+    supplier: "Google Ads",
+    description: month.description,
+    amount: month.netCost,
+    status: month.status,
+    invoice_url: "",
+    created_by: "Google Ads statement",
+    created_by_user_id: null,
+    created_at: now,
+    updated_at: now,
+  }));
+}
+
+function createPressServicePayments(
+  lines: BudgetLine[],
+  now: string
+): BudgetPayment[] {
+  const lineId = resolvePressLineId(lines);
+  return PRESS_SERVICE_2026_INVOICES.map((invoice) => ({
+    id: invoice.id,
+    budget_line_id: lineId,
+    paid_at: invoice.paid_at,
+    supplier: "Prowly",
+    description: `Press Service invoice ${invoice.invoice}. Charge £299.00.`,
+    amount: invoice.amount,
+    status: "paid" as const,
+    invoice_url: "",
+    created_by: "Prowly billing history",
+    created_by_user_id: null,
+    created_at: now,
+    updated_at: now,
+  }));
+}
+
+export function createDefaultBudgetPayments(
+  lines: BudgetLine[] = createDefaultBudgetLines(),
+  now = new Date().toISOString()
+): BudgetPayment[] {
+  return [
+    ...createGoogleAdsPayments(lines, now),
+    ...createPressServicePayments(lines, now),
+  ];
+}
+
+/** Add statement months that are not already in the store. Does not overwrite edits. */
+export function mergeDefaultBudgetPayments(
+  payments: BudgetPayment[],
+  lines: BudgetLine[]
+): BudgetPayment[] {
+  const seeded = createDefaultBudgetPayments(lines);
+  const existingIds = new Set(payments.map((payment) => payment.id));
+  const missing = seeded.filter((payment) => !existingIds.has(payment.id));
+  return missing.length === 0 ? payments : [...payments, ...missing];
+}
+
+export function needsDefaultBudgetPaymentMigration(
+  payments: BudgetPayment[] | undefined
+): boolean {
+  const ids = new Set((payments ?? []).map((payment) => payment.id));
+  return createDefaultBudgetPayments().some((payment) => !ids.has(payment.id));
+}
+
+export const VIDEO_LINE_ID = "bln_video";
+export const DRONE_FILMING_MONTHLY = 1200;
+export const DRONE_FILMING_ANNUAL = 14400;
+const DRONE_FILMING_NOTE =
+  "Drone filming £1,200 a month (maritime filming retainer).";
+const DRONE_FILMING_CHILD = {
+  name: "Drone filming £1,200 a month",
+  amount: DRONE_FILMING_ANNUAL,
+};
+
+function isVideoPhotographyLine(line: BudgetLine) {
+  return line.id === VIDEO_LINE_ID || /^video \/ photography$/i.test(line.name);
+}
+
+function hasDroneFilming(line: BudgetLine) {
+  return (
+    /drone filming/i.test(line.notes) ||
+    (line.children ?? []).some((child) => /drone filming/i.test(child.name))
+  );
+}
+
+export function applyDroneFilmingBudget(lines: BudgetLine[]): BudgetLine[] {
+  const now = new Date().toISOString();
+  const idx = lines.findIndex(isVideoPhotographyLine);
+
+  if (idx === -1) {
+    const video = createDefaultBudgetLines().find(isVideoPhotographyLine);
+    return video ? [...lines, video] : lines;
+  }
+
+  const line = lines[idx];
+  const alreadyNoted = hasDroneFilming(line);
+  const childOk = (line.children ?? []).some((child) =>
+    /drone filming/i.test(child.name)
+  );
+  const amountOk =
+    line.planned === DRONE_FILMING_ANNUAL &&
+    line.marketing === DRONE_FILMING_ANNUAL;
+  if (alreadyNoted && childOk && amountOk) return lines;
+
+  const next = [...lines];
+  next[idx] = {
+    ...line,
+    planned: DRONE_FILMING_ANNUAL,
+    marketing: DRONE_FILMING_ANNUAL,
+    notes: alreadyNoted
+      ? line.notes
+      : line.notes.trim()
+        ? `${line.notes.trim()} ${DRONE_FILMING_NOTE}`
+        : DRONE_FILMING_NOTE,
+    children: childOk
+      ? line.children
+      : [...(line.children ?? []), DRONE_FILMING_CHILD],
+    updated_at: now,
+  };
+  return next;
+}
+
+export function applyDroneFilmingMeta(meta: BudgetMeta): BudgetMeta {
+  if (meta.notes.some((note) => /drone filming/i.test(note.title))) return meta;
+  const droneNote = BUDGET_2026.notes.find((note) => note.title === "Drone filming");
+  if (!droneNote) return meta;
+  const notes = [...meta.notes];
+  const googleIdx = notes.findIndex((note) => note.title === "Google Ads");
+  if (googleIdx >= 0) notes.splice(googleIdx + 1, 0, droneNote);
+  else notes.unshift(droneNote);
+  return { ...meta, notes };
+}
+
+export function needsDroneFilmingBudgetMigration(
+  lines: BudgetLine[] | undefined,
+  meta?: BudgetMeta | null
+): boolean {
+  const line = (lines ?? []).find(isVideoPhotographyLine);
+  if (!line) return true;
+  if (line.planned !== DRONE_FILMING_ANNUAL) return true;
+  if (!hasDroneFilming(line)) return true;
+  if (meta && !meta.notes.some((note) => /drone filming/i.test(note.title))) {
+    return true;
+  }
+  return false;
 }

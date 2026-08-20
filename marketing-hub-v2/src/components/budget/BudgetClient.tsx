@@ -10,7 +10,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { computeBudgetTotals } from "@/lib/budget/totals";
+import { computeBudgetTotals, type LineSpend } from "@/lib/budget/totals";
 import type {
   BudgetGroup,
   BudgetLine,
@@ -62,6 +62,11 @@ function groupLabel(group: BudgetGroup) {
   return group === "committed" ? "Committed" : "Uncommitted";
 }
 
+function isHistoricBudgetLine(line: BudgetLine) {
+  if (line.planned === 0 && (line.prior_year ?? 0) > 0) return true;
+  return /not continued|remove for 20\d{2}/i.test(line.notes);
+}
+
 function SummaryCard({
   label,
   value,
@@ -109,6 +114,141 @@ function SpendBar({ planned, used }: { planned: number; used: number }) {
         style={{ width: `${pct}%` }}
       />
     </div>
+  );
+}
+
+function BudgetLineTableRows({
+  line,
+  spend,
+  open,
+  payments,
+  onToggle,
+  onEdit,
+  onDelete,
+  onAddPayment,
+}: {
+  line: BudgetLine;
+  spend?: LineSpend;
+  open: boolean;
+  payments: BudgetPayment[];
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  onAddPayment: () => void;
+}) {
+  const historic = isHistoricBudgetLine(line);
+  return (
+    <Fragment>
+      <tr className="align-top">
+        <td className="px-5 py-3">
+          <button
+            type="button"
+            className="flex min-w-0 items-start gap-2 text-left"
+            onClick={onToggle}
+          >
+            {open ? (
+              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <span className="min-w-0">
+              <span className="font-medium">{line.name}</span>
+              <span className="ml-2 text-xs text-muted">
+                {line.code || groupLabel(line.group)}
+              </span>
+              {historic && (line.prior_year ?? 0) > 0 ? (
+                <span className="mt-1 block text-xs text-muted">
+                  2025 {gbp(line.prior_year)} · {line.notes || "Not continued"}
+                </span>
+              ) : (
+                <span className="mt-2 block max-w-xs">
+                  <SpendBar
+                    planned={spend?.planned ?? line.planned}
+                    used={spend?.used ?? 0}
+                  />
+                </span>
+              )}
+            </span>
+          </button>
+        </td>
+        <td className="px-3 py-3 text-right tabular-nums">
+          {gbp(line.planned)}
+        </td>
+        <td className="px-3 py-3 text-right tabular-nums">
+          {gbp(spend?.paid ?? 0)}
+        </td>
+        <td className="px-3 py-3 text-right tabular-nums">
+          {gbp(spend?.pending ?? 0)}
+        </td>
+        <td
+          className={cn(
+            "px-3 py-3 text-right font-medium tabular-nums",
+            (spend?.remaining ?? 0) < 0 ? "text-amber-800" : ""
+          )}
+        >
+          {gbp(spend?.remaining ?? line.planned)}
+        </td>
+        <td className="px-5 py-3">
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1"
+              aria-label="Edit line"
+              onClick={onEdit}
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="btn-ghost px-2 py-1 text-danger"
+              aria-label="Delete line"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+      {open ? (
+        <tr>
+          <td className="bg-sand/30 px-5 pb-4 pt-0" colSpan={6}>
+            <div className="ml-6 rounded-xl border border-border bg-white p-3">
+              {line.notes ? (
+                <p className="mb-2 text-xs text-muted">{line.notes}</p>
+              ) : null}
+              {payments.length === 0 ? (
+                <p className="text-xs text-muted">No payments yet.</p>
+              ) : (
+                <ul className="space-y-2 text-xs">
+                  {payments.map((payment) => (
+                    <li
+                      key={payment.id}
+                      className="flex flex-wrap items-center justify-between gap-2"
+                    >
+                      <span>
+                        {payment.paid_at || "No date"} ·{" "}
+                        {payment.supplier || "No supplier"} ·{" "}
+                        {payment.description || "Payment"}
+                      </span>
+                      <span className="tabular-nums">
+                        {gbp(payment.amount)} · {statusLabel(payment.status)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                className="btn-secondary mt-3 text-xs"
+                onClick={onAddPayment}
+              >
+                Add payment
+              </button>
+            </div>
+          </td>
+        </tr>
+      ) : null}
+    </Fragment>
   );
 }
 
@@ -189,6 +329,7 @@ export function BudgetClient({
   );
   const [paymentLine, setPaymentLine] = useState("all");
   const [openLineId, setOpenLineId] = useState<string | null>(null);
+  const [showHistoric, setShowHistoric] = useState(false);
   const [showLineForm, setShowLineForm] = useState(false);
   const [lineForm, setLineForm] = useState(emptyLineForm);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
@@ -207,11 +348,20 @@ export function BudgetClient({
   );
 
   const lineOptions = useMemo(
-    () =>
-      lines.map((line) => ({
+    () => {
+      const toOption = (line: BudgetLine, historic = false) => ({
         value: line.id,
-        label: line.code ? `${line.name} (${line.code})` : line.name,
-      })),
+        label: `${line.code ? `${line.name} (${line.code})` : line.name}${
+          historic ? " — historic" : ""
+        }`,
+      });
+      return [
+        ...lines
+          .filter((line) => !isHistoricBudgetLine(line))
+          .map((line) => toOption(line)),
+        ...lines.filter(isHistoricBudgetLine).map((line) => toOption(line, true)),
+      ];
+    },
     [lines]
   );
 
@@ -264,6 +414,58 @@ export function BudgetClient({
       return matchesSearch(search, [line.name, line.code, line.notes]);
     });
   }, [lines, groupFilter, search]);
+
+  const currentLines = useMemo(
+    () => filteredLines.filter((line) => !isHistoricBudgetLine(line)),
+    [filteredLines]
+  );
+  const historicLines = useMemo(
+    () => filteredLines.filter(isHistoricBudgetLine),
+    [filteredLines]
+  );
+  const historicPriorYear = useMemo(
+    () =>
+      historicLines.reduce((total, line) => total + (line.prior_year ?? 0), 0),
+    [historicLines]
+  );
+  const historicOpen =
+    showHistoric || (search.trim().length > 0 && historicLines.length > 0);
+
+  function renderBudgetLine(line: BudgetLine) {
+    const spend = totals.byLine[line.id];
+    const open = openLineId === line.id;
+    return (
+      <BudgetLineTableRows
+        key={line.id}
+        line={line}
+        spend={spend}
+        open={open}
+        payments={payments.filter(
+          (payment) => payment.budget_line_id === line.id
+        )}
+        onToggle={() => setOpenLineId(open ? null : line.id)}
+        onEdit={() => {
+          setEditingLineId(line.id);
+          setLineForm(toLineForm(line));
+          setShowLineForm(true);
+        }}
+        onDelete={() => {
+          if (!window.confirm(`Delete ${line.name} and its payments?`)) {
+            return;
+          }
+          void post({ action: "delete_line", id: line.id });
+        }}
+        onAddPayment={() => {
+          setTab("payments");
+          setPaymentForm({
+            ...emptyPaymentForm,
+            budget_line_id: line.id,
+          });
+          setShowPaymentForm(true);
+        }}
+      />
+    );
+  }
 
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
@@ -552,7 +754,7 @@ export function BudgetClient({
                 search={search}
                 onSearchChange={setSearch}
                 searchPlaceholder="Search lines…"
-                resultCount={filteredLines.length}
+                resultCount={currentLines.length}
                 totalCount={lines.length}
                 selects={[
                   {
@@ -587,147 +789,41 @@ export function BudgetClient({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredLines.map((line) => {
-                    const spend = totals.byLine[line.id];
-                    const open = openLineId === line.id;
-                    const linePayments = payments.filter(
-                      (payment) => payment.budget_line_id === line.id
-                    );
-                    return (
-                      <Fragment key={line.id}>
-                        <tr className="align-top">
-                          <td className="px-5 py-3">
-                            <button
-                              type="button"
-                              className="flex min-w-0 items-start gap-2 text-left"
-                              onClick={() =>
-                                setOpenLineId(open ? null : line.id)
-                              }
-                            >
-                              {open ? (
-                                <ChevronDown className="mt-0.5 h-4 w-4 shrink-0" />
+                  {currentLines.map(renderBudgetLine)}
+                  {historicLines.length > 0 ? (
+                    <>
+                      <tr>
+                        <td className="px-5 py-3" colSpan={6}>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-between gap-3 text-left"
+                            onClick={() => setShowHistoric((open) => !open)}
+                            aria-expanded={historicOpen}
+                          >
+                            <span className="flex min-w-0 items-center gap-2">
+                              {historicOpen ? (
+                                <ChevronDown className="h-4 w-4 shrink-0 text-muted" />
                               ) : (
-                                <ChevronRight className="mt-0.5 h-4 w-4 shrink-0" />
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted" />
                               )}
-                              <span className="min-w-0">
-                                <span className="font-medium">{line.name}</span>
-                                <span className="ml-2 text-xs text-muted">
-                                  {line.code || groupLabel(line.group)}
+                              <span>
+                                <span className="font-medium text-muted">
+                                  Historic / not continued in 2026
                                 </span>
-                                <span className="mt-2 block max-w-xs">
-                                  <SpendBar
-                                    planned={spend?.planned ?? line.planned}
-                                    used={spend?.used ?? 0}
-                                  />
+                                <span className="ml-2 text-xs text-muted">
+                                  {historicLines.length} lines
                                 </span>
                               </span>
-                            </button>
-                          </td>
-                          <td className="px-3 py-3 text-right tabular-nums">
-                            {gbp(line.planned)}
-                          </td>
-                          <td className="px-3 py-3 text-right tabular-nums">
-                            {gbp(spend?.paid ?? 0)}
-                          </td>
-                          <td className="px-3 py-3 text-right tabular-nums">
-                            {gbp(spend?.pending ?? 0)}
-                          </td>
-                          <td
-                            className={cn(
-                              "px-3 py-3 text-right font-medium tabular-nums",
-                              (spend?.remaining ?? 0) < 0
-                                ? "text-amber-800"
-                                : ""
-                            )}
-                          >
-                            {gbp(spend?.remaining ?? line.planned)}
-                          </td>
-                          <td className="px-5 py-3">
-                            <div className="flex justify-end gap-1">
-                              <button
-                                type="button"
-                                className="btn-ghost px-2 py-1"
-                                aria-label="Edit line"
-                                onClick={() => {
-                                  setEditingLineId(line.id);
-                                  setLineForm(toLineForm(line));
-                                  setShowLineForm(true);
-                                }}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-ghost px-2 py-1 text-danger"
-                                aria-label="Delete line"
-                                onClick={() => {
-                                  if (
-                                    !window.confirm(
-                                      `Delete ${line.name} and its payments?`
-                                    )
-                                  ) {
-                                    return;
-                                  }
-                                  void post({
-                                    action: "delete_line",
-                                    id: line.id,
-                                  });
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {open ? (
-                          <tr>
-                            <td className="bg-sand/30 px-5 pb-4 pt-0" colSpan={6}>
-                              <div className="ml-6 rounded-xl border border-border bg-white p-3">
-                                {linePayments.length === 0 ? (
-                                  <p className="text-xs text-muted">
-                                    No payments yet.
-                                  </p>
-                                ) : (
-                                  <ul className="space-y-2 text-xs">
-                                    {linePayments.map((payment) => (
-                                      <li
-                                        key={payment.id}
-                                        className="flex flex-wrap items-center justify-between gap-2"
-                                      >
-                                        <span>
-                                          {payment.paid_at || "No date"} ·{" "}
-                                          {payment.supplier || "No supplier"} ·{" "}
-                                          {payment.description || "Payment"}
-                                        </span>
-                                        <span className="tabular-nums">
-                                          {gbp(payment.amount)} ·{" "}
-                                          {statusLabel(payment.status)}
-                                        </span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                                <button
-                                  type="button"
-                                  className="btn-secondary mt-3 text-xs"
-                                  onClick={() => {
-                                    setTab("payments");
-                                    setPaymentForm({
-                                      ...emptyPaymentForm,
-                                      budget_line_id: line.id,
-                                    });
-                                    setShowPaymentForm(true);
-                                  }}
-                                >
-                                  Add payment
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })}
+                            </span>
+                            <span className="shrink-0 text-xs tabular-nums text-muted">
+                              2025 {gbp(historicPriorYear)}
+                            </span>
+                          </button>
+                        </td>
+                      </tr>
+                      {historicOpen ? historicLines.map(renderBudgetLine) : null}
+                    </>
+                  ) : null}
                 </tbody>
               </table>
             </div>

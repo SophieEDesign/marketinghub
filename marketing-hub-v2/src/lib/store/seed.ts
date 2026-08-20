@@ -2,6 +2,7 @@
 import {
   createDefaultBudgetLines,
   createDefaultBudgetMeta,
+  createDefaultBudgetPayments,
 } from "@/lib/budget/2026";
 import { createMerchInventorySeed } from "@/lib/merch/inventory-seed";
 
@@ -1208,7 +1209,7 @@ export function createSeedStore(): HubStore {
     page_notes: {},
     field_extras: {},
     budget_lines: createDefaultBudgetLines(),
-    budget_payments: [],
+    budget_payments: createDefaultBudgetPayments(),
     budget_meta: createDefaultBudgetMeta(),
   };
 }
