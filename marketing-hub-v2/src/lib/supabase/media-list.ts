@@ -199,13 +199,19 @@ export async function listMediaFromSupabase(options?: {
   scope?: MediaListScope;
   /** When false, admin-only items are hidden (members / non-admins). */
   includeAdmin?: boolean;
+  /** Max rows per request (default 200). Use offset for pagination. */
+  limit?: number;
+  offset?: number;
 }): Promise<{
   items: MediaListItem[];
   tableName: string | null;
   scope: MediaListScope;
+  total?: number;
 }> {
   const scope: MediaListScope = options?.scope === "all" ? "all" : "public";
   const includeAdmin = options?.includeAdmin === true;
+  const limit = Math.min(Math.max(options?.limit ?? 200, 1), 1000);
+  const offset = Math.max(options?.offset ?? 0, 0);
   const tables = await listCoreTables();
   const mediaTable = findMediaTable(tables);
   if (!mediaTable) {
@@ -213,10 +219,14 @@ export async function listMediaFromSupabase(options?: {
   }
 
   const supabase = createServiceClient();
+  const { count } = await supabase
+    .from(mediaTable.supabase_table)
+    .select("*", { count: "exact", head: true });
+
   const { data, error } = await supabase
     .from(mediaTable.supabase_table)
     .select("*")
-    .limit(1000);
+    .range(offset, offset + limit - 1);
 
   if (error) {
     throw new Error(error.message);
@@ -330,7 +340,7 @@ export async function listMediaFromSupabase(options?: {
       return a.display_name.localeCompare(b.display_name);
     });
 
-  return { items, tableName: mediaTable.name, scope };
+  return { items, tableName: mediaTable.name, scope, total: count ?? undefined };
 }
 
 export const MEDIA_HUB_CATEGORIES = [

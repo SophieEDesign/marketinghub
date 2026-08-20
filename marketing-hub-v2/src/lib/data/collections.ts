@@ -63,6 +63,8 @@ export type CollectionDef = {
   fields: FieldDef[];
   /** Hide from Data Admin nav (kept for Themes hierarchy plumbing). */
   hiddenFromDataAdmin?: boolean;
+  /** Require admin role for /api/data access (e.g. platform credentials). */
+  adminOnly?: boolean;
 };
 
 export const CONTENT_STATUS: FieldOption[] = [
@@ -639,6 +641,7 @@ export const DATA_COLLECTIONS: CollectionDef[] = [
     label: "Platform logins",
     description: "Shared marketing platform credentials (admin only)",
     hiddenFromDataAdmin: true,
+    adminOnly: true,
     fields: [
       f("id", { type: "readonly", locked: true }),
       f("platform", {

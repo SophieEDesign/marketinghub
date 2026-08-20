@@ -143,22 +143,32 @@ export function mapWebhookPayload(
   };
 }
 
+import { timingSafeEqual } from "crypto";
+
+function secretsMatch(provided: string, expected: string): boolean {
+  if (!provided || !expected) return false;
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export function requireWebhookSecret(request: Request): boolean {
   const expected = process.env.WEB_ENQUIRY_WEBHOOK_SECRET?.trim();
   if (!expected) return false;
 
-  const url = new URL(request.url);
-  const key = url.searchParams.get("key")?.trim() ?? "";
-  if (key && key === expected) return true;
-
   const headerSecret =
     request.headers.get("x-webhook-secret")?.trim() ?? "";
-  if (headerSecret && headerSecret === expected) return true;
+  if (headerSecret && secretsMatch(headerSecret, expected)) return true;
 
   const auth = request.headers.get("authorization")?.trim() ?? "";
   if (auth.toLowerCase().startsWith("bearer ")) {
     const token = auth.slice(7).trim();
-    if (token && token === expected) return true;
+    if (token && secretsMatch(token, expected)) return true;
   }
 
   return false;
@@ -228,14 +238,20 @@ export async function upsertWebEnquiryFromWebhook(
 
 export async function listWebEnquiries(options?: {
   includeTest?: boolean;
+  limit?: number;
+  offset?: number;
 }): Promise<WebEnquiry[]> {
   if (!hasServiceRoleKey()) return [];
+
+  const limit = Math.min(Math.max(options?.limit ?? 500, 1), 2000);
+  const offset = Math.max(options?.offset ?? 0, 0);
 
   const supabase = createServiceClient();
   let query = supabase
     .from("web_enquiries")
     .select("*")
-    .order("received_at", { ascending: false });
+    .order("received_at", { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (!options?.includeTest) {
     query = query.eq("is_test", false);

@@ -7,7 +7,7 @@ import type {
   Sponsorship,
   SponsorshipStatus,
 } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { useHubView } from "@/lib/hub-view";
@@ -15,10 +15,13 @@ import { format, parseISO, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 import { TimelineChart } from "@/components/ui/TimelineChart";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { statusEventColor } from "@/lib/ui/statusTokens";
 
 const STATUSES: { id: SponsorshipStatus; label: string }[] = [
   { id: "prospect", label: "Prospect" },
@@ -30,12 +33,12 @@ const STATUSES: { id: SponsorshipStatus; label: string }[] = [
 ];
 
 const STATUS_COLOR: Record<SponsorshipStatus, string> = {
-  prospect: "#94a3b8",
-  negotiating: "#c47b3a",
-  confirmed: "#5b6ee1",
-  active: "#3d8b5c",
-  complete: "#64748b",
-  declined: "#b91c1c",
+  prospect: statusEventColor("watching"),
+  negotiating: statusEventColor("todo"),
+  confirmed: statusEventColor("scheduled"),
+  active: statusEventColor("published"),
+  complete: statusEventColor("done"),
+  declined: statusEventColor("lost"),
 };
 
 const MEMBERSHIP_TYPES: { id: MembershipType; label: string }[] = [
@@ -694,9 +697,10 @@ export function SponsorshipsClient({
                 </article>
               ))}
               {filtered.length === 0 ? (
-                <p className="text-sm text-muted">
-                  No partners match your filters.
-                </p>
+                <EmptyState
+                  title="No partners match"
+                  description="Try clearing filters or add a new partner above."
+                />
               ) : null}
             </div>
           ) : null}
@@ -767,43 +771,51 @@ export function SponsorshipsClient({
       </div>
 
       {selected && !edit ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={() => setSelected(null)}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selected.partner} details`}
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">
-                Partner details
-              </h2>
+        <RecordDrawer
+          open
+          onClose={() => setSelected(null)}
+          title="Partner details"
+          ariaLabel={`${selected.partner} details`}
+          footer={
+            <div className="flex flex-wrap gap-2">
+              {canManageItem(selected) ? (
+                <>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => openEdit(selected)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost text-[var(--danger)]"
+                    onClick={() => void remove(selected.id)}
+                  >
+                    Delete
+                  </button>
+                </>
+              ) : null}
               <button
                 type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
+                className="btn-secondary"
                 onClick={() => setSelected(null)}
               >
                 Close
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+          }
+        >
               <div className="space-y-4">
                 <div>
                   <h3 className="font-display text-2xl text-brand">
                     {selected.partner}
                   </h3>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white"
-                      style={{ background: STATUS_COLOR[selected.status] }}
-                    >
-                      {statusLabel(selected.status)}
-                    </span>
+                    <StatusPill
+                      status={selected.status}
+                      label={statusLabel(selected.status)}
+                    />
                     <span className="rounded-full bg-sand px-2.5 py-0.5 text-[11px] font-medium text-muted">
                       {partnerKind(selected) === "membership"
                         ? "Membership"
@@ -888,64 +900,44 @@ export function SponsorshipsClient({
                   relatedId={selected.id}
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              {canManageItem(selected) ? (
-                <>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => openEdit(selected)}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost text-[var(--danger)]"
-                    onClick={() => void remove(selected.id)}
-                  >
-                    Delete
-                  </button>
-                </>
-              ) : null}
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setSelected(null)}
-              >
-                Close
-              </button>
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
 
       {edit && editingItem ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Edit ${noun}`}
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">
-                Edit {noun}
-              </h2>
+        <RecordDrawer
+          open
+          onClose={closeEdit}
+          title={`Edit ${noun}`}
+          ariaLabel={`Edit ${noun}`}
+          footer={
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
+                className="btn-primary"
+                disabled={saving}
+                onClick={() => void saveEdit()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={saving}
                 onClick={closeEdit}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-[var(--danger)]"
+                disabled={saving}
+                onClick={() => void remove(editingItem.id)}
+              >
+                Delete
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+          }
+        >
               <div className="grid gap-2">
                 {editingItem?.kind === "membership" ? (
                   <div>
@@ -1070,35 +1062,7 @@ export function SponsorshipsClient({
                   relatedId={editingId}
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={saving}
-                onClick={() => void saveEdit()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={saving}
-                onClick={closeEdit}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={saving}
-                onClick={() => void remove(editingItem.id)}
-              >
-                Delete
-              </button>
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </div>
   );

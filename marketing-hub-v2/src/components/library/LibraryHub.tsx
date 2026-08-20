@@ -1,14 +1,23 @@
 "use client";
 
-import { MediaGallery } from "@/components/media/MediaGallery";
+import dynamic from "next/dynamic";
 import { BrandGuidelinesPanel } from "@/components/brand/BrandGuidelinesPanel";
 import { ResourcesClient } from "@/components/resources/ResourcesClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
+import { ModuleSkeleton } from "@/components/ui/ModuleSkeleton";
 import { useHubView } from "@/lib/hub-view";
 import type { FieldOption } from "@/lib/data/collections";
 import type { ResourceLink } from "@/lib/types";
 import { useState } from "react";
+
+const MediaGallery = dynamic(
+  () =>
+    import("@/components/media/MediaGallery").then((m) => ({
+      default: m.MediaGallery,
+    })),
+  { loading: () => <ModuleSkeleton rows={12} /> }
+);
 
 type Tab = "media" | "brand" | "resources";
 

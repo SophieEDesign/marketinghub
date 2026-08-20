@@ -7,10 +7,16 @@ import {
   updateTask,
 } from "@/lib/data/repos";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { error } = await requireAdmin();
   if (error) return error;
-  return jsonOk({ tasks: await listTasks() });
+  const relatedType = request.nextUrl.searchParams.get("related_type") ?? undefined;
+  const relatedId = request.nextUrl.searchParams.get("related_id") ?? undefined;
+  return jsonOk({
+    tasks: await listTasks(
+      relatedType && relatedId ? { relatedType, relatedId } : undefined
+    ),
+  });
 }
 
 export async function POST(request: NextRequest) {

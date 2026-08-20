@@ -6,6 +6,10 @@ import {
   syncMerchOrderPrimaryFields,
 } from "@/lib/merch/order-items";
 import { effectiveProductLabel } from "@/lib/merch/product-images";
+import {
+  decryptCredentialSecret,
+  encryptCredentialSecret,
+} from "@/lib/security/credentials-crypto";
 import type {
   AccessRequest,
   Advertisement,
@@ -680,18 +684,39 @@ export async function deleteAdvertisement(id: string) {
   });
 }
 
+function decryptCredential(item: PlatformCredential): PlatformCredential {
+  return {
+    ...item,
+    password: decryptCredentialSecret(item.password),
+  };
+}
+
+function encryptCredentialFields(
+  input: Partial<PlatformCredential>
+): Partial<PlatformCredential> {
+  if (input.password === undefined) return input;
+  return {
+    ...input,
+    password: encryptCredentialSecret(String(input.password)),
+  };
+}
+
 export async function listPlatformCredentials() {
   const store = await readStore();
-  return [...(store.platform_credentials ?? [])].sort((a, b) =>
-    a.platform.localeCompare(b.platform)
-  );
+  return [...(store.platform_credentials ?? [])]
+    .map(decryptCredential)
+    .sort((a, b) => a.platform.localeCompare(b.platform));
 }
 
 export async function createPlatformCredential(
   input: Omit<PlatformCredential, "id" | "created_at" | "updated_at">
 ) {
+  const encrypted = encryptCredentialFields(input) as Omit<
+    PlatformCredential,
+    "id" | "created_at" | "updated_at"
+  >;
   const item: PlatformCredential = {
-    ...input,
+    ...encrypted,
     id: uid("cred"),
     created_at: nowIso(),
     updated_at: nowIso(),
@@ -699,7 +724,7 @@ export async function createPlatformCredential(
   await updateStore((s) => {
     s.platform_credentials.push(item);
   });
-  return item;
+  return decryptCredential(item);
 }
 
 export async function updatePlatformCredential(
@@ -707,18 +732,19 @@ export async function updatePlatformCredential(
   patch: Partial<PlatformCredential>
 ) {
   let updated: PlatformCredential | null = null;
+  const encryptedPatch = encryptCredentialFields(patch);
   await updateStore((s) => {
     const idx = s.platform_credentials.findIndex((c) => c.id === id);
     if (idx === -1) return;
     s.platform_credentials[idx] = {
       ...s.platform_credentials[idx],
-      ...patch,
+      ...encryptedPatch,
       id,
       updated_at: nowIso(),
     };
     updated = s.platform_credentials[idx];
   });
-  return updated;
+  return updated ? decryptCredential(updated) : null;
 }
 
 export async function deletePlatformCredential(id: string) {
@@ -1421,16 +1447,26 @@ export async function deleteAward(id: string) {
   });
 }
 
-export async function listTasks() {
+export async function listTasks(options?: {
+  relatedType?: string;
+  relatedId?: string;
+}) {
   const store = await readStore();
-  return [...(store.tasks ?? [])]
+  let tasks = [...(store.tasks ?? [])]
     .map((t) => ({
       ...t,
       start_date: t.start_date ?? null,
       related_type: t.related_type ?? "",
       related_id: t.related_id ?? null,
-    }))
-    .sort((a, b) => {
+    }));
+  if (options?.relatedType && options?.relatedId) {
+    tasks = tasks.filter(
+      (t) =>
+        (t.related_type || "") === options.relatedType &&
+        t.related_id === options.relatedId
+    );
+  }
+  return tasks.sort((a, b) => {
     const rank = (status: string) => {
       const s = status.trim().toLowerCase();
       if (s === "todo") return 0;

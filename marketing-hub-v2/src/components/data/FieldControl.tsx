@@ -6,7 +6,7 @@ import { statusTone } from "@/lib/data/collections";
 import { cn } from "@/lib/utils";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 
 function toDateInput(value: unknown): string {
   if (value == null || value === "") return "";

@@ -4,7 +4,7 @@
 
 import { addDays, format, parseISO } from "date-fns";
 import type { EventItem } from "@/lib/types";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 
 function escapeIcsText(value: string): string {
   return value

@@ -12,7 +12,8 @@ import {
 } from "@/lib/data/normalize";
 import { CompactMultiImageThumb } from "@/components/social/PlatformPostPreview";
 import { PLATFORM_META, platformKey } from "@/lib/social/platforms";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
+import { statusChipClass } from "@/lib/ui/statusTokens";
 
 const STATUS_LABEL: Record<ContentStatus, string> = {
   idea: "Idea",
@@ -24,19 +25,7 @@ const STATUS_LABEL: Record<ContentStatus, string> = {
 };
 
 function statusTone(status: ContentStatus) {
-  switch (status) {
-    case "published":
-      return "bg-emerald-50 text-emerald-800 border-emerald-200";
-    case "scheduled":
-      return "bg-sky-50 text-sky-800 border-sky-200";
-    case "approved":
-    case "review":
-      return "bg-teal-50 text-teal-800 border-teal-200";
-    case "draft":
-      return "bg-teal-50 text-teal-800 border-teal-200";
-    default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
-  }
+  return statusChipClass(status);
 }
 
 function PlatformDot({ channel }: { channel: string }) {

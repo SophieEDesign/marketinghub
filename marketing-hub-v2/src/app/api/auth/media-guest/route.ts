@@ -4,7 +4,10 @@ import {
   productionAuthMisconfigured,
 } from "@/lib/auth/config";
 import { hubCookieOptions } from "@/lib/auth/cookies";
-import { MEDIA_ACCESS_COOKIE } from "@/lib/auth/media-access";
+import {
+  issueSignedMediaToken,
+  MEDIA_ACCESS_COOKIE,
+} from "@/lib/auth/media-access";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { getSessionUser } from "@/lib/auth/session";
 
@@ -38,9 +41,13 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // Real auth: staff hub uses Supabase session; only stamp media download cookie.
+    // Real auth: bind signed media cookie to the authenticated user.
     const res = NextResponse.json({ ok: true, next });
-    res.cookies.set(MEDIA_ACCESS_COOKIE, "1", hubCookieOptions());
+    res.cookies.set(
+      MEDIA_ACCESS_COOKIE,
+      issueSignedMediaToken(user.id),
+      hubCookieOptions()
+    );
     return res;
   }
 

@@ -1,8 +1,9 @@
 /**
- * XSS-safe HTML sanitization for rich text fields.
+ * XSS-safe HTML sanitization for rich text fields (server / editor save path).
  */
 
 import DOMPurify from "isomorphic-dompurify";
+import { isRichTextEmpty, plainTextFromHtml } from "@/lib/plain-text";
 
 const RICH_TEXT_CONFIG = {
   ALLOWED_TAGS: [
@@ -42,16 +43,4 @@ export function normalizeRichTextStorage(html: string): string {
   return plain ? cleaned : "";
 }
 
-/** Strip tags for previews, search, ICS, channel detection. */
-export function plainTextFromHtml(html: string): string {
-  if (typeof html !== "string" || !html.trim()) return "";
-  if (!html.includes("<")) return html.trim();
-  return (DOMPurify.sanitize(html, { ALLOWED_TAGS: [] }) as string)
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function isRichTextEmpty(html: string | null | undefined): boolean {
-  if (!html) return true;
-  return !plainTextFromHtml(html);
-}
+export { plainTextFromHtml, isRichTextEmpty };

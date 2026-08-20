@@ -1,6 +1,7 @@
 "use client";
 
-import { sanitizeRichText, isRichTextEmpty, plainTextFromHtml } from "@/lib/sanitize";
+import { sanitizeRichText } from "@/lib/sanitize";
+import { isRichTextEmpty, plainTextFromHtml } from "@/lib/plain-text";
 import { cn } from "@/lib/utils";
 
 type RichTextViewProps = {

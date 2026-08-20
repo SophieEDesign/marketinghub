@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Download, Inbox } from "lucide-react";
+import { Download } from "lucide-react";
 import type { WebEnquiry } from "@/lib/types";
 import {
   computeEnquiryStats,
@@ -13,11 +13,12 @@ import {
   getEnquiryAttribution,
   isGoogleAdsEnquiry,
 } from "@/lib/data/web-enquiries-stats";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { EnquiryYearCompare } from "@/components/enquiries/EnquiryYearCompare";
 import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 const MARKETING_SOURCE_UPDATE_KEY = "web-enquiries-marketing-source-1.3.24";
 
@@ -1139,14 +1140,10 @@ export function EnquiriesClient({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="surface-card flex flex-col items-center gap-3 px-6 py-16 text-center">
-          <Inbox className="h-8 w-8 text-muted" />
-          <p className="text-sm font-medium text-foreground">No enquiries match</p>
-          <p className="max-w-md text-sm text-muted">
-            Try clearing the date range or filters. New submissions appear when
-            the Quote Builder webhook is connected.
-          </p>
-        </div>
+        <EmptyState
+          title="No enquiries match"
+          description="Try clearing the date range or filters. New submissions appear when the Quote Builder webhook is connected."
+        />
       ) : (
         <div className="surface-card overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-sm">
@@ -1233,43 +1230,38 @@ export function EnquiriesClient({
         </div>
       )}
       {selected && detail ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeDrawer}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Enquiry details"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-brand">
-                  {selected.customer_name || "Enquiry"}
-                </h2>
-                <p className="text-xs text-muted">{selected.submission_id}</p>
-                {detail.vesselName ? (
-                  <p className="mt-1 text-sm text-foreground">
-                    <span className="text-muted">Vessel:</span>{" "}
-                    {detail.vesselName}
-                    {detail.makeModel ? (
-                      <span className="text-muted"> · {detail.makeModel}</span>
-                    ) : null}
-                  </p>
-                ) : null}
+        <RecordDrawer
+          open
+          onClose={closeDrawer}
+          title={selected.customer_name || "Enquiry"}
+          ariaLabel="Enquiry details"
+          className="max-w-xl"
+          subtitle={
+            <>
+              {selected.submission_id}
+              {detail.vesselName
+                ? ` · ${detail.vesselName}${
+                    detail.makeModel ? ` · ${detail.makeModel}` : ""
+                  }`
+                : null}
+            </>
+          }
+          footer={
+            canDelete ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost text-[var(--danger)]"
+                  disabled={saving}
+                  onClick={() => void remove(selected.id)}
+                >
+                  Delete
+                </button>
               </div>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={closeDrawer}
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+            ) : undefined
+          }
+        >
+              <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs text-muted">
                   Submitted{" "}
@@ -1394,21 +1386,8 @@ export function EnquiriesClient({
                   {JSON.stringify(selected.raw_payload, null, 2)}
                 </pre>
               ) : null}
-            </div>
-            {canDelete ? (
-              <div className="flex gap-2 border-t border-border px-4 py-3">
-                <button
-                  type="button"
-                  className="btn-ghost text-[var(--danger)]"
-                  disabled={saving}
-                  onClick={() => void remove(selected.id)}
-                >
-                  Delete
-                </button>
               </div>
-            ) : null}
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </div>
   );

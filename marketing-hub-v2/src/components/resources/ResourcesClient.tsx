@@ -12,7 +12,7 @@ import {
 import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 
 export function ResourcesClient({

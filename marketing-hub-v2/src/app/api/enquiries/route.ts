@@ -9,10 +9,11 @@ import {
 } from "@/lib/data/web-enquiries";
 import type { WebEnquiryStatus } from "@/lib/types";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
+import { rateLimitPublic } from "@/lib/security/rate-limit";
 
 /**
  * Staff list: GET with session.
- * Webhook ingest: POST with ?key= / X-Webhook-Secret / Bearer (no session).
+ * Webhook ingest: POST with X-Webhook-Secret / Bearer (no session).
  * Staff mutations: POST with session + action update|delete (delete = admin only).
  */
 export async function GET(request: NextRequest) {
@@ -26,9 +27,11 @@ export async function GET(request: NextRequest) {
   const includeTest =
     request.nextUrl.searchParams.get("include_test") === "1" ||
     request.nextUrl.searchParams.get("include_test") === "true";
+  const limit = Number(request.nextUrl.searchParams.get("limit") || "500");
+  const offset = Number(request.nextUrl.searchParams.get("offset") || "0");
 
   try {
-    const enquiries = await listWebEnquiries({ includeTest });
+    const enquiries = await listWebEnquiries({ includeTest, limit, offset });
     return jsonOk({ enquiries, configured: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to list";
@@ -81,6 +84,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Webhook ingest (secret auth — WordPress Quote Builder)
+  const limited = rateLimitPublic(request, "web-enquiry-webhook", 60);
+  if (!limited.ok) return limited.response;
+
   if (!requireWebhookSecret(request)) {
     return jsonError("Unauthorized", 401);
   }

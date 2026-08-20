@@ -1,14 +1,30 @@
 ﻿"use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { ExternalLink } from "lucide-react";
-import { ContentClient } from "@/components/content/ContentClient";
-import { SocialClient } from "@/components/social/SocialClient";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
+import { ModuleSkeleton } from "@/components/ui/ModuleSkeleton";
 import { useHubView } from "@/lib/hub-view";
 import type { FieldOption } from "@/lib/data/collections";
 import type { ContentItem } from "@/lib/types";
+
+const ContentClient = dynamic(
+  () =>
+    import("@/components/content/ContentClient").then((m) => ({
+      default: m.ContentClient,
+    })),
+  { loading: () => <ModuleSkeleton rows={8} /> }
+);
+
+const SocialClient = dynamic(
+  () =>
+    import("@/components/social/SocialClient").then((m) => ({
+      default: m.SocialClient,
+    })),
+  { loading: () => <ModuleSkeleton rows={8} /> }
+);
 
 type Scope = "all" | "content" | "social";
 
@@ -60,7 +76,7 @@ export function ContentSocialHub({
           title="Social calendar"
           description="Scheduled and published posts only — drafts stay with the marketing team."
         />
-        <SocialClient hideHeader memberView />
+        <SocialClient hideHeader memberView initialContent={initialContent} />
       </div>
     );
   }
@@ -106,7 +122,7 @@ export function ContentSocialHub({
       />
 
       {scope === "social" ? (
-        <SocialClient hideHeader />
+        <SocialClient hideHeader initialContent={initialContent} />
       ) : (
         <ContentClient
           initial={initialContent}

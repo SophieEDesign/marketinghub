@@ -20,6 +20,7 @@ import {
 } from "@/lib/data/normalize";
 import { allowDemoAuth } from "@/lib/auth/config";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
+import { cache } from "react";
 
 const DATA_DIR = getDataDir();
 const STORE_PATH = path.join(DATA_DIR, "store.json");
@@ -445,9 +446,9 @@ async function ensureStore(): Promise<StoreRead> {
   return { store: merged, remoteUpdatedAt: null };
 }
 
-export async function readStore(): Promise<HubStore> {
+export const readStore = cache(async (): Promise<HubStore> => {
   return (await ensureStore()).store;
-}
+});
 
 export async function writeStore(
   store: HubStore,

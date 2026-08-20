@@ -1,5 +1,5 @@
 import { DEFAULT_CLOTHING_LOGO, normalizeClothingLogo } from "@/lib/merch/north-sails";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import type { MerchOrder, MerchOrderLineItem } from "@/lib/types";
 
 /** Catalogue picker value for manual / non-catalogue clothing lines. */

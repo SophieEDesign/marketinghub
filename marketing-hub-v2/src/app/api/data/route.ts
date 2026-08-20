@@ -13,12 +13,24 @@ import {
   updateCell,
   updateField,
 } from "@/lib/data/data-admin";
+import { getCollection, isCollectionKey } from "@/lib/data/collections";
+
+function collectionRequiresAdmin(collection: string): boolean {
+  if (!isCollectionKey(collection)) return false;
+  return getCollection(collection)?.adminOnly === true;
+}
 
 export async function GET(request: NextRequest) {
-  const { error } = await requireStaff();
-  if (error) return error;
-
   const collection = request.nextUrl.searchParams.get("collection");
+
+  if (collection && collectionRequiresAdmin(collection)) {
+    const { error } = await requireAdmin();
+    if (error) return error;
+  } else {
+    const { error } = await requireStaff();
+    if (error) return error;
+  }
+
   if (!collection) {
     return jsonOk({ collections: listCollectionSummaries() });
   }
@@ -39,17 +51,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const action = body.action as string;
+  const collection = body.collection as string | undefined;
 
-  // Schema / bulk destructive ops are admin-only; cell edits stay staff.
-  const adminOnly = new Set([
-    "bulkDelete",
-    "deleteRow",
-    "addField",
-    "updateField",
-    "removeField",
-  ]);
-  const gate = adminOnly.has(action) ? await requireAdmin() : await requireStaff();
-  if (gate.error) return gate.error;
+  if (collection && collectionRequiresAdmin(collection)) {
+    const { error } = await requireAdmin();
+    if (error) return error;
+  } else {
+    const adminOnly = new Set([
+      "bulkDelete",
+      "deleteRow",
+      "addField",
+      "updateField",
+      "removeField",
+    ]);
+    const gate = adminOnly.has(action) ? await requireAdmin() : await requireStaff();
+    if (gate.error) return gate.error;
+  }
 
   try {
     if (action === "updateCell") {

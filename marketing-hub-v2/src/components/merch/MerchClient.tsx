@@ -7,8 +7,9 @@ import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 import {
   CLOTHING_BRAND,
   CLOTHING_FITS,
@@ -1062,29 +1063,42 @@ export function MerchClient({
       </div>
 
       {editHeader && editingOrder ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit clothing order"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Edit order</h2>
+        <RecordDrawer
+          open
+          onClose={closeEdit}
+          title="Edit order"
+          ariaLabel="Edit clothing order"
+          className="max-w-lg"
+          footer={
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
+                className="btn-primary"
+                disabled={saving}
+                onClick={() => void saveEdit()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={saving}
                 onClick={closeEdit}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-[var(--danger)]"
+                disabled={saving}
+                onClick={() => void remove(editingOrder.id)}
+              >
+                Delete
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          }
+        >
+            <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <RequestedForField
                   form={editHeader}
@@ -1194,34 +1208,7 @@ export function MerchClient({
                 </button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={saving}
-                onClick={() => void saveEdit()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={saving}
-                onClick={closeEdit}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={saving}
-                onClick={() => void remove(editingOrder.id)}
-              >
-                Delete
-              </button>
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </div>
   );

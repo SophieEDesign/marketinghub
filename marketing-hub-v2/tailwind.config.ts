@@ -22,6 +22,9 @@ const config: Config = {
         muted: "var(--muted)",
         sand: "var(--sand)",
         border: "var(--border)",
+        danger: "var(--danger)",
+        success: "var(--success)",
+        surface: "var(--surface)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],

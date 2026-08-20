@@ -4,25 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import type { HubTask, TaskRelatedType } from "@/lib/types";
-import { isClosedTaskStatus } from "@/lib/data/collections";
 import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
-
-function statusTone(status: string) {
-  const s = status.trim().toLowerCase();
-  if (isClosedTaskStatus(s)) {
-    return "bg-emerald-50 text-emerald-800 border-emerald-200";
-  }
-  if (
-    s === "doing" ||
-    s === "inprogress" ||
-    s.includes("progress") ||
-    s.includes("wait")
-  ) {
-    return "bg-sky-50 text-sky-800 border-sky-200";
-  }
-  return "bg-amber-50 text-amber-900 border-amber-200";
-}
+import { StatusPill } from "@/components/ui/StatusPill";
 
 /**
  * Reverse lookup: tasks that link to this content / theme / partner / award / event / asset.
@@ -48,14 +32,14 @@ export function RelatedTasksPanel({
       return;
     }
     try {
-      const res = await fetch("/api/tasks");
+      const qs = new URLSearchParams({
+        related_type: relatedType,
+        related_id: relatedId,
+      });
+      const res = await fetch(`/api/tasks?${qs.toString()}`);
       if (!res.ok) return;
       const data = (await res.json()) as { tasks?: HubTask[] };
-      const linked = (data.tasks ?? []).filter(
-        (t) =>
-          (t.related_type || "") === relatedType && t.related_id === relatedId
-      );
-      setTasks(linked);
+      setTasks(data.tasks ?? []);
     } catch {
       /* keep previous */
     } finally {
@@ -108,14 +92,7 @@ export function RelatedTasksPanel({
                   <p className="text-sm font-medium text-foreground">
                     {task.title}
                   </p>
-                  <span
-                    className={cn(
-                      "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      statusTone(task.status)
-                    )}
-                  >
-                    {task.status}
-                  </span>
+                  <StatusPill status={task.status} />
                 </div>
                 <p className="mt-0.5 text-[11px] text-muted">
                   {[

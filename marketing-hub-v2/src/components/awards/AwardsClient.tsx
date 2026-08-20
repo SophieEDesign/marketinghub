@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import type { AwardEntry, AwardStatus } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
+import { StatusPill } from "@/components/ui/StatusPill";
+import { statusEventColor } from "@/lib/ui/statusTokens";
 
 const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "watching", label: "Watching" },
@@ -22,15 +25,6 @@ const STATUSES: { id: AwardStatus; label: string }[] = [
   { id: "won", label: "Won" },
   { id: "not_won", label: "Not won" },
 ];
-
-const STATUS_COLOR: Record<AwardStatus, string> = {
-  watching: "#94a3b8",
-  entering: "#0ea5e9",
-  submitted: "#5b6ee1",
-  shortlisted: "#c47b3a",
-  won: "#3d8b5c",
-  not_won: "#64748b",
-};
 
 const VIEWS = [
   { id: "list", label: "List" },
@@ -63,16 +57,6 @@ function toEditForm(item: AwardEntry): EditForm {
     owner: item.owner,
     notes: item.notes,
   };
-}
-
-function statusTone(status: AwardStatus) {
-  if (status === "won") return "bg-emerald-50 text-emerald-800 border-emerald-200";
-  if (status === "shortlisted") return "bg-amber-50 text-amber-900 border-amber-200";
-  if (status === "submitted" || status === "entering") {
-    return "bg-sky-50 text-sky-800 border-sky-200";
-  }
-  if (status === "not_won") return "bg-slate-100 text-slate-600 border-slate-200";
-  return "bg-sand text-muted border-border";
 }
 
 export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
@@ -353,14 +337,10 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="font-medium text-brand">{item.title}</h2>
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                        statusTone(item.status)
-                      )}
-                    >
-                      {statusLabel(item.status)}
-                    </span>
+                    <StatusPill
+                      status={item.status}
+                      label={statusLabel(item.status)}
+                    />
                   </div>
                   <p className="mt-1 text-sm text-muted">
                     {[item.organisation, item.category, String(item.year)]
@@ -414,11 +394,15 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
             </li>
           ))}
           {filtered.length === 0 ? (
-            <li className="rounded-2xl border border-dashed border-border px-5 py-10 text-center text-sm text-muted">
-              No awards match your filters.
-              {isAdmin
-                ? " Add one, or sync Events that include award ceremonies."
-                : ""}
+            <li className="list-none">
+              <EmptyState
+                title="No awards match"
+                description={
+                  isAdmin
+                    ? "Try clearing filters, add one, or sync Events that include award ceremonies."
+                    : "Try clearing filters to see more awards."
+                }
+              />
             </li>
           ) : null}
         </ul>
@@ -488,7 +472,7 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                                   <span
                                     className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
                                     style={{
-                                      background: STATUS_COLOR[item.status],
+                                      background: statusEventColor(item.status),
                                     }}
                                     aria-hidden
                                   />
@@ -537,97 +521,13 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
       ) : null}
 
       {selected && !edit ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={() => setSelected(null)}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selected.title} details`}
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">
-                Award details
-              </h2>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={() => setSelected(null)}
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-display text-2xl text-brand">
-                    {selected.title}
-                  </h3>
-                  <div className="mt-2">
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                        statusTone(selected.status)
-                      )}
-                    >
-                      {statusLabel(selected.status)}
-                    </span>
-                  </div>
-                </div>
-
-                <dl className="space-y-3 text-sm">
-                  <div>
-                    <dt className="label !mb-0.5">Organisation</dt>
-                    <dd>{selected.organisation || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="label !mb-0.5">Category</dt>
-                    <dd>{selected.category || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="label !mb-0.5">Year</dt>
-                    <dd>{selected.year || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="label !mb-0.5">Ceremony date</dt>
-                    <dd>{formatCeremony(selected.ceremony_at)}</dd>
-                  </div>
-                  <div>
-                    <dt className="label !mb-0.5">Owner</dt>
-                    <dd>{selected.owner || "—"}</dd>
-                  </div>
-                  <div>
-                    <dt className="label !mb-0.5">Notes</dt>
-                    <dd>
-                      <RichTextView html={selected.notes} />
-                    </dd>
-                  </div>
-                  {selected.event_id ? (
-                    <div>
-                      <dt className="label !mb-0.5">Linked event</dt>
-                      <dd>
-                        <a
-                          href="/app/events"
-                          className="text-brand underline-offset-2 hover:underline"
-                        >
-                          Open in Events
-                        </a>
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-                <RelatedTasksPanel
-                  className="mt-4"
-                  relatedType="award"
-                  relatedId={selected.id}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+        <RecordDrawer
+          open
+          onClose={() => setSelected(null)}
+          title="Award details"
+          ariaLabel={`${selected.title} details`}
+          footer={
+            <div className="flex flex-wrap gap-2">
               {isAdmin ? (
                 <>
                   <button
@@ -654,42 +554,79 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                 Close
               </button>
             </div>
-          </aside>
-        </>
+          }
+        >
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-display text-2xl text-brand">
+                {selected.title}
+              </h3>
+              <div className="mt-2">
+                <StatusPill
+                  status={selected.status}
+                  label={statusLabel(selected.status)}
+                />
+              </div>
+            </div>
+
+            <dl className="space-y-3 text-sm">
+              <div>
+                <dt className="label !mb-0.5">Organisation</dt>
+                <dd>{selected.organisation || "—"}</dd>
+              </div>
+              <div>
+                <dt className="label !mb-0.5">Category</dt>
+                <dd>{selected.category || "—"}</dd>
+              </div>
+              <div>
+                <dt className="label !mb-0.5">Year</dt>
+                <dd>{selected.year || "—"}</dd>
+              </div>
+              <div>
+                <dt className="label !mb-0.5">Ceremony date</dt>
+                <dd>{formatCeremony(selected.ceremony_at)}</dd>
+              </div>
+              <div>
+                <dt className="label !mb-0.5">Owner</dt>
+                <dd>{selected.owner || "—"}</dd>
+              </div>
+              <div>
+                <dt className="label !mb-0.5">Notes</dt>
+                <dd>
+                  <RichTextView html={selected.notes} />
+                </dd>
+              </div>
+              {selected.event_id ? (
+                <div>
+                  <dt className="label !mb-0.5">Linked event</dt>
+                  <dd>
+                    <a
+                      href="/app/events"
+                      className="text-brand underline-offset-2 hover:underline"
+                    >
+                      Open in Events
+                    </a>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            <RelatedTasksPanel
+              className="mt-4"
+              relatedType="award"
+              relatedId={selected.id}
+            />
+          </div>
+        </RecordDrawer>
       ) : null}
 
       {isAdmin && edit && editingId ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit award"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Edit award</h2>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={closeEdit}
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <AwardFields form={edit} onChange={setEdit} />
-              <RelatedTasksPanel
-                className="mt-4"
-                relatedType="award"
-                relatedId={editingId}
-              />
-            </div>
-            <div className="flex gap-2 border-t border-border px-4 py-3">
+        <RecordDrawer
+          open
+          onClose={closeEdit}
+          title="Edit award"
+          ariaLabel="Edit award"
+          footer={
+            <div className="flex gap-2">
               <button
                 type="button"
                 className="btn-primary"
@@ -702,8 +639,15 @@ export function AwardsClient({ initial }: { initial: AwardEntry[] }) {
                 Cancel
               </button>
             </div>
-          </aside>
-        </>
+          }
+        >
+          <AwardFields form={edit} onChange={setEdit} />
+          <RelatedTasksPanel
+            className="mt-4"
+            relatedType="award"
+            relatedId={editingId}
+          />
+        </RecordDrawer>
       ) : null}
     </div>
   );

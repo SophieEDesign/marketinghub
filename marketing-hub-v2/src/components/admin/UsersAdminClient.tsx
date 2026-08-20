@@ -7,7 +7,7 @@ import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { PasswordField } from "@/components/ui/PasswordField";
 

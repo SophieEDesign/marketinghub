@@ -19,7 +19,14 @@ export type SessionUser = {
 
 async function withProfileRole(base: SessionUser): Promise<SessionUser> {
   const hubRole = await getProfileRoleForUser(base.id);
-  if (!hubRole) return base;
+  if (!hubRole) {
+    // Fail closed: authenticated user without a profile cannot access staff APIs.
+    console.warn("[auth] No profile for user — defaulting to media_guest", {
+      userId: base.id,
+      email: base.email,
+    });
+    return { ...base, role: "media_guest" };
+  }
   return { ...base, role: hubRoleToSessionRole(hubRole) };
 }
 
@@ -69,7 +76,7 @@ export async function getSessionUser(
         (user.user_metadata?.full_name as string | undefined) ??
         user.email ??
         "Staff",
-      role: "staff",
+      role: "media_guest",
     });
   }
 
@@ -86,6 +93,6 @@ export async function getSessionUser(
       (user.user_metadata?.full_name as string | undefined) ??
       user.email ??
       "Staff",
-    role: "staff",
+    role: "media_guest",
   });
 }

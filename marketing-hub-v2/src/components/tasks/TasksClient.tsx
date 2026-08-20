@@ -7,7 +7,9 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
 import type { HubTask, TaskRelatedType, TaskStatus } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
@@ -15,7 +17,7 @@ import { TimelineChart } from "@/components/ui/TimelineChart";
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import {
   TASK_CATEGORIES,
   TASK_STATUSES,
@@ -700,15 +702,13 @@ export function TasksClient({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{item.title}</p>
-                  <span
-                    className={cn(
-                      "rounded-full border px-2 py-0.5 text-[11px] font-medium",
-                      statusTone(item.status)
-                    )}
-                  >
-                    {statusColumns.find((s) => s.id === item.status)?.label ??
-                      item.status}
-                  </span>
+                  <StatusPill
+                    status={item.status}
+                    label={
+                      statusColumns.find((s) => s.id === item.status)?.label ??
+                      item.status
+                    }
+                  />
                   {isOverdue(item) ? (
                     <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-800">
                       Overdue
@@ -770,8 +770,11 @@ export function TasksClient({
             </li>
           ))}
           {filtered.length === 0 ? (
-            <li className="p-6 text-sm text-muted">
-              No tasks match your filters.
+            <li className="list-none">
+              <EmptyState
+                title="No tasks match"
+                description="Try clearing filters or add a new task from the form above."
+              />
             </li>
           ) : null}
         </ul>
@@ -1010,112 +1013,17 @@ export function TasksClient({
       ) : null}
 
       {edit && editingId ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={() => {
-              setEditingId(null);
-              setEdit(null);
-            }}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit task"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Edit task</h2>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={() => {
-                  setEditingId(null);
-                  setEdit(null);
-                }}
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
-              <div>
-                <label className="label">Title</label>
-                <input
-                  className="field"
-                  value={edit.title}
-                  onChange={(e) => setEdit({ ...edit, title: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="label">From</label>
-                <input
-                  className="field"
-                  type="date"
-                  value={edit.start_date}
-                  onChange={(e) =>
-                    setEdit({ ...edit, start_date: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="label">Deadline</label>
-                <input
-                  className="field"
-                  type="date"
-                  value={edit.due_date}
-                  onChange={(e) =>
-                    setEdit({ ...edit, due_date: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <label className="label">Category</label>
-                <SearchSelect
-                  className="field"
-                  value={edit.category}
-                  onChange={(category) =>
-                    setEdit({ ...edit, category })
-                  }
-                  options={selectOptionsWithCurrent(categoryOptions, edit.category)}
-                />
-              </div>
-              <div>
-                <label className="label">Assign to</label>
-                <ContactOwnerSelect
-                  value={edit.owner}
-                  onChange={(owner) => setEdit({ ...edit, owner })}
-                />
-              </div>
-              <div>
-                <label className="label">Status</label>
-                <SearchSelect
-                  className="field"
-                  value={edit.status}
-                  onChange={(status) =>
-                    setEdit({ ...edit, status: status as TaskStatus })
-                  }
-                  options={selectOptionsWithCurrent(statusOptions, edit.status)}
-                />
-              </div>
-              <TaskRelatedFields
-                value={{
-                  related_type: edit.related_type,
-                  related_id: edit.related_id,
-                }}
-                onChange={(related) => setEdit({ ...edit, ...related })}
-              />
-              <div>
-                <label className="label">Details</label>
-                <RichTextEditor
-                  value={edit.details}
-                  onChange={(details) => setEdit({ ...edit, details })}
-                  placeholder="Details…"
-                  minHeight="100px"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 border-t border-border p-4">
+        <RecordDrawer
+          open
+          onClose={() => {
+            setEditingId(null);
+            setEdit(null);
+            setFormError(null);
+          }}
+          title="Edit task"
+          ariaLabel="Edit task"
+          footer={
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 className="btn-primary"
@@ -1136,13 +1044,89 @@ export function TasksClient({
                 Cancel
               </button>
               {formError && editingId ? (
-                <p className="text-sm text-rose-700" role="alert">
+                <p className="text-sm text-danger" role="alert">
                   {formError}
                 </p>
               ) : null}
             </div>
-          </aside>
-        </>
+          }
+        >
+          <div className="space-y-3">
+            <div>
+              <label className="label">Title</label>
+              <input
+                className="field"
+                value={edit.title}
+                onChange={(e) => setEdit({ ...edit, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="label">From</label>
+              <input
+                className="field"
+                type="date"
+                value={edit.start_date}
+                onChange={(e) =>
+                  setEdit({ ...edit, start_date: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Deadline</label>
+              <input
+                className="field"
+                type="date"
+                value={edit.due_date}
+                onChange={(e) =>
+                  setEdit({ ...edit, due_date: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <label className="label">Category</label>
+              <SearchSelect
+                className="field"
+                value={edit.category}
+                onChange={(category) => setEdit({ ...edit, category })}
+                options={selectOptionsWithCurrent(categoryOptions, edit.category)}
+              />
+            </div>
+            <div>
+              <label className="label">Assign to</label>
+              <ContactOwnerSelect
+                value={edit.owner}
+                onChange={(owner) => setEdit({ ...edit, owner })}
+              />
+            </div>
+            <div>
+              <label className="label">Status</label>
+              <SearchSelect
+                className="field"
+                value={edit.status}
+                onChange={(status) =>
+                  setEdit({ ...edit, status: status as TaskStatus })
+                }
+                options={selectOptionsWithCurrent(statusOptions, edit.status)}
+              />
+            </div>
+            <TaskRelatedFields
+              value={{
+                related_type: edit.related_type,
+                related_id: edit.related_id,
+              }}
+              onChange={(related) => setEdit({ ...edit, ...related })}
+            />
+            <div>
+              <label className="label">Details</label>
+              <RichTextEditor
+                value={edit.details}
+                onChange={(details) => setEdit({ ...edit, details })}
+                placeholder="Details…"
+                minHeight="100px"
+              />
+            </div>
+          </div>
+        </RecordDrawer>
       ) : null}
     </div>
   );

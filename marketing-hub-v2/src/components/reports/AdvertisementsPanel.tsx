@@ -9,7 +9,6 @@ import {
   Pencil,
   Plus,
   Trash2,
-  X,
 } from "lucide-react";
 import type { Advertisement, AdvertisementStatus } from "@/lib/types";
 import {
@@ -21,6 +20,7 @@ import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { cn } from "@/lib/utils";
 import { useHubView } from "@/lib/hub-view";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 function emptyForm(): Omit<Advertisement, "id" | "created_at" | "updated_at"> {
   return {
@@ -288,28 +288,41 @@ export function AdvertisementsPanel({
       )}
 
       {drawerOpen ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeDrawer}
-            aria-hidden
-          />
-          <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl flex-col border-l border-border bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h3 className="font-display text-lg text-brand">
-                {editingId ? "Edit advertisement" : "Add advertisement"}
-              </h3>
+        <RecordDrawer
+          open
+          onClose={closeDrawer}
+          title={editingId ? "Edit advertisement" : "Add advertisement"}
+          className="max-w-xl"
+          footer={
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-ghost p-2"
-                onClick={closeDrawer}
-                aria-label="Close"
+                className="btn-primary"
+                onClick={() => void save()}
               >
-                <X className="h-5 w-5" />
+                Save
               </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={closeDrawer}
+              >
+                Cancel
+              </button>
+              {editingId && canToggleAdminView ? (
+                <button
+                  type="button"
+                  className="btn-ghost ml-auto text-[var(--danger)]"
+                  onClick={() => void remove(editingId)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              ) : null}
             </div>
-
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          }
+        >
+            <div className="space-y-4">
               <div>
                 <label className="label">Title</label>
                 <input
@@ -407,35 +420,7 @@ export function AdvertisementsPanel({
                 />
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-2 border-t border-border px-5 py-4">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => void save()}
-              >
-                Save
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={closeDrawer}
-              >
-                Cancel
-              </button>
-              {editingId && canToggleAdminView ? (
-                <button
-                  type="button"
-                  className="btn-ghost ml-auto text-[var(--danger)]"
-                  onClick={() => void remove(editingId)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-              ) : null}
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </section>
   );

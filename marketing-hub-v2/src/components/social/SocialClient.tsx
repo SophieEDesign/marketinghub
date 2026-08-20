@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
+import { StatusPill } from "@/components/ui/StatusPill";
 import { cn } from "@/lib/utils";
 import { CONTENT_STATUS } from "@/lib/data/collections";
 import type { ContentItem, ContentStatus } from "@/lib/types";
@@ -183,11 +185,15 @@ function PostCard({
 export function SocialClient({
   hideHeader = false,
   memberView = false,
+  initialContent,
 }: {
   hideHeader?: boolean;
   /** Members: scheduled/published only, read-only calendar. */
   memberView?: boolean;
+  /** SSR content rows — skips duplicate /api/content fetch on first load. */
+  initialContent?: ContentItem[];
 }) {
+  const skipContentFetchRef = useRef(Boolean(initialContent));
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [openUrl, setOpenUrl] = useState("https://app.planable.io");
   const [sourceLabel, setSourceLabel] = useState("Social Posts");
@@ -215,21 +221,34 @@ export function SocialClient({
   const [savingStatus, setSavingStatus] = useState(false);
   const createFormRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!overflowDay) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOverflowDay(null);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [overflowDay]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [planableRes, contentRes] = await Promise.all([
-        fetch("/api/planable/posts"),
-        fetch("/api/content"),
-      ]);
+      let contentItems: ContentItem[];
+      if (skipContentFetchRef.current && initialContent) {
+        contentItems = initialContent;
+        skipContentFetchRef.current = false;
+      } else {
+        const contentRes = await fetch("/api/content");
+        const contentData = await contentRes.json();
+        contentItems = (contentData.content ?? []) as ContentItem[];
+      }
+
+      const planableRes = await fetch("/api/planable/posts");
       const planable = await planableRes.json();
-      const contentData = await contentRes.json();
       setOpenUrl(planable.openUrl ?? "https://app.planable.io");
 
-      const fromHub: SocialPost[] = (
-        (contentData.content ?? []) as ContentItem[]
-      )
+      const fromHub: SocialPost[] = contentItems
         .filter((c) => isSocialContentItem(c) && !!c.due_date)
         .map((c) => {
           const unique = platformsFromChannel(
@@ -264,9 +283,7 @@ export function SocialClient({
         );
 
       const syncedHub = fromHub.filter((p) => {
-        const raw = (contentData.content as ContentItem[]).find(
-          (c) => c.id === p.id
-        );
+        const raw = contentItems.find((c) => c.id === p.id);
         return Boolean(raw?.planable_post_id);
       });
 
@@ -338,7 +355,7 @@ export function SocialClient({
       setPosts([]);
     }
     setLoading(false);
-  }, [memberView]);
+  }, [memberView, initialContent]);
 
   async function syncFromPlanable() {
     setSyncing(true);
@@ -989,29 +1006,51 @@ export function SocialClient({
       ) : null}
 
       {selected ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={() => setSelectedId(null)}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Social post detail"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">Post preview</h2>
+        <RecordDrawer
+          open
+          onClose={() => setSelectedId(null)}
+          title="Post preview"
+          ariaLabel="Social post detail"
+          footer={
+            <div className="flex flex-wrap gap-2">
+              {!memberView && selected.url ? (
+                <a
+                  href={selected.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary"
+                >
+                  Open in Planable
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              ) : null}
+              {!memberView && !selected.url ? (
+                <a href="/app/content" className="btn-secondary">
+                  Edit in Content planner
+                </a>
+              ) : null}
+              {isCanvaUrl(selected.mediaUrl) ? (
+                <a
+                  href={selected.mediaUrl!}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-secondary"
+                >
+                  Open in Canva
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              ) : null}
               <button
                 type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
+                className="btn-ghost"
                 onClick={() => setSelectedId(null)}
               >
                 Close
               </button>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          }
+        >
+              <div className="space-y-3">
               <PlatformPostPreview
                 platforms={
                   selected.platforms.length
@@ -1035,18 +1074,7 @@ export function SocialClient({
                     {p}
                   </span>
                 ))}
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-                    statusTone(selected.status)
-                  )}
-                >
-                  {(selected.status.toLowerCase().includes("approv") ||
-                    selected.status.toLowerCase().includes("publish")) && (
-                    <Check className="h-3 w-3" />
-                  )}
-                  {selected.status}
-                </span>
+                <StatusPill status={selected.status} />
               </div>
               {!memberView &&
               selected.source === "hub" &&
@@ -1089,45 +1117,8 @@ export function SocialClient({
                   {selected.source === "planable" ? "Planable" : "Hub Content"}
                 </p>
               ) : null}
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              {!memberView && selected.url ? (
-                <a
-                  href={selected.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary"
-                >
-                  Open in Planable
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              ) : null}
-              {!memberView && !selected.url ? (
-                <a href="/app/content" className="btn-secondary">
-                  Edit in Content planner
-                </a>
-              ) : null}
-              {isCanvaUrl(selected.mediaUrl) ? (
-                <a
-                  href={selected.mediaUrl!}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-secondary"
-                >
-                  Open in Canva
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              ) : null}
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setSelectedId(null)}
-              >
-                Close
-              </button>
-            </div>
-          </aside>
-        </>
+              </div>
+        </RecordDrawer>
       ) : null}
     </div>
   );

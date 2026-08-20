@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Contact, ContactKind, HubUser } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
 import { SegmentFilter } from "@/components/ui/SegmentFilter";
 import { useHubView } from "@/lib/hub-view";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 type KindFilter = "all" | ContactKind;
 
@@ -372,7 +373,10 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
             </tbody>
           </table>
           {filtered.length === 0 ? (
-            <p className="p-6 text-sm text-muted">No contacts match your search.</p>
+            <EmptyState
+              title="No contacts match"
+              description="Try clearing your search or add a new contact above."
+            />
           ) : null}
         </div>
 
@@ -531,34 +535,13 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
       </div>
 
       {edit && editingId ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit contact"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">
-                {isCompany(edit.kind) ? "Edit company" : "Edit contact"}
-              </h2>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={closeEdit}
-              >
-                Close
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <ContactFields form={edit} onChange={setEdit} users={users} />
-            </div>
-            <div className="flex gap-2 border-t border-border px-4 py-3">
+        <RecordDrawer
+          open
+          onClose={closeEdit}
+          title={isCompany(edit.kind) ? "Edit company" : "Edit contact"}
+          ariaLabel="Edit contact"
+          footer={
+            <div className="flex gap-2">
               <button
                 type="button"
                 className="btn-primary"
@@ -571,8 +554,10 @@ export function ContactsClient({ initial }: { initial: Contact[] }) {
                 Cancel
               </button>
             </div>
-          </aside>
-        </>
+          }
+        >
+          <ContactFields form={edit} onChange={setEdit} users={users} />
+        </RecordDrawer>
       ) : null}
     </div>
   );

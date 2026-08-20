@@ -413,7 +413,7 @@ export function HubTourProvider({
 
       {phase === "welcome" ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 md:left-sidebar"
           role="dialog"
           aria-modal="true"
           aria-labelledby="hub-tour-welcome-title"
@@ -473,7 +473,7 @@ export function HubTourProvider({
 
       {/* preparing state uses running chrome with full dim */}
       {showTourChrome ? (
-        <div className="fixed inset-0 z-[100]" aria-live="polite">
+        <div className="fixed inset-0 z-[100] md:left-sidebar" aria-live="polite">
           <div
             className="pointer-events-auto absolute inset-0"
             onClick={skip}
@@ -580,7 +580,7 @@ export function HubTourProvider({
 
           {leaveConfirmOpen ? (
             <div
-              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+              className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 md:left-sidebar"
               role="alertdialog"
               aria-modal="true"
               aria-labelledby="hub-tour-leave-title"

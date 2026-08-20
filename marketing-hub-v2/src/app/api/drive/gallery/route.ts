@@ -9,6 +9,8 @@ import {
   upsizeThumb,
 } from "@/lib/drive/client";
 import { hasMediaDownloadAccess } from "@/lib/auth/media-access";
+import { getSessionUser } from "@/lib/auth/session";
+import { rateLimitPublic } from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,6 +18,14 @@ export const runtime = "nodejs";
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 export async function GET(request: Request) {
+  const limited = rateLimitPublic(request, "drive-gallery", 60);
+  if (!limited.ok) return limited.response;
+
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const canDownload = await hasMediaDownloadAccess();
 
   if (!isDriveConfigured()) {

@@ -50,7 +50,9 @@ import {
 import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
+import { statusEventColor } from "@/lib/ui/statusTokens";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 
@@ -74,12 +76,12 @@ const VIEWS = [
 type ContentView = (typeof VIEWS)[number]["id"];
 
 const STATUS_COLOR: Record<ContentStatus, string> = {
-  idea: "#94a3b8",
-  draft: "#2a8f9e",
-  review: "#0d9488",
-  approved: "#0d9488",
-  scheduled: "#5b6ee1",
-  published: "#3d8b5c",
+  idea: statusEventColor("idea"),
+  draft: statusEventColor("draft"),
+  review: statusEventColor("review"),
+  approved: statusEventColor("review"),
+  scheduled: statusEventColor("scheduled"),
+  published: statusEventColor("published"),
 };
 
 function emptyFormForScope(scope: "all" | "content" | "social") {
@@ -254,10 +256,6 @@ export function ContentClient({
     const data = await res.json();
     setItems(data.content ?? []);
   }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
 
   const scopedItems = useMemo(() => {
     if (scope === "social") return items.filter(isSocialContentItem);
@@ -1077,37 +1075,50 @@ export function ContentClient({
       </div>
 
       {edit && editingItem ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit content piece"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <h2 className="text-sm font-semibold text-brand">
-                {editLocked ? "Published piece (locked)" : "Edit piece"}
-              </h2>
-              <button
-                type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
-                onClick={closeEdit}
-              >
-                Close
-              </button>
-            </div>
-            {editLocked ? (
+        <RecordDrawer
+          open
+          onClose={closeEdit}
+          title={editLocked ? "Published piece (locked)" : "Edit piece"}
+          ariaLabel="Edit content piece"
+          banner={
+            editLocked ? (
               <p className="border-b border-border bg-emerald-50 px-4 py-2 text-xs text-emerald-900">
                 Published — editing is locked. You can only delete this piece
                 from the Hub. Approve and publish stay in Planable.
               </p>
-            ) : null}
-            <div className="flex-1 overflow-y-auto p-4">
+            ) : undefined
+          }
+          footer={
+            <div className="flex flex-wrap gap-2">
+              {!editLocked ? (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={saving}
+                  onClick={() => void saveEdit()}
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={saving}
+                onClick={closeEdit}
+              >
+                {editLocked ? "Close" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-[var(--danger)]"
+                disabled={saving}
+                onClick={() => void remove(editingItem.id)}
+              >
+                Delete
+              </button>
+            </div>
+          }
+        >
               {editIsSocial ? (
                 <div className="mb-4">
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted">
@@ -1328,37 +1339,7 @@ export function ContentClient({
                   relatedId={editingId}
                 />
               </fieldset>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              {!editLocked ? (
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={saving}
-                  onClick={() => void saveEdit()}
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={saving}
-                onClick={closeEdit}
-              >
-                {editLocked ? "Close" : "Cancel"}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={saving}
-                onClick={() => void remove(editingItem.id)}
-              >
-                Delete
-              </button>
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </div>
   );

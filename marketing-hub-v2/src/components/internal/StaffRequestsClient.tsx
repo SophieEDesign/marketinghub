@@ -12,7 +12,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 
 const KINDS: { id: StaffRequestKind; label: string }[] = [

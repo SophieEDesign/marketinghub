@@ -11,7 +11,7 @@ import {
   joinAssetUrls,
   normalizeChannels,
 } from "@/lib/data/normalize";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
   archivePlanablePost,

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { hasMediaDownloadAccess } from "@/lib/auth/media-access";
 import { allowDemoAuth, hasSupabaseConfig } from "@/lib/auth/config";
 import { getSessionUser } from "@/lib/auth/session";
+import { redactMediaItemsForPublic } from "@/lib/media/redact";
+import { rateLimitPublic } from "@/lib/security/rate-limit";
 import {
   listMediaFromSupabase,
   type MediaListScope,
@@ -26,6 +28,9 @@ async function canIncludeAdminMedia(): Promise<boolean> {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimitPublic(request, "media-list", 120);
+  if (!limited.ok) return limited.response;
+
   const canDownload = await hasMediaDownloadAccess();
   const url = new URL(request.url);
   const requestedScope = parseScope(url.searchParams.get("scope"));
@@ -51,11 +56,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { items, tableName } = await listMediaFromSupabase({
+    const limit = Number(url.searchParams.get("limit") || "200");
+    const offset = Number(url.searchParams.get("offset") || "0");
+    const { items, tableName, total } = await listMediaFromSupabase({
       scope,
       includeAdmin,
+      limit,
+      offset,
     });
-    const fromItems = items.map((i) => i.category).filter(Boolean);
+    const safeItems = redactMediaItemsForPublic(items, canDownload);
+    const fromItems = safeItems.map((i) => i.category).filter(Boolean);
     // Always surface Gallery even when empty (staff + public/external).
     const categories = Array.from(
       new Set(["Gallery", ...fromItems])
@@ -67,8 +77,11 @@ export async function GET(request: Request) {
       tableName,
       canDownload,
       scope,
-      items,
+      items: safeItems,
       categories,
+      total,
+      limit,
+      offset,
     });
   } catch (e) {
     return NextResponse.json(

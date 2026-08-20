@@ -11,7 +11,7 @@ import type {
   ThemeOffshoot,
   ThemeStatus,
 } from "@/lib/types";
-import { PageHeader } from "@/components/ui/PageHeader";
+import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 import { ChannelMultiSelect } from "@/components/ui/ChannelMultiSelect";
 import { AssetUploadField } from "@/components/content/AssetUploadField";
@@ -29,9 +29,10 @@ import { useManagedFieldOptions } from "@/lib/data/useManagedFieldOptions";
 import { isSocialContentItem } from "@/lib/data/normalize";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
-import { plainTextFromHtml } from "@/lib/sanitize";
+import { plainTextFromHtml } from "@/lib/plain-text";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 const STATUS_LABEL: Record<ThemeStatus, string> = {
   previous: "Previous",
@@ -609,9 +610,12 @@ export function ThemesClient({
           );
         })}
         {yearThemes.length === 0 ? (
-          <p className="col-span-full text-sm text-muted">
-            No themes for {yearTab} yet.
-          </p>
+          <div className="col-span-full">
+            <EmptyState
+              title={`No themes for ${yearTab} yet`}
+              description="Create a quarterly theme to link content mains and offshoots."
+            />
+          </div>
         ) : null}
       </div>
 
@@ -959,32 +963,40 @@ export function ThemesClient({
       )}
 
       {contentEdit && editingMainId ? (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/25 md:left-sidebar"
-            onClick={closeContentEdit}
-            aria-hidden
-          />
-          <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-soft"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Edit content piece"
-          >
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-brand">Edit content</h2>
-                <p className="text-xs text-muted">Synced with the Content table</p>
-              </div>
+        <RecordDrawer
+          open
+          onClose={closeContentEdit}
+          title="Edit content"
+          ariaLabel="Edit content piece"
+          subtitle="Synced with the Content table"
+          footer={
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                className="btn-ghost px-2.5 py-1.5 text-xs"
+                className="btn-primary"
+                disabled={savingContent}
+                onClick={() => void saveContentEdit()}
+              >
+                {savingContent ? "Saving…" : "Save"}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={savingContent}
                 onClick={closeContentEdit}
               >
-                Close
+                Cancel
               </button>
+              <Link
+                href="/app/content"
+                className="btn-ghost text-xs"
+                onClick={closeContentEdit}
+              >
+                Open Content table
+              </Link>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
+          }
+        >
               <div className="grid gap-2">
                 <div>
                   <label className="label">Title</label>
@@ -1191,34 +1203,7 @@ export function ThemesClient({
                   relatedId={editingContentId}
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={savingContent}
-                onClick={() => void saveContentEdit()}
-              >
-                {savingContent ? "Saving…" : "Save"}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={savingContent}
-                onClick={closeContentEdit}
-              >
-                Cancel
-              </button>
-              <Link
-                href="/app/content"
-                className="btn-ghost text-xs"
-                onClick={closeContentEdit}
-              >
-                Open Content table
-              </Link>
-            </div>
-          </aside>
-        </>
+        </RecordDrawer>
       ) : null}
     </div>
   );

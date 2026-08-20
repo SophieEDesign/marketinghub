@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireAdmin } from "@/lib/api";
 import { isAutoMemberEmail } from "@/lib/auth/member-domain";
+import { rateLimitPublic } from "@/lib/security/rate-limit";
 import {
   createAccessRequest,
   createHubUser,
@@ -121,6 +122,9 @@ export async function POST(request: NextRequest) {
       return jsonError(message, 400, { item: updated });
     }
   }
+
+  const limited = rateLimitPublic(request, "access-requests", 10);
+  if (!limited.ok) return limited.response;
 
   const email = String(body.email ?? "").trim().toLowerCase();
   const fullName = String(body.full_name ?? "").trim();

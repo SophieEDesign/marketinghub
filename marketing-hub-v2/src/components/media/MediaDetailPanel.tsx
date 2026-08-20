@@ -8,7 +8,6 @@ import {
   Shield,
   Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 import {
@@ -34,6 +33,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 import { RelatedTasksPanel } from "@/components/tasks/RelatedTasksPanel";
+import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 const NEW_SUBFOLDER_VALUE = "__new_subfolder__";
 const MEDIA_ACCEPT = UPLOAD_ACCEPT;
@@ -466,40 +466,84 @@ export function MediaDetailPanel({
   const needsPreviewImage = !previewUrl && canEdit;
 
   return (
-    <>
-      <button
-        type="button"
-        className="fixed inset-0 z-40 bg-black/20 md:left-sidebar"
-        aria-label="Close media details"
-        onClick={onClose}
-      />
-      <aside
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border bg-white shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label={canEdit ? "Edit media" : "Media details"}
-        onPaste={onPasteFiles}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-brand">
-              {canEdit ? "Edit media" : "Media details"}
-            </p>
-            <p className="truncate text-xs text-muted">
-              {item.name || "Untitled asset"}
-            </p>
+    <RecordDrawer
+      open
+      onClose={onClose}
+      title={canEdit ? "Edit media" : "Media details"}
+      ariaLabel={canEdit ? "Edit media" : "Media details"}
+      subtitle={item.name || "Untitled asset"}
+      footer={
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            {canEdit ? (
+              <button
+                type="button"
+                className={cn("btn-primary", (saving || uploading) && "opacity-70")}
+                disabled={saving || uploading}
+                onClick={() => void save()}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            ) : null}
+            {focusedFile && canDownload ? (
+              <a
+                href={focusedFile.url}
+                download={fileName || focusedFile.name}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary"
+              >
+                <Download className="h-4 w-4" />
+                Download
+              </a>
+            ) : documentLink && canDownload ? (
+              <a
+                href={documentLink}
+                target="_blank"
+                rel="noreferrer"
+                className="btn-secondary"
+              >
+                Open link
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            ) : null}
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={saving}
+              onClick={onClose}
+            >
+              Close
+            </button>
           </div>
-          <button
-            type="button"
-            className="rounded-xl p-2 text-muted hover:bg-sand/60 hover:text-brand"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {canEdit ? (
+            <div className="flex flex-wrap gap-2">
+              {focusedFile ? (
+                <button
+                  type="button"
+                  className="btn-ghost text-[var(--danger)]"
+                  disabled={saving}
+                  onClick={() => void deleteFile()}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete file
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn-ghost text-[var(--danger)]"
+                disabled={saving}
+                onClick={() => void deleteAsset()}
+              >
+                Delete asset
+              </button>
+            </div>
+          ) : null}
         </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      }
+    >
+      <div onPaste={onPasteFiles}>
+        <div className="min-h-0">
           {previewUrl ? (
             <div className="overflow-hidden rounded-2xl border border-border bg-[#f0f2f3]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -966,75 +1010,7 @@ export function MediaDetailPanel({
             <RelatedTasksPanel relatedType="asset" relatedId={item.id} />
           </div>
         </div>
-
-        <div className="space-y-2 border-t border-border p-4">
-          <div className="flex flex-wrap gap-2">
-            {canEdit ? (
-              <button
-                type="button"
-                className={cn("btn-primary", (saving || uploading) && "opacity-70")}
-                disabled={saving || uploading}
-                onClick={() => void save()}
-              >
-                {saving ? "Saving…" : "Save"}
-              </button>
-            ) : null}
-            {focusedFile && canDownload ? (
-              <a
-                href={focusedFile.url}
-                download={fileName || focusedFile.name}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary"
-              >
-                <Download className="h-4 w-4" />
-                Download
-              </a>
-            ) : documentLink && canDownload ? (
-              <a
-                href={documentLink}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-secondary"
-              >
-                Open link
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            ) : null}
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={saving}
-              onClick={onClose}
-            >
-              Close
-            </button>
-          </div>
-          {canEdit ? (
-            <div className="flex flex-wrap gap-2">
-              {focusedFile ? (
-                <button
-                  type="button"
-                  className="btn-ghost text-[var(--danger)]"
-                  disabled={saving}
-                  onClick={() => void deleteFile()}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete file
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="btn-ghost text-[var(--danger)]"
-                disabled={saving}
-                onClick={() => void deleteAsset()}
-              >
-                Delete asset
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </aside>
-    </>
+      </div>
+    </RecordDrawer>
   );
 }
