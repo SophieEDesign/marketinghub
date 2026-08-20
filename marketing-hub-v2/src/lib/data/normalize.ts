@@ -277,6 +277,8 @@ export function normalizeChannels(
 const EVENT_TYPE_MAP: Record<string, string> = {
   event: "Trade show",
   events: "Trade show",
+  boat_show: "Boat show",
+  boatshow: "Boat show",
   commercial_event: "Commercial",
   commercial: "Commercial",
   awards: "Awards",

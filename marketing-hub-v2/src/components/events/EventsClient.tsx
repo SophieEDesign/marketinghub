@@ -6,7 +6,12 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import listPlugin from "@fullcalendar/list";
-import type { EventAttendance, EventAttendanceStatus, EventItem } from "@/lib/types";
+import type {
+  Contact,
+  EventAttendance,
+  EventAttendanceStatus,
+  EventItem,
+} from "@/lib/types";
 import { RecordDrawer } from "@/components/ui/RecordDrawer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { FullCalendarStyles } from "@/components/ui/FullCalendarStyles";
@@ -25,6 +30,7 @@ import {
 import {
   DIVISIONS,
   EVENT_TYPES,
+  ensureFieldOption,
   optionsForField,
   orderedFilterValues,
   selectOptionsWithCurrent,
@@ -368,6 +374,124 @@ function EventFields({
   );
 }
 
+function EventAttendeeManager({
+  attending,
+  contacts,
+  contactsLoaded,
+  canManage,
+  currentUserId,
+  saving,
+  onAddContact,
+  onRemove,
+  className = "",
+}: {
+  attending: EventAttendance[];
+  contacts: Contact[];
+  contactsLoaded: boolean;
+  canManage: boolean;
+  currentUserId: string | null;
+  saving: boolean;
+  onAddContact: (contactId: string) => void;
+  onRemove: (userId: string) => void;
+  className?: string;
+}) {
+  const [pick, setPick] = useState("");
+
+  const attendingIds = useMemo(() => {
+    const ids = new Set(attending.map((a) => a.user_id));
+    const names = new Set(
+      attending.map((a) => a.user_name.trim().toLowerCase()).filter(Boolean)
+    );
+    return { ids, names };
+  }, [attending]);
+
+  const options = useMemo(() => {
+    return contacts
+      .filter((c) => c.kind !== "company")
+      .filter((c) => {
+        const name = c.name.trim();
+        if (!name) return false;
+        const linkedId = (c.user_id ?? "").trim();
+        if (linkedId && attendingIds.ids.has(linkedId)) return false;
+        if (attendingIds.ids.has(c.id) || attendingIds.ids.has(`contact:${c.id}`)) {
+          return false;
+        }
+        if (attendingIds.names.has(name.toLowerCase())) return false;
+        return true;
+      })
+      .map((c) => ({
+        value: c.id,
+        label: c.organisation ? `${c.name} · ${c.organisation}` : c.name,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [contacts, attendingIds]);
+
+  return (
+    <div className={className}>
+      <p className="label !mb-2">Attending ({attending.length})</p>
+      {attending.length > 0 ? (
+        <div className="space-y-2">
+          <AttendeeInitials
+            people={attending.map((p) => ({
+              id: p.user_id,
+              name: p.user_name,
+            }))}
+            max={8}
+            size="md"
+          />
+          <ul className="space-y-1">
+            {attending.map((person) => (
+              <li
+                key={person.id}
+                className="flex items-center justify-between gap-2 text-sm text-foreground"
+              >
+                <span>
+                  {person.user_name}
+                  {person.user_id === currentUserId ? (
+                    <span className="ml-1 text-xs text-muted">(you)</span>
+                  ) : null}
+                </span>
+                {canManage ? (
+                  <button
+                    type="button"
+                    className="btn-ghost shrink-0 px-2 py-0.5 text-xs"
+                    disabled={saving}
+                    onClick={() => onRemove(person.user_id)}
+                  >
+                    Remove
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="text-xs text-muted">No one marked attending yet.</p>
+      )}
+      {canManage ? (
+        <div className="mt-3">
+          <SearchSelect
+            className="field"
+            value={pick}
+            disabled={saving || !contactsLoaded}
+            aria-label="Add someone attending"
+            placeholder={
+              contactsLoaded ? "Add someone…" : "Loading people…"
+            }
+            options={options}
+            noResultsLabel="No more people to add"
+            onChange={(contactId) => {
+              if (!contactId) return;
+              setPick("");
+              onAddContact(contactId);
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function EventsClient({
   initialEvents,
   initialAttendance = [],
@@ -384,13 +508,14 @@ export function EventsClient({
 }) {
   const { view } = useHubView();
   const canDelete = view === "admin";
+  const canManageAttendees = view !== "external";
   const showUndatedQueue = view === "admin";
 
   const fieldOptions = useManagedFieldOptions("events", fieldOptionsProp);
-  const eventTypeOptions = optionsForField(
-    fieldOptions,
-    "event_type",
-    EVENT_TYPES
+  const eventTypeOptions = ensureFieldOption(
+    optionsForField(fieldOptions, "event_type", EVENT_TYPES),
+    { value: "Boat show", label: "Boat show" },
+    "Trade show"
   );
   const divisionOptions = optionsForField(
     fieldOptions,
@@ -417,6 +542,8 @@ export function EventsClient({
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [syncMenuOpen, setSyncMenuOpen] = useState(false);
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
+  const [peopleContacts, setPeopleContacts] = useState<Contact[]>([]);
+  const [peopleContactsLoaded, setPeopleContactsLoaded] = useState(false);
 
   const refresh = useCallback(async () => {
     const res = await fetch("/api/events");
@@ -430,6 +557,26 @@ export function EventsClient({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!canManageAttendees) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/contacts");
+        if (!res.ok) return;
+        const data = (await res.json()) as { contacts?: Contact[] };
+        if (!cancelled) setPeopleContacts(data.contacts ?? []);
+      } catch {
+        /* keep empty list */
+      } finally {
+        if (!cancelled) setPeopleContactsLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManageAttendees]);
 
   // Keep selected in sync after refresh/edit
   useEffect(() => {
@@ -530,6 +677,79 @@ export function EventsClient({
       }
     },
     [selected?.id, currentUserId, currentUserName, attendanceSaving]
+  );
+
+  const mergeEventAttendance = useCallback(
+    (eventId: string, rows: EventAttendance[]) => {
+      setAllAttendance((prev) => [
+        ...prev.filter((a) => a.event_id !== eventId),
+        ...rows,
+      ]);
+    },
+    []
+  );
+
+  const addAttendeeFromContact = useCallback(
+    async (eventId: string, contactId: string) => {
+      if (!eventId || !contactId || attendanceSaving) return;
+      setAttendanceSaving(true);
+      try {
+        const res = await fetch("/api/events/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            status: "attending",
+            contactId,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.attendance)) {
+          mergeEventAttendance(eventId, data.attendance);
+        }
+      } finally {
+        setAttendanceSaving(false);
+      }
+    },
+    [attendanceSaving, mergeEventAttendance]
+  );
+
+  const removeAttendee = useCallback(
+    async (eventId: string, userId: string) => {
+      if (!eventId || !userId || attendanceSaving) return;
+      setAttendanceSaving(true);
+      try {
+        const res = await fetch("/api/events/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            action: "remove",
+            userId,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.attendance)) {
+          mergeEventAttendance(eventId, data.attendance);
+        }
+      } finally {
+        setAttendanceSaving(false);
+      }
+    },
+    [attendanceSaving, mergeEventAttendance]
+  );
+
+  const editingAttending = useMemo(
+    () =>
+      editingId
+        ? allAttendance
+            .filter(
+              (a) =>
+                a.event_id === editingId && a.attendance_status === "attending"
+            )
+            .sort((a, b) => a.user_name.localeCompare(b.user_name))
+        : [],
+    [allAttendance, editingId]
   );
 
   const eventTypes = useMemo(() => {
@@ -873,7 +1093,7 @@ export function EventsClient({
       `}</style>
       <PageHeader
         title="Events"
-        description="Add and edit shows and meetings. Mark whether you're attending when you select an event. Only admins can delete events."
+        description="Add and edit shows and meetings. Mark whether you're attending, and add who else is going."
         actions={
           <>
             <div className="relative">
@@ -1322,38 +1542,20 @@ export function EventsClient({
                   className="border-t border-border pt-3"
                   data-tour="events-attending-list"
                 >
-                  <p className="label !mb-2">
-                    Attending ({attendingPeople.length})
-                  </p>
-                  {attendingPeople.length > 0 ? (
-                    <div className="space-y-2">
-                      <AttendeeInitials
-                        people={attendingPeople.map((p) => ({
-                          id: p.user_id,
-                          name: p.user_name,
-                        }))}
-                        max={8}
-                        size="md"
-                      />
-                      <ul className="space-y-1">
-                        {attendingPeople.map((person) => (
-                          <li
-                            key={person.id}
-                            className="text-sm text-foreground"
-                          >
-                            {person.user_name}
-                            {person.user_id === currentUserId ? (
-                              <span className="ml-1 text-xs text-muted">
-                                (you)
-                              </span>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted">No one marked attending yet.</p>
-                  )}
+                  <EventAttendeeManager
+                    attending={attendingPeople}
+                    contacts={peopleContacts}
+                    contactsLoaded={peopleContactsLoaded}
+                    canManage={canManageAttendees}
+                    currentUserId={currentUserId}
+                    saving={attendanceSaving}
+                    onAddContact={(contactId) =>
+                      void addAttendeeFromContact(selected.id, contactId)
+                    }
+                    onRemove={(userId) =>
+                      void removeAttendee(selected.id, userId)
+                    }
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-2 border-t border-border pt-3">
@@ -1362,7 +1564,7 @@ export function EventsClient({
                     className="btn-secondary"
                     onClick={() => openEdit(selected)}
                   >
-                    {hasValidStart(selected) ? "Edit event" : "Add date"}
+                    Edit event
                   </button>
                   {hasValidStart(selected) ? (
                     <>
@@ -1431,12 +1633,15 @@ export function EventsClient({
               </div>
               <ul className="flex-1 divide-y divide-border overflow-y-auto">
                 {undated.map((e) => (
-                  <li key={e.id}>
+                  <li
+                    key={e.id}
+                    className={`flex items-stretch ${
+                      selected?.id === e.id ? "bg-accent-soft/50" : ""
+                    }`}
+                  >
                     <button
                       type="button"
-                      className={`flex w-full flex-col gap-1 px-4 py-3 text-left hover:bg-sand ${
-                        selected?.id === e.id ? "bg-accent-soft/50" : ""
-                      }`}
+                      className="flex min-w-0 flex-1 flex-col gap-1 px-4 py-3 text-left hover:bg-sand"
                       onClick={() => setSelected(e)}
                     >
                       <span className="text-sm font-medium">{e.title}</span>
@@ -1447,6 +1652,16 @@ export function EventsClient({
                         ) : null}
                         {e.location ? <span>{e.location}</span> : null}
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost shrink-0 self-center px-3 py-1 text-xs"
+                      onClick={() => {
+                        setSelected(e);
+                        openEdit(e);
+                      }}
+                    >
+                      Edit
                     </button>
                   </li>
                 ))}
@@ -1503,6 +1718,21 @@ export function EventsClient({
             eventTypeOptions={eventTypeOptions}
             divisionOptions={divisionOptions}
           />
+          {editingId ? (
+            <EventAttendeeManager
+              className="mt-4"
+              attending={editingAttending}
+              contacts={peopleContacts}
+              contactsLoaded={peopleContactsLoaded}
+              canManage={canManageAttendees}
+              currentUserId={currentUserId}
+              saving={attendanceSaving}
+              onAddContact={(contactId) =>
+                void addAttendeeFromContact(editingId, contactId)
+              }
+              onRemove={(userId) => void removeAttendee(editingId, userId)}
+            />
+          ) : null}
           <RelatedTasksPanel
             className="mt-4"
             relatedType="event"

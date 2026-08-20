@@ -173,6 +173,14 @@ export async function upsertEventAttendance(input: {
   return row;
 }
 
+export async function deleteEventAttendance(eventId: string, userId: string) {
+  await updateStore((s) => {
+    s.event_attendance = s.event_attendance.filter(
+      (a) => !(a.event_id === eventId && a.user_id === userId)
+    );
+  });
+}
+
 export async function listContent() {
   const store = await readStore();
   return store.content.map(withContentPlanableDefaults);

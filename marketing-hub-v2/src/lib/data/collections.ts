@@ -115,6 +115,7 @@ const STAFF_REQUEST_STATUS: FieldOption[] = [
 
 export const EVENT_TYPES: FieldOption[] = [
   { value: "Trade show", label: "Trade show" },
+  { value: "Boat show", label: "Boat show" },
   { value: "Commercial", label: "Commercial" },
   { value: "Awards", label: "Awards" },
   { value: "Conference", label: "Conference" },
@@ -821,6 +822,28 @@ export function selectOptionsWithCurrent(
   const current = (currentValue ?? "").trim();
   if (!current || options.some((o) => o.value === current)) return options;
   return [{ value: current, label: `${current} (custom)` }, ...options];
+}
+
+/** Insert an option if missing (case-insensitive), optionally after a given value. */
+export function ensureFieldOption(
+  options: FieldOption[],
+  option: FieldOption,
+  afterValue?: string
+): FieldOption[] {
+  const needle = option.value.trim().toLowerCase();
+  if (options.some((o) => o.value.trim().toLowerCase() === needle)) {
+    return options;
+  }
+  if (afterValue) {
+    const after = afterValue.trim().toLowerCase();
+    const idx = options.findIndex(
+      (o) => o.value.trim().toLowerCase() === after
+    );
+    if (idx >= 0) {
+      return [...options.slice(0, idx + 1), option, ...options.slice(idx + 1)];
+    }
+  }
+  return [...options, option];
 }
 
 /** Resolve Field Manager options for a key, falling back to the built-in list. */
