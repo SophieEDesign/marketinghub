@@ -25,6 +25,13 @@ async function maybePushPlanable(
     return { item };
   }
   const result = await pushContentToPlanable(item);
+  if (result.error) {
+    console.error("[planable] push failed", {
+      id: item.id,
+      status: item.status,
+      error: result.error,
+    });
+  }
   return {
     item: result.item,
     ...(result.error ? { planableSyncError: result.error } : {}),

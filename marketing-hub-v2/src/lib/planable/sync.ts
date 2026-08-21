@@ -488,6 +488,7 @@ export async function pushContentToPlanable(
     const result = await updatePlanablePost(current.planable_post_id, {
       plainText: caption,
       scheduledAt,
+      approved: true,
       ...(mediaUrls ? { media: mediaUrls } : {}),
     });
     if (!result.ok) {
@@ -530,9 +531,11 @@ export async function pushContentToPlanable(
       dueDateFromScheduledAt(p.scheduledAt) === due
   );
   if (existing) {
-    if (mediaUrls?.length) {
-      await updatePlanablePost(existing.id, { media: mediaUrls });
-    }
+    await updatePlanablePost(existing.id, {
+      approved: true,
+      scheduledAt,
+      ...(mediaUrls?.length ? { media: mediaUrls } : {}),
+    });
     return {
       item: await linkHubToPlanablePost(current, existing, pageId, now),
     };
@@ -542,6 +545,7 @@ export async function pushContentToPlanable(
     pageId,
     plainText: caption,
     scheduledAt,
+    approved: true,
     ...(mediaUrls ? { media: mediaUrls } : {}),
   });
   if (!created.ok) {

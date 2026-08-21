@@ -482,6 +482,7 @@ export async function createPlanablePost(input: {
   plainText: string;
   scheduledAt?: string | null;
   media?: string[];
+  approved?: boolean;
 }): Promise<{ ok: true; post: PlanableRawPost } | { ok: false; error: string }> {
   const config = getPlanableConfig();
   if (!config.configured || !config.token || !config.workspaceId) {
@@ -496,8 +497,13 @@ export async function createPlanablePost(input: {
     text: input.plainText,
     plainText: input.plainText,
   };
-  if (input.scheduledAt) body.scheduledAt = input.scheduledAt;
+  if (input.scheduledAt) {
+    body.scheduledAt = input.scheduledAt;
+    // Without this, Planable keeps a date on the draft but does not put it on the calendar.
+    body.publishAtScheduledDate = true;
+  }
   if (input.media?.length) body.media = input.media;
+  if (input.approved === true) body.approved = true;
 
   try {
     const res = await fetch(`${PLANABLE_API_BASE_URL}/posts`, {
@@ -563,6 +569,7 @@ export async function updatePlanablePost(
     plainText?: string;
     scheduledAt?: string | null;
     media?: string[];
+    approved?: boolean;
   }
 ): Promise<{ ok: true; post?: PlanableRawPost } | { ok: false; error: string }> {
   const config = getPlanableConfig();
@@ -574,8 +581,10 @@ export async function updatePlanablePost(
   if (patch.plainText !== undefined) body.plainText = patch.plainText;
   if (patch.scheduledAt !== undefined && patch.scheduledAt !== null) {
     body.scheduledAt = patch.scheduledAt;
+    body.publishAtScheduledDate = true;
   }
   if (patch.media !== undefined) body.media = patch.media;
+  if (patch.approved !== undefined) body.approved = patch.approved;
   if (Object.keys(body).length === 0) {
     return { ok: false, error: "No Planable fields to update." };
   }
