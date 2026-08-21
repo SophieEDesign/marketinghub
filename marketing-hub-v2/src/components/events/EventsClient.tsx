@@ -513,9 +513,13 @@ export function EventsClient({
 
   const fieldOptions = useManagedFieldOptions("events", fieldOptionsProp);
   const eventTypeOptions = ensureFieldOption(
-    optionsForField(fieldOptions, "event_type", EVENT_TYPES),
-    { value: "Boat show", label: "Boat show" },
-    "Trade show"
+    ensureFieldOption(
+      optionsForField(fieldOptions, "event_type", EVENT_TYPES),
+      { value: "Boat show", label: "Boat show" },
+      "Trade show"
+    ),
+    { value: "Race", label: "Race" },
+    "Boat show"
   );
   const divisionOptions = optionsForField(
     fieldOptions,

@@ -116,6 +116,7 @@ const STAFF_REQUEST_STATUS: FieldOption[] = [
 export const EVENT_TYPES: FieldOption[] = [
   { value: "Trade show", label: "Trade show" },
   { value: "Boat show", label: "Boat show" },
+  { value: "Race", label: "Race" },
   { value: "Commercial", label: "Commercial" },
   { value: "Awards", label: "Awards" },
   { value: "Conference", label: "Conference" },

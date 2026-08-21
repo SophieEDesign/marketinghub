@@ -5,6 +5,7 @@ export type EventColor = { bg: string; border: string; text: string };
 export const EVENT_TYPE_COLORS: Record<string, EventColor> = {
   "Trade show": { bg: "#2a8f9e", border: "#1f7380", text: "#ffffff" },
   "Boat show": { bg: "#1d6b9a", border: "#155578", text: "#ffffff" },
+  Race: { bg: "#b42318", border: "#912018", text: "#ffffff" },
   Awards: { bg: "#c47a2c", border: "#a36320", text: "#ffffff" },
   Conference: { bg: "#4a6fa5", border: "#3a5984", text: "#ffffff" },
   Sponsorship: { bg: "#8b5a6b", border: "#6e4654", text: "#ffffff" },

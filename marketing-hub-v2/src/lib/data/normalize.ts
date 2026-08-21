@@ -279,6 +279,8 @@ const EVENT_TYPE_MAP: Record<string, string> = {
   events: "Trade show",
   boat_show: "Boat show",
   boatshow: "Boat show",
+  race: "Race",
+  racing: "Race",
   commercial_event: "Commercial",
   commercial: "Commercial",
   awards: "Awards",
