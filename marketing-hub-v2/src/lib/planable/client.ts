@@ -495,7 +495,6 @@ export async function createPlanablePost(input: {
     pageId: input.pageId,
     pageIds,
     text: input.plainText,
-    plainText: input.plainText,
   };
   if (input.scheduledAt) {
     body.scheduledAt = input.scheduledAt;
@@ -578,7 +577,7 @@ export async function updatePlanablePost(
   }
 
   const body: Record<string, unknown> = {};
-  if (patch.plainText !== undefined) body.plainText = patch.plainText;
+  if (patch.plainText !== undefined) body.text = patch.plainText;
   if (patch.scheduledAt !== undefined && patch.scheduledAt !== null) {
     body.scheduledAt = patch.scheduledAt;
     body.publishAtScheduledDate = true;

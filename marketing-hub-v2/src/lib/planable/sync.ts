@@ -484,7 +484,6 @@ export async function pushContentToPlanable(
   const caption = plainText || "Untitled post";
 
   if (current.planable_post_id) {
-    let lastError: string | undefined;
     const result = await updatePlanablePost(current.planable_post_id, {
       plainText: caption,
       scheduledAt,
@@ -492,7 +491,6 @@ export async function pushContentToPlanable(
       ...(mediaUrls ? { media: mediaUrls } : {}),
     });
     if (!result.ok) {
-      lastError = result.error;
       if (/publish/i.test(result.error)) {
         const locked = await updateContent(current.id, {
           status: "published",
@@ -504,6 +502,7 @@ export async function pushContentToPlanable(
           error: "Post is published in Planable and is locked in the Hub.",
         };
       }
+      return { item: current, error: result.error };
     }
 
     const patched = await updateContent(current.id, {
@@ -514,7 +513,6 @@ export async function pushContentToPlanable(
     });
     return {
       item: patched ?? current,
-      ...(lastError ? { error: lastError } : {}),
     };
   }
 
