@@ -428,7 +428,7 @@ async function linkHubToPlanablePost(
 export async function pushContentToPlanable(
   item: ContentItem
 ): Promise<{ item: ContentItem; error?: string }> {
-  const current = withContentPlanableDefaults(item);
+  let current = withContentPlanableDefaults(item);
   if (!shouldPushSocialToPlanable(current)) {
     return { item: current };
   }
@@ -490,29 +490,38 @@ export async function pushContentToPlanable(
       approved: true,
       ...(mediaUrls ? { media: mediaUrls } : {}),
     });
-    if (!result.ok) {
-      if (/publish/i.test(result.error)) {
-        const locked = await updateContent(current.id, {
-          status: "published",
-          sync_source: "planable",
-          last_synced_at: now,
-        });
-        return {
-          item: locked ?? current,
-          error: "Post is published in Planable and is locked in the Hub.",
-        };
-      }
+    if (result.ok) {
+      const patched = await updateContent(current.id, {
+        planable_url:
+          current.planable_url || planableDeepLink(current.planable_post_id),
+        last_synced_at: now,
+        sync_source: "hub",
+      });
+      return {
+        item: patched ?? current,
+      };
+    }
+    if (/publish/i.test(result.error)) {
+      const locked = await updateContent(current.id, {
+        status: "published",
+        sync_source: "planable",
+        last_synced_at: now,
+      });
+      return {
+        item: locked ?? current,
+        error: "Post is published in Planable and is locked in the Hub.",
+      };
+    }
+    if (!result.notFound && !/not found|404/i.test(result.error)) {
       return { item: current, error: result.error };
     }
-
-    const patched = await updateContent(current.id, {
-      planable_url:
-        current.planable_url || planableDeepLink(current.planable_post_id),
-      last_synced_at: now,
-      sync_source: "hub",
-    });
-    return {
-      item: patched ?? current,
+    // Stale Planable id (deleted/archived) — create a new post below.
+    current = {
+      ...current,
+      planable_post_id: "",
+      planable_url: "",
+      planable_group_id: "",
+      planable_page_ids: [],
     };
   }
 

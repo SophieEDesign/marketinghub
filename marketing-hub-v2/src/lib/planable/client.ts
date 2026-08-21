@@ -570,7 +570,10 @@ export async function updatePlanablePost(
     media?: string[];
     approved?: boolean;
   }
-): Promise<{ ok: true; post?: PlanableRawPost } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; post?: PlanableRawPost }
+  | { ok: false; notFound?: boolean; error: string }
+> {
   const config = getPlanableConfig();
   if (!config.configured || !config.token || !config.workspaceId) {
     return { ok: false, error: "Planable is not configured." };
@@ -604,9 +607,14 @@ export async function updatePlanablePost(
     if (!res.ok) {
       const err = (json as { error?: { message?: string } } | null)?.error
         ?.message;
+      const message =
+        err || `Planable update ${res.status}: ${text.slice(0, 200)}`;
       return {
         ok: false,
-        error: err || `Planable update ${res.status}: ${text.slice(0, 200)}`,
+        ...(res.status === 404 || /not found/i.test(message)
+          ? { notFound: true }
+          : {}),
+        error: message,
       };
     }
     const raw = extractPostFromResponse(json);
