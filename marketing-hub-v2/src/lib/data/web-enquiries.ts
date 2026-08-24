@@ -236,6 +236,17 @@ export async function upsertWebEnquiryFromWebhook(
   return rowToEnquiry(data as Record<string, unknown>);
 }
 
+const ENQUIRY_PAGE_SIZE = 1000;
+const ENQUIRY_FETCH_CAP = 20_000;
+
+function sortEnquiries(items: WebEnquiry[]): WebEnquiry[] {
+  return [...items].sort((a, b) => {
+    const ta = new Date(a.created_at ?? a.received_at).getTime();
+    const tb = new Date(b.created_at ?? b.received_at).getTime();
+    return tb - ta;
+  });
+}
+
 export async function listWebEnquiries(options?: {
   includeTest?: boolean;
   limit?: number;
@@ -243,29 +254,40 @@ export async function listWebEnquiries(options?: {
 }): Promise<WebEnquiry[]> {
   if (!hasServiceRoleKey()) return [];
 
-  const limit = Math.min(Math.max(options?.limit ?? 500, 1), 2000);
-  const offset = Math.max(options?.offset ?? 0, 0);
-
   const supabase = createServiceClient();
-  let query = supabase
-    .from("web_enquiries")
-    .select("*")
-    .order("received_at", { ascending: false })
-    .range(offset, offset + limit - 1);
+  const includeTest = Boolean(options?.includeTest);
 
-  if (!options?.includeTest) {
-    query = query.eq("is_test", false);
+  async function fetchRange(from: number, to: number): Promise<WebEnquiry[]> {
+    let query = supabase
+      .from("web_enquiries")
+      .select("*")
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .order("received_at", { ascending: false })
+      .range(from, to);
+    if (!includeTest) query = query.eq("is_test", false);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((row) =>
+      rowToEnquiry(row as Record<string, unknown>)
+    );
   }
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data ?? [])
-    .map((row) => rowToEnquiry(row as Record<string, unknown>))
-    .sort((a, b) => {
-      const ta = new Date(a.created_at ?? a.received_at).getTime();
-      const tb = new Date(b.created_at ?? b.received_at).getTime();
-      return tb - ta;
-    });
+  if (options?.limit != null) {
+    const limit = Math.min(Math.max(options.limit, 1), ENQUIRY_FETCH_CAP);
+    const offset = Math.max(options.offset ?? 0, 0);
+    return sortEnquiries(await fetchRange(offset, offset + limit - 1));
+  }
+
+  const all: WebEnquiry[] = [];
+  let offset = 0;
+  while (offset < ENQUIRY_FETCH_CAP) {
+    const to = Math.min(offset + ENQUIRY_PAGE_SIZE, ENQUIRY_FETCH_CAP) - 1;
+    const batch = await fetchRange(offset, to);
+    all.push(...batch);
+    if (batch.length < ENQUIRY_PAGE_SIZE) break;
+    offset += ENQUIRY_PAGE_SIZE;
+  }
+  return sortEnquiries(all);
 }
 
 export async function updateWebEnquiry(

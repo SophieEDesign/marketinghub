@@ -27,11 +27,17 @@ export async function GET(request: NextRequest) {
   const includeTest =
     request.nextUrl.searchParams.get("include_test") === "1" ||
     request.nextUrl.searchParams.get("include_test") === "true";
-  const limit = Number(request.nextUrl.searchParams.get("limit") || "500");
-  const offset = Number(request.nextUrl.searchParams.get("offset") || "0");
+  const limitRaw = request.nextUrl.searchParams.get("limit");
+  const offsetRaw = request.nextUrl.searchParams.get("offset");
+  const limit = limitRaw ? Number(limitRaw) : undefined;
+  const offset = offsetRaw ? Number(offsetRaw) : undefined;
 
   try {
-    const enquiries = await listWebEnquiries({ includeTest, limit, offset });
+    const enquiries = await listWebEnquiries({
+      includeTest,
+      ...(Number.isFinite(limit) ? { limit } : {}),
+      ...(Number.isFinite(offset) ? { offset } : {}),
+    });
     return jsonOk({ enquiries, configured: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to list";
