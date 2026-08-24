@@ -5,6 +5,7 @@ import type {
   BudgetPaymentStatus,
   BudgetQuarter,
 } from "@/lib/types";
+import { createP6BudgetPayments } from "@/lib/budget/p6-2026";
 
 export type BudgetAmount = number | null;
 
@@ -751,6 +752,7 @@ export function createDefaultBudgetPayments(
   return [
     ...createGoogleAdsPayments(lines, now),
     ...createPressServicePayments(lines, now),
+    ...createP6BudgetPayments(lines, now),
   ];
 }
 
