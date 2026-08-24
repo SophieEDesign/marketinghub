@@ -489,11 +489,10 @@ export async function createPlanablePost(input: {
     return { ok: false, error: "Planable is not configured." };
   }
 
-  const pageIds = [input.pageId];
+  // Planable rejects create when both pageId and pageIds are sent.
   const body: Record<string, unknown> = {
     workspaceId: config.workspaceId,
-    pageId: input.pageId,
-    pageIds,
+    pageIds: [input.pageId],
     text: input.plainText,
   };
   if (input.scheduledAt) {
