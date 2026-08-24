@@ -670,7 +670,7 @@ export function ContentClient({
       ) : (
         <PageHeader
           title="Content planner"
-          description="Draft social in the Hub; Approved sends one Facebook post to Planable as approved. Add LinkedIn and Instagram there, then publish. Published posts are locked."
+          description="Draft social in the Hub; Approved sends one Facebook draft to Planable on the due date. Add LinkedIn and Instagram there, then approve and publish. Published posts are locked."
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {scope !== "content" ? (
@@ -836,7 +836,7 @@ export function ContentClient({
             />
             {formIsSocial ? (
               <p className="mt-1 text-xs text-muted">
-                Approved sends the post to Planable as approved.
+                Approved sends a Facebook draft to Planable on the due date.
               </p>
             ) : null}
           </div>
@@ -1273,9 +1273,9 @@ export function ContentClient({
                   />
                   {editIsSocial ? (
                     <p className="mt-1 text-xs text-muted">
-                      Approved sends the post to Planable as approved. Add
-                      platforms and publish there — then Sync from Planable
-                      locks this piece.
+                      Approved sends a Facebook draft to Planable on the due
+                      date. Add platforms, approve, and publish there — then
+                      Sync from Planable locks this piece.
                     </p>
                   ) : null}
                 </div>
