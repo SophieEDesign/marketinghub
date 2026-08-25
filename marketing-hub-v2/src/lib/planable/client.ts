@@ -561,6 +561,17 @@ export async function createPlanablePost(input: {
   }
 }
 
+export async function listPlanableGroupPosts(
+  groupId: string
+): Promise<PlanableRawPost[]> {
+  if (!groupId) return [];
+  const listed = await listAllPlanablePosts({
+    maxPosts: PLANABLE_MAX_POSTS,
+    cache: "no-store",
+  });
+  return listed.posts.filter((p) => p.groupId === groupId && !p.archived);
+}
+
 export async function updatePlanablePost(
   postId: string,
   patch: {
@@ -568,6 +579,7 @@ export async function updatePlanablePost(
     scheduledAt?: string | null;
     media?: string[];
     approved?: boolean;
+    notify?: boolean;
   }
 ): Promise<
   | { ok: true; post?: PlanableRawPost }
@@ -578,7 +590,9 @@ export async function updatePlanablePost(
     return { ok: false, error: "Planable is not configured." };
   }
 
-  const body: Record<string, unknown> = {};
+  const body: Record<string, unknown> = {
+    notify: patch.notify === true,
+  };
   if (patch.plainText !== undefined) body.text = patch.plainText;
   if (patch.scheduledAt !== undefined && patch.scheduledAt !== null) {
     body.scheduledAt = patch.scheduledAt;
@@ -586,7 +600,8 @@ export async function updatePlanablePost(
   }
   if (patch.media !== undefined) body.media = patch.media;
   if (patch.approved !== undefined) body.approved = patch.approved;
-  if (Object.keys(body).length === 0) {
+  const hasFields = Object.keys(body).some((key) => key !== "notify");
+  if (!hasFields) {
     return { ok: false, error: "No Planable fields to update." };
   }
 

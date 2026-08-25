@@ -22,11 +22,11 @@ import {
   getPlanablePost,
   hubStatusFromPlanable,
   listAllPlanablePosts,
+  listPlanableGroupPosts,
   listPlanablePages,
   planableDeepLink,
   scheduledAtFromDueDate,
   updatePlanablePost,
-  uploadPlanableMediaFromUrl,
   type PlanableRawPost,
 } from "@/lib/planable/client";
 
@@ -399,12 +399,74 @@ export async function removeContentFromPlanable(
   return { ok: true };
 }
 
+function htmlToPlanableText(html: string): string {
+  if (!html.trim()) return "";
+  if (!html.includes("<")) return html.trim();
+  return html
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\s*\/p\s*>/gi, "\n")
+    .replace(/<\s*\/div\s*>/gi, "\n")
+    .replace(/<\s*\/h[1-6]\s*>/gi, "\n")
+    .replace(/<\s*\/li\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function pushableCaption(item: ContentItem): string {
-  const caption = plainTextFromHtml(item.caption || "").trim();
+  const caption = htmlToPlanableText(item.caption || "");
   if (caption) return caption;
-  const notes = plainTextFromHtml(item.notes || "").trim();
+  const notes = htmlToPlanableText(item.notes || "");
   if (notes) return notes;
+  const fallback = plainTextFromHtml(item.caption || item.notes || "").trim();
+  if (fallback) return fallback;
   return (item.title || "").trim();
+}
+
+function hubHostedMediaUrls(urls: string[]): string[] {
+  return urls.filter((url) => /supabase\.co\/storage\//i.test(url));
+}
+
+async function patchPlanableContent(
+  postId: string,
+  input: {
+    plainText: string;
+    scheduledAt: string | null;
+    mediaUrls: string[];
+  }
+): Promise<
+  | { ok: true; mediaApplied: boolean }
+  | { ok: false; notFound?: boolean; error: string }
+> {
+  const hubMedia = hubHostedMediaUrls(input.mediaUrls);
+  const mediaAttempts: Array<string[] | undefined> = [
+    input.mediaUrls.length ? input.mediaUrls : undefined,
+    hubMedia.length ? hubMedia : undefined,
+    undefined,
+  ];
+  const seen = new Set<string>();
+  let lastError = "Planable update failed";
+  for (const media of mediaAttempts) {
+    const key = media?.join("\n") ?? "";
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const result = await updatePlanablePost(postId, {
+      plainText: input.plainText,
+      scheduledAt: input.scheduledAt,
+      ...(media?.length ? { media } : {}),
+    });
+    if (result.ok) return { ok: true, mediaApplied: Boolean(media?.length) };
+    if (result.notFound) return result;
+    lastError = result.error;
+  }
+  return { ok: false, error: lastError };
 }
 
 async function linkHubToPlanablePost(
@@ -461,18 +523,9 @@ export async function pushContentToPlanable(
 
   const plainText = pushableCaption(current);
   const scheduledAt = scheduledAtFromDueDate(current.due_date);
-  const imageUrls = imageAssetUrls(current.asset_url);
-  let mediaUrls: string[] | undefined;
-  if (imageUrls.length) {
-    const uploaded: string[] = [];
-    for (const url of imageUrls) {
-      const result = await uploadPlanableMediaFromUrl(url);
-      uploaded.push(result.ok ? result.mediaUrl : url);
-    }
-    mediaUrls = uploaded;
-  }
+  const mediaUrls = imageAssetUrls(current.asset_url).slice(0, 20);
 
-  if (!plainText && !mediaUrls?.length) {
+  if (!plainText && !mediaUrls.length) {
     return {
       item: current,
       error:
@@ -482,14 +535,35 @@ export async function pushContentToPlanable(
 
   const now = new Date().toISOString();
   const caption = plainText || "Untitled post";
+  const patchInput = { plainText: caption, scheduledAt, mediaUrls };
 
   if (current.planable_post_id) {
-    const result = await updatePlanablePost(current.planable_post_id, {
-      plainText: caption,
-      scheduledAt,
-      ...(mediaUrls ? { media: mediaUrls } : {}),
-    });
+    const result = await patchPlanableContent(
+      current.planable_post_id,
+      patchInput
+    );
     if (result.ok) {
+      const groupId = current.planable_group_id;
+      if (groupId) {
+        const siblings = (await listPlanableGroupPosts(groupId)).filter(
+          (p) => p.id !== current.planable_post_id && !p.published
+        );
+        const siblingResults = await Promise.all(
+          siblings.map(async (post) => ({
+            id: post.id,
+            result: await patchPlanableContent(post.id, patchInput),
+          }))
+        );
+        for (const row of siblingResults) {
+          if (!row.result.ok) {
+            console.error("[planable] group sibling update failed", {
+              id: current.id,
+              postId: row.id,
+              error: row.result.error,
+            });
+          }
+        }
+      }
       const patched = await updateContent(current.id, {
         planable_url:
           current.planable_url || planableDeepLink(current.planable_post_id),
@@ -498,6 +572,12 @@ export async function pushContentToPlanable(
       });
       return {
         item: patched ?? current,
+        ...(!result.mediaApplied && mediaUrls.length
+          ? {
+              error:
+                "Caption reached Planable, but the images were rejected. Check the Planable post and try again.",
+            }
+          : {}),
       };
     }
     if (/publish/i.test(result.error)) {
@@ -537,10 +617,7 @@ export async function pushContentToPlanable(
       dueDateFromScheduledAt(p.scheduledAt) === due
   );
   if (existing) {
-    await updatePlanablePost(existing.id, {
-      scheduledAt,
-      ...(mediaUrls?.length ? { media: mediaUrls } : {}),
-    });
+    await patchPlanableContent(existing.id, patchInput);
     return {
       item: await linkHubToPlanablePost(current, existing, pageId, now),
     };
@@ -550,7 +627,7 @@ export async function pushContentToPlanable(
     pageId,
     plainText: caption,
     scheduledAt,
-    ...(mediaUrls ? { media: mediaUrls } : {}),
+    ...(mediaUrls.length ? { media: mediaUrls } : {}),
   });
   if (!created.ok) {
     return {
