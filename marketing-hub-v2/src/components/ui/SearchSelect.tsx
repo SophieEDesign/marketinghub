@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SearchSelectOption = {
@@ -23,6 +23,9 @@ export function SearchSelect({
   "aria-label": ariaLabel,
   searchPlaceholder = "Search…",
   noResultsLabel = "No matches",
+  allowCreate = false,
+  onCreate,
+  createLabel,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -38,9 +41,15 @@ export function SearchSelect({
   "aria-label"?: string;
   searchPlaceholder?: string;
   noResultsLabel?: string;
+  /** Offer adding the current search text when it is not already an option. */
+  allowCreate?: boolean;
+  onCreate?: (query: string) => void | Promise<void>;
+  createLabel?: (query: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listId = useId();
@@ -75,6 +84,23 @@ export function SearchSelect({
     );
   }, [allOptions, query]);
 
+  const createQuery = query.trim();
+  const createQueryKey = createQuery.toLowerCase();
+
+  function optionEqualsQuery(opt: SearchSelectOption, q: string) {
+    if (!q) return false;
+    const label = opt.label.toLowerCase();
+    const val = opt.value.toLowerCase();
+    return val === q || label === q || label.startsWith(`${q} ·`);
+  }
+
+  const canCreate = Boolean(
+    allowCreate &&
+      onCreate &&
+      createQuery &&
+      !allOptions.some((o) => optionEqualsQuery(o, createQueryKey))
+  );
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
@@ -94,6 +120,7 @@ export function SearchSelect({
   useEffect(() => {
     if (!open) {
       setQuery("");
+      setCreateError("");
       return;
     }
     const t = window.setTimeout(() => searchRef.current?.focus(), 0);
@@ -103,6 +130,29 @@ export function SearchSelect({
   function select(next: string) {
     onChange(next);
     setOpen(false);
+  }
+
+  function exactMatch() {
+    if (!createQueryKey) return undefined;
+    return filtered.find(
+      (o) => !o.disabled && optionEqualsQuery(o, createQueryKey)
+    );
+  }
+
+  async function handleCreate() {
+    if (!canCreate || !onCreate || creating) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      await onCreate(createQuery);
+      setOpen(false);
+    } catch (err) {
+      setCreateError(
+        err instanceof Error ? err.message : "Could not add this person"
+      );
+    } finally {
+      setCreating(false);
+    }
   }
 
   const triggerLabel =
@@ -155,12 +205,24 @@ export function SearchSelect({
                 className="field py-2 pl-8 text-sm"
                 value={query}
                 placeholder={searchPlaceholder}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setCreateError("");
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && filtered.length > 0) {
-                    const first = filtered.find((o) => !o.disabled);
-                    if (first) select(first.value);
+                  if (e.key !== "Enter") return;
+                  e.preventDefault();
+                  const exact = exactMatch();
+                  if (exact) {
+                    select(exact.value);
+                    return;
                   }
+                  if (canCreate) {
+                    void handleCreate();
+                    return;
+                  }
+                  const first = filtered.find((o) => !o.disabled);
+                  if (first) select(first.value);
                 }}
               />
             </div>
@@ -194,7 +256,7 @@ export function SearchSelect({
                 {emptyLabel ?? "—"}
               </button>
             ) : null}
-            {filtered.length === 0 ? (
+            {filtered.length === 0 && !canCreate ? (
               <p className="px-2.5 py-2 text-sm text-muted">{noResultsLabel}</p>
             ) : (
               filtered.map((opt) => {
@@ -232,6 +294,26 @@ export function SearchSelect({
                 );
               })
             )}
+            {canCreate ? (
+              <button
+                type="button"
+                role="option"
+                className="mt-0.5 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-brand transition hover:bg-accent-soft disabled:opacity-60"
+                disabled={creating}
+                onClick={() => void handleCreate()}
+              >
+                <Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                <span className="truncate">
+                  {creating
+                    ? "Adding…"
+                    : (createLabel?.(createQuery) ??
+                      `Add “${createQuery}”`)}
+                </span>
+              </button>
+            ) : null}
+            {createError ? (
+              <p className="px-2.5 py-1.5 text-xs text-red-600">{createError}</p>
+            ) : null}
           </div>
         </div>
       ) : null}

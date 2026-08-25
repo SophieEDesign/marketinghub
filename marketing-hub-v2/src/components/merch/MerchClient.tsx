@@ -29,6 +29,7 @@ import {
   MERCH_FOR_OTHER,
   contactMerchForOptions,
 } from "@/lib/merch/requested-for";
+import { createPersonContact } from "@/lib/contacts/create-person";
 import {
   getMerchOrderItems,
   merchOrderItemLabels,
@@ -250,11 +251,27 @@ function RequestedForField<T extends RequestedForForm>({
             disabled={!loaded}
             aria-label="Allocate order to contact"
             placeholder={loaded ? "Choose contact…" : "Loading…"}
+            searchPlaceholder="Search or add a person…"
+            noResultsLabel="No matches — add them below"
             options={contactMerchForOptions(
               contacts,
               form.requested_for_contact_id,
               form.requested_for
             )}
+            allowCreate
+            createLabel={(name) => `Add “${name}” as a contact`}
+            onCreate={async (name) => {
+              const item = await createPersonContact(name);
+              setContacts((prev) =>
+                prev.some((c) => c.id === item.id) ? prev : [...prev, item]
+              );
+              onChange({
+                ...form,
+                requested_for_contact_id: item.id,
+                requested_for: item.name,
+                for_mode: "other",
+              });
+            }}
             onChange={(value) => {
               if (value === MERCH_FOR_OTHER) {
                 onChange({

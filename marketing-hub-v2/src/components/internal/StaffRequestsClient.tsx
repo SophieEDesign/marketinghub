@@ -14,6 +14,7 @@ import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { plainTextFromHtml } from "@/lib/plain-text";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { ContactOwnerSelect } from "@/components/ui/ContactOwnerSelect";
 
 const KINDS: { id: StaffRequestKind; label: string }[] = [
   { id: "asset", label: "Asset request" },
@@ -229,11 +230,12 @@ export function StaffRequestsClient({
           ) : null}
           <div className={!kind ? undefined : "md:col-span-2"}>
             <label className="label">Requested by</label>
-            <input
+            <ContactOwnerSelect
               className="field"
+              aria-label="Requested by"
               value={form.requested_by}
-              onChange={(e) =>
-                setForm({ ...form, requested_by: e.target.value })
+              onChange={(requested_by) =>
+                setForm({ ...form, requested_by })
               }
             />
           </div>

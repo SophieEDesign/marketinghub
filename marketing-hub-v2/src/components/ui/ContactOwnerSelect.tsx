@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { contactOwnerOptions } from "@/lib/data/collections";
+import { createPersonContact } from "@/lib/contacts/create-person";
 import type { Contact } from "@/lib/types";
 import { SearchSelect } from "@/components/ui/SearchSelect";
 
@@ -54,7 +55,18 @@ export function ContactOwnerSelect({
       allowEmpty
       emptyLabel={loaded ? "Assign person…" : "Loading…"}
       placeholder={loaded ? "Assign person…" : "Loading…"}
+      searchPlaceholder="Search or add a person…"
+      noResultsLabel="No matches — add them below"
       options={options}
+      allowCreate
+      createLabel={(name) => `Add “${name}” as a contact`}
+      onCreate={async (name) => {
+        const item = await createPersonContact(name);
+        setContacts((prev) =>
+          prev.some((c) => c.id === item.id) ? prev : [...prev, item]
+        );
+        onChange(item.name);
+      }}
       onChange={onChange}
     />
   );
