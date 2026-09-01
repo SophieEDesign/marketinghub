@@ -263,6 +263,7 @@ export const REPORT_TOOLS: FieldOption[] = [
 export const PAID_CAMPAIGN_PLATFORMS: FieldOption[] = [
   { value: "LinkedIn", label: "LinkedIn" },
   { value: "Google Ads", label: "Google Ads" },
+  { value: "ChatGPT Ads", label: "ChatGPT Ads" },
   { value: "Meta", label: "Meta" },
   { value: "Other", label: "Other" },
 ];
