@@ -164,8 +164,21 @@ body {
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .prose-hub strong {
-    font-weight: 650;
+  .prose-hub strong,
+  .prose-hub b {
+    font-weight: 700;
+  }
+  .prose-hub em,
+  .prose-hub i {
+    font-style: italic;
+  }
+  .prose-hub s,
+  .prose-hub strike,
+  .prose-hub del {
+    text-decoration: line-through;
+  }
+  .prose-hub u {
+    text-decoration: underline;
   }
   .prose-hub blockquote {
     border-left: 3px solid var(--border);
@@ -179,11 +192,11 @@ body {
     padding: 0.1em 0.35em;
     border-radius: 0.35rem;
   }
-  .rich-text-editor .ProseMirror {
+  .ProseMirror.rich-text-editor {
     outline: none;
     min-height: inherit;
   }
-  .rich-text-editor .ProseMirror p.is-editor-empty:first-child::before {
+  .ProseMirror.rich-text-editor p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     float: left;
     height: 0;

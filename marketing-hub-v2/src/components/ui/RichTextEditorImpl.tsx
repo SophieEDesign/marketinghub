@@ -15,6 +15,7 @@ import {
   Heading2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { plainTextToEditorHtml } from "@/lib/plain-text";
 import { normalizeRichTextStorage } from "@/lib/sanitize";
 
 function escapeHtml(text: string): string {
@@ -23,6 +24,17 @@ function escapeHtml(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function editorHtml(value: string): string {
+  return plainTextToEditorHtml(value || "");
+}
+
+function sameEditorContent(a: string, b: string): boolean {
+  return (
+    normalizeRichTextStorage(editorHtml(a)) ===
+    normalizeRichTextStorage(editorHtml(b))
+  );
 }
 
 type RichTextEditorProps = {
@@ -95,7 +107,7 @@ export function RichTextEditorImpl({
         placeholder,
       }),
     ],
-    content: value || "",
+    content: editorHtml(value),
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -106,13 +118,15 @@ export function RichTextEditorImpl({
         style: `min-height: ${minHeight};`,
       },
       handlePaste: (_view, event) => {
+        const html = event.clipboardData?.getData("text/html")?.trim();
+        if (html) return false;
         const plain = event.clipboardData?.getData("text/plain");
         if (plain != null && plain !== "" && editorRef.current) {
-          const html = plain
+          const paragraphs = plain
             .split(/\r?\n/)
-            .map((line) => `<p>${escapeHtml(line)}</p>`)
+            .map((line) => `<p>${escapeHtml(line) || "<br>"}</p>`)
             .join("");
-          editorRef.current.chain().insertContent(html).run();
+          editorRef.current.chain().insertContent(paragraphs).run();
           return true;
         }
         return false;
@@ -133,8 +147,8 @@ export function RichTextEditorImpl({
   useEffect(() => {
     if (!editor) return;
     const current = editor.getHTML();
-    const next = value || "";
-    if (normalizeRichTextStorage(current) === normalizeRichTextStorage(next)) {
+    const next = editorHtml(value);
+    if (sameEditorContent(current, next)) {
       return;
     }
     if (!next) {
