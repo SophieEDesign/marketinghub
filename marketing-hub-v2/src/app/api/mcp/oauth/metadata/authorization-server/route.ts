@@ -1,6 +1,4 @@
-import {
-  metadataCorsOptionsRequestHandler,
-} from "mcp-handler";
+import { metadataCorsOptionsRequestHandler } from "mcp-handler";
 import { oauthAuthorizationServerMetadata } from "@/lib/mcp/oauth";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +10,7 @@ export async function GET(request: Request) {
   return Response.json(oauthAuthorizationServerMetadata(request), {
     headers: {
       "Cache-Control": "public, max-age=300",
+      "Content-Type": "application/json",
     },
   });
 }

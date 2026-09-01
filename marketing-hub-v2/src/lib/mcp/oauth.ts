@@ -250,7 +250,7 @@ export function oauthAuthorizationServerMetadata(request?: Request) {
       "client_secret_basic",
       "none",
     ],
-    code_challenge_methods_supported: ["S256", "plain"],
+    code_challenge_methods_supported: ["S256"],
     scopes_supported: ["mcp:tools"],
   };
 }

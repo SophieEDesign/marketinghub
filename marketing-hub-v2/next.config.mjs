@@ -48,6 +48,26 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/mcp/.well-known/oauth-protected-resource",
+        destination: "/api/mcp/oauth/metadata/protected-resource",
+      },
+      {
+        source: "/.well-known/oauth-protected-resource",
+        destination: "/api/mcp/oauth/metadata/protected-resource",
+      },
+      {
+        source: "/api/mcp/oauth/.well-known/oauth-authorization-server",
+        destination: "/api/mcp/oauth/metadata/authorization-server",
+      },
+      {
+        source: "/.well-known/oauth-authorization-server",
+        destination: "/api/mcp/oauth/metadata/authorization-server",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
