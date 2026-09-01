@@ -1,5 +1,6 @@
-import { createMcpHandler } from "mcp-handler";
-import { isMcpConfigured, verifyMcpApiKey } from "@/lib/mcp/auth";
+import { createMcpHandler, withMcpAuth } from "mcp-handler";
+import type { AuthInfo } from "@modelcontextprotocol/server";
+import { isMcpConfigured, verifyMcpAccessToken } from "@/lib/mcp/oauth";
 import { registerHubMcpTools } from "@/lib/mcp/register-tools";
 
 export const dynamic = "force-dynamic";
@@ -21,15 +22,27 @@ Publishing happens in Planable — do not set status to published.`,
   }
 );
 
-function unauthorized(): Response {
-  return new Response(JSON.stringify({ error: "Unauthorized" }), {
-    status: 401,
-    headers: {
-      "Content-Type": "application/json",
-      "WWW-Authenticate": 'Bearer realm="Marketing Hub MCP"',
-    },
-  });
+async function verifyToken(
+  _req: Request,
+  bearerToken?: string
+): Promise<AuthInfo | undefined> {
+  const auth = verifyMcpAccessToken(bearerToken);
+  if (!auth) return undefined;
+  return {
+    token: bearerToken!,
+    scopes: auth.scope.split(/\s+/).filter(Boolean),
+    clientId: auth.clientId,
+  };
 }
+
+const authHandler = withMcpAuth(mcpHandler, verifyToken, {
+  required: true,
+  requiredScopes: ["mcp:tools"],
+  resourceMetadataPath: "/.well-known/oauth-protected-resource",
+  resourceUrl: process.env.NEXT_PUBLIC_APP_URL
+    ? `${process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")}/api/mcp`
+    : undefined,
+});
 
 function notConfigured(): Response {
   return new Response(
@@ -43,8 +56,7 @@ function notConfigured(): Response {
 
 async function handleMcp(request: Request): Promise<Response> {
   if (!isMcpConfigured()) return notConfigured();
-  if (!verifyMcpApiKey(request)) return unauthorized();
-  return mcpHandler(request);
+  return authHandler(request);
 }
 
 export { handleMcp as GET, handleMcp as POST, handleMcp as DELETE };
