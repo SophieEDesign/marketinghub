@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import { uid } from "@/lib/utils";
 import {
   createServiceClient,
@@ -143,8 +144,6 @@ export function mapWebhookPayload(
   };
 }
 
-import { timingSafeEqual } from "crypto";
-
 function secretsMatch(provided: string, expected: string): boolean {
   if (!provided || !expected) return false;
   try {
@@ -160,6 +159,10 @@ function secretsMatch(provided: string, expected: string): boolean {
 export function requireWebhookSecret(request: Request): boolean {
   const expected = process.env.WEB_ENQUIRY_WEBHOOK_SECRET?.trim();
   if (!expected) return false;
+
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key")?.trim() ?? "";
+  if (key && secretsMatch(key, expected)) return true;
 
   const headerSecret =
     request.headers.get("x-webhook-secret")?.trim() ?? "";
