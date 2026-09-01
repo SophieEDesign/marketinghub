@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     });
 
     if ("error" in result) {
-      return oauthError(result.error, undefined, 400);
+      return oauthError(result.error ?? "invalid_grant", undefined, 400);
     }
     return NextResponse.json(result.token);
   }
