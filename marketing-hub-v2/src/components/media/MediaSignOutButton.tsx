@@ -1,12 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { signOutOfHub } from "@/lib/auth/sign-out";
 
 export function MediaSignOutButton() {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function onSignOut() {
@@ -14,9 +12,10 @@ export function MediaSignOutButton() {
     setBusy(true);
     try {
       await signOutOfHub();
-      router.push("/media");
-      router.refresh();
-    } finally {
+      // Hard navigation clears MediaGallery client state (download URLs / canDownload)
+      // that soft refresh would otherwise leave cached after logout.
+      window.location.assign("/media");
+    } catch {
       setBusy(false);
     }
   }

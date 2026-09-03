@@ -17,6 +17,7 @@ export default async function PublicMediaPage() {
       isExternalGuest={Boolean(isExternalGuest)}
     >
       <MediaGallery
+        key={canDownload ? "download" : "view"}
         title="Media gallery"
         description="Browse logos, presentations, and gallery — view freely, sign in to download."
         showStaffChrome={false}
