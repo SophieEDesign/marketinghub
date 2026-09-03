@@ -5,7 +5,10 @@
  * Flow: ask the API for a signed Supabase URL → PUT the file directly.
  */
 
-import { MAX_UPLOAD_BYTES } from "@/lib/upload/allowed-types";
+import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_BYTES_ADMIN,
+} from "@/lib/upload/allowed-types";
 
 export type UploadedAsset = {
   url: string;
@@ -13,7 +16,12 @@ export type UploadedAsset = {
   storage: "supabase";
 };
 
-async function readErrorMessage(res: Response, fallback: string) {
+export type UploadAssetOptions = {
+  /** Pass admin max when uploading from admin media manage UI. */
+  maxBytes?: number;
+};
+
+async function readErrorMessage(res: Response, fallback: string, maxBytes: number) {
   const text = await res.text();
   try {
     const json = JSON.parse(text) as { error?: string };
@@ -22,16 +30,23 @@ async function readErrorMessage(res: Response, fallback: string) {
     // ignore
   }
   if (/request entity too large/i.test(text) || res.status === 413) {
-    return `File too large for upload (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB).`;
+    return `File too large for upload (max ${Math.round(maxBytes / (1024 * 1024))}MB).`;
   }
   return text.trim().slice(0, 180) || fallback;
 }
 
-export async function uploadAssetDirect(file: File): Promise<UploadedAsset> {
+export async function uploadAssetDirect(
+  file: File,
+  opts?: UploadAssetOptions
+): Promise<UploadedAsset> {
+  const maxBytes = Math.min(
+    opts?.maxBytes ?? MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_BYTES_ADMIN
+  );
   if (file.size <= 0) throw new Error("Empty file");
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (file.size > maxBytes) {
     throw new Error(
-      `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB): ${file.name}`
+      `File too large (max ${Math.round(maxBytes / (1024 * 1024))}MB): ${file.name}`
     );
   }
 
@@ -47,7 +62,11 @@ export async function uploadAssetDirect(file: File): Promise<UploadedAsset> {
 
   if (!intentRes.ok) {
     throw new Error(
-      await readErrorMessage(intentRes, `Could not start upload for ${file.name}`)
+      await readErrorMessage(
+        intentRes,
+        `Could not start upload for ${file.name}`,
+        maxBytes
+      )
     );
   }
 

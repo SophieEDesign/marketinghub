@@ -7,7 +7,7 @@ import { hasServiceRoleKey } from "@/lib/supabase/admin";
 import { getDataDir } from "@/lib/store/paths";
 import {
   isAllowedUpload,
-  MAX_UPLOAD_BYTES,
+  maxUploadBytesForRole,
 } from "@/lib/upload/allowed-types";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +46,7 @@ async function uploadToSupabase(
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   let form: FormData;
@@ -63,9 +63,10 @@ export async function POST(request: NextRequest) {
 
   const blob = file as File;
   if (blob.size <= 0) return jsonError("Empty file", 400);
-  if (blob.size > MAX_UPLOAD_BYTES) {
+  const maxBytes = maxUploadBytesForRole(user.role);
+  if (blob.size > maxBytes) {
     return jsonError(
-      `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB): ${blob.name || "file"}`,
+      `File too large (max ${Math.round(maxBytes / (1024 * 1024))}MB): ${blob.name || "file"}`,
       413
     );
   }

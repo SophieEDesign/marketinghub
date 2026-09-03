@@ -25,10 +25,12 @@ import {
   GALLERY_VISIBILITY_OPTIONS,
   MEDIA_HUB_CATEGORIES,
   effectiveMediaVisibility,
+  gallerySharePath,
   matchesMediaDivisionFilter,
   moreRestrictiveVisibility,
   normalizeGalleryVisibility,
   visibilityLabel,
+  type GalleryFolderShare,
   type GalleryFolderVisibility,
   type MediaFile,
   type MediaListItem,
@@ -42,6 +44,7 @@ import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import {
   isAllowedUpload,
   MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_BYTES_ADMIN,
   UPLOAD_ACCEPT,
 } from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
@@ -136,7 +139,7 @@ function formatFileDateLabel(value: string | null | undefined) {
   });
 }
 
-async function readErrorMessage(res: Response, fallback: string) {
+async function readErrorMessage(res: Response, fallback: string, maxBytes = MAX_UPLOAD_BYTES) {
   const text = await res.text();
   try {
     const json = JSON.parse(text) as { error?: string };
@@ -145,7 +148,7 @@ async function readErrorMessage(res: Response, fallback: string) {
     // Non-JSON (e.g. proxy "Request Entity Too Large")
   }
   if (/request entity too large/i.test(text) || res.status === 413) {
-    return `File too large for the server (max about ${formatMb(MAX_UPLOAD_BYTES)} each). Try fewer or smaller images.`;
+    return `File too large for the server (max about ${formatMb(maxBytes)} each). Try fewer or smaller images.`;
   }
   return text.trim().slice(0, 180) || fallback;
 }
@@ -607,6 +610,7 @@ export function MediaGallery({
   const [formError, setFormError] = useState<string | null>(null);
   const [divisionFilter, setDivisionFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const maxUploadBytes = allowManage ? MAX_UPLOAD_BYTES_ADMIN : MAX_UPLOAD_BYTES;
 
   useEffect(() => {
     return onTourPrepare((action) => {
@@ -989,10 +993,10 @@ export function MediaGallery({
     setSaving(true);
     setFormError(null);
     try {
-      const oversized = files.filter((f) => f.size > MAX_UPLOAD_BYTES);
+      const oversized = files.filter((f) => f.size > maxUploadBytes);
       if (oversized.length > 0) {
         throw new Error(
-          `These files are over ${formatMb(MAX_UPLOAD_BYTES)}: ${oversized
+          `These files are over ${formatMb(maxUploadBytes)}: ${oversized
             .map((f) => f.name)
             .slice(0, 3)
             .join(", ")}${oversized.length > 3 ? ` +${oversized.length - 3} more` : ""}. Remove them or compress, then save again.`
@@ -1009,7 +1013,9 @@ export function MediaGallery({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         try {
-          const uploadedFile = await uploadAssetDirect(file);
+          const uploadedFile = await uploadAssetDirect(file, {
+            maxBytes: maxUploadBytes,
+          });
           uploaded.push({
             url: uploadedFile.url,
             name: uploadedFile.name || file.name,
@@ -1612,7 +1618,7 @@ export function MediaGallery({
               </p>
               <p className="mt-1 text-xs text-muted">
                 Drop a folder of images or pick multiple files · each file
-                becomes its own asset (max {formatMb(MAX_UPLOAD_BYTES)} each)
+                becomes its own asset (max {formatMb(maxUploadBytes)} each)
               </p>
               <input
                 ref={fileInputRef}

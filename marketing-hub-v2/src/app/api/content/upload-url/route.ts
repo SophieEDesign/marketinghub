@@ -4,7 +4,7 @@ import { jsonError, jsonOk, requireStaff } from "@/lib/api";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 import {
   isAllowedUpload,
-  MAX_UPLOAD_BYTES,
+  maxUploadBytesForRole,
 } from "@/lib/upload/allowed-types";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ function safeName(name: string) {
  * Clients PUT the file directly to Storage — avoids Next.js ~1MB Route Handler body limit (413).
  */
 export async function POST(request: NextRequest) {
-  const { error } = await requireStaff();
+  const { user, error } = await requireStaff();
   if (error) return error;
 
   if (!hasServiceRoleKey()) {
@@ -50,9 +50,10 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return jsonError("Invalid upload request", 400);
 
   const { name, type = "application/octet-stream", size } = parsed.data;
-  if (typeof size === "number" && size > MAX_UPLOAD_BYTES) {
+  const maxBytes = maxUploadBytesForRole(user.role);
+  if (typeof size === "number" && size > maxBytes) {
     return jsonError(
-      `File too large (max ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB): ${name}`,
+      `File too large (max ${Math.round(maxBytes / (1024 * 1024))}MB): ${name}`,
       413
     );
   }

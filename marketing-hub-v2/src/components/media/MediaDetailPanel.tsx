@@ -25,7 +25,7 @@ import {
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
 import {
   isAllowedUpload,
-  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_BYTES_ADMIN,
   UPLOAD_ACCEPT,
 } from "@/lib/upload/allowed-types";
 import { cn } from "@/lib/utils";
@@ -358,10 +358,10 @@ export function MediaDetailPanel({
     setUploading(true);
     setError(null);
     try {
-      const oversized = incoming.filter((f) => f.size > MAX_UPLOAD_BYTES);
+      const oversized = incoming.filter((f) => f.size > MAX_UPLOAD_BYTES_ADMIN);
       if (oversized.length > 0) {
         throw new Error(
-          `These files are over ${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB: ${oversized
+          `These files are over ${Math.round(MAX_UPLOAD_BYTES_ADMIN / (1024 * 1024))}MB: ${oversized
             .map((f) => f.name)
             .slice(0, 3)
             .join(", ")}`
@@ -378,7 +378,9 @@ export function MediaDetailPanel({
       for (let i = 0; i < incoming.length; i++) {
         const file = incoming[i];
         try {
-          const uploadedFile = await uploadAssetDirect(file);
+          const uploadedFile = await uploadAssetDirect(file, {
+            maxBytes: MAX_UPLOAD_BYTES_ADMIN,
+          });
           uploaded.push({
             url: uploadedFile.url,
             name: uploadedFile.name || file.name,
@@ -700,7 +702,7 @@ export function MediaDetailPanel({
                 </p>
                 <p className="mt-1 text-xs text-muted">
                   Images, PDF, or short video · max{" "}
-                  {Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))}MB each
+                  {Math.round(MAX_UPLOAD_BYTES_ADMIN / (1024 * 1024))}MB each
                   {needsPreviewImage
                     ? " · screenshots become the gallery thumbnail"
                     : ""}

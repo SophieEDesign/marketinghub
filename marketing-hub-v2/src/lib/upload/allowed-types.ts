@@ -3,7 +3,15 @@
  * Still blocks SVG/HTML/executables (XSS / malware risk).
  */
 
+/** Default per-file limit for staff uploads (requests, merch, etc.). */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/** Admins managing media may upload larger originals (e.g. DJI stills). */
+export const MAX_UPLOAD_BYTES_ADMIN = 100 * 1024 * 1024;
+
+export function maxUploadBytesForRole(role?: string | null) {
+  return role === "admin" ? MAX_UPLOAD_BYTES_ADMIN : MAX_UPLOAD_BYTES;
+}
 
 export const ALLOWED_UPLOAD_MIME = new Set([
   // Images
