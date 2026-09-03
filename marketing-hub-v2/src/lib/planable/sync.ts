@@ -535,13 +535,29 @@ export async function pushContentToPlanable(
 
   const now = new Date().toISOString();
   const caption = plainText || "Untitled post";
-  const patchInput = { plainText: caption, scheduledAt, mediaUrls };
+  let effectiveScheduledAt = scheduledAt;
+  const patchInput = () => ({
+    plainText: caption,
+    scheduledAt: effectiveScheduledAt,
+    mediaUrls,
+  });
 
   if (current.planable_post_id) {
-    const result = await patchPlanableContent(
+    let result = await patchPlanableContent(
       current.planable_post_id,
-      patchInput
+      patchInput()
     );
+    // Same-day approve after 09:00 UTC used to fail; bump and retry once.
+    if (
+      !result.ok &&
+      /schedule date must be in the future/i.test(result.error)
+    ) {
+      effectiveScheduledAt = new Date(Date.now() + 15 * 60_000).toISOString();
+      result = await patchPlanableContent(
+        current.planable_post_id,
+        patchInput()
+      );
+    }
     if (result.ok) {
       const groupId = current.planable_group_id;
       if (groupId) {
@@ -551,7 +567,7 @@ export async function pushContentToPlanable(
         const siblingResults = await Promise.all(
           siblings.map(async (post) => ({
             id: post.id,
-            result: await patchPlanableContent(post.id, patchInput),
+            result: await patchPlanableContent(post.id, patchInput()),
           }))
         );
         for (const row of siblingResults) {
@@ -609,7 +625,7 @@ export async function pushContentToPlanable(
     maxPosts: 200,
     cache: "no-store",
   });
-  const due = dueDateFromScheduledAt(scheduledAt);
+  const due = dueDateFromScheduledAt(effectiveScheduledAt);
   const existing = listed.posts.find(
     (p) =>
       !p.archived &&
@@ -617,18 +633,30 @@ export async function pushContentToPlanable(
       dueDateFromScheduledAt(p.scheduledAt) === due
   );
   if (existing) {
-    await patchPlanableContent(existing.id, patchInput);
+    await patchPlanableContent(existing.id, patchInput());
     return {
       item: await linkHubToPlanablePost(current, existing, pageId, now),
     };
   }
 
-  const created = await createPlanablePost({
+  let created = await createPlanablePost({
     pageId,
     plainText: caption,
-    scheduledAt,
+    scheduledAt: effectiveScheduledAt,
     ...(mediaUrls.length ? { media: mediaUrls } : {}),
   });
+  if (
+    !created.ok &&
+    /schedule date must be in the future/i.test(created.error)
+  ) {
+    effectiveScheduledAt = new Date(Date.now() + 15 * 60_000).toISOString();
+    created = await createPlanablePost({
+      pageId,
+      plainText: caption,
+      scheduledAt: effectiveScheduledAt,
+      ...(mediaUrls.length ? { media: mediaUrls } : {}),
+    });
+  }
   if (!created.ok) {
     return {
       item: current,

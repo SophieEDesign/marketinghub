@@ -817,13 +817,20 @@ export function hubStatusFromPlanable(post: {
   return "draft";
 }
 
+/** Prefer 09:00 UTC on the due day; bump into the near future if that time has passed. */
 export function scheduledAtFromDueDate(
-  dueDate: string | null | undefined
+  dueDate: string | null | undefined,
+  now = new Date()
 ): string | null {
   if (!dueDate) return null;
   const day = dueDate.slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  return `${day}T09:00:00.000Z`;
+  const preferred = new Date(`${day}T09:00:00.000Z`);
+  // Planable rejects create/update when scheduledAt is not in the future.
+  if (preferred.getTime() > now.getTime() + 60_000) {
+    return preferred.toISOString();
+  }
+  return new Date(now.getTime() + 15 * 60_000).toISOString();
 }
 
 export function dueDateFromScheduledAt(
