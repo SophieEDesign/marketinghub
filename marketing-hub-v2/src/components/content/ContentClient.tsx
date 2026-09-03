@@ -537,13 +537,15 @@ export function ContentClient({
   async function reschedule(id: string, dueDate: string) {
     const item = items.find((i) => i.id === id);
     if (item?.status === "published") return;
+    const previousDueDate = item?.due_date ?? null;
+    setSyncMessage(null);
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, due_date: dueDate } : i))
     );
     if (editingId === id && edit) {
       setEdit({ ...edit, due_date: dueDate });
     }
-    await fetch("/api/content", {
+    const res = await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -552,6 +554,22 @@ export function ContentClient({
         patch: { due_date: dueDate },
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === id ? { ...i, due_date: previousDueDate } : i
+        )
+      );
+      if (editingId === id && edit) {
+        setEdit({ ...edit, due_date: previousDueDate ?? "" });
+      }
+      setSyncMessage(data.error || "Could not update date");
+      return;
+    }
+    if (data.planableSyncError) {
+      setSyncMessage(data.planableSyncError);
+    }
   }
 
   async function remove(id: string) {

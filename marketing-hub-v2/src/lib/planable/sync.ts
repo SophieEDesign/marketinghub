@@ -434,36 +434,72 @@ function hubHostedMediaUrls(urls: string[]): string[] {
   return urls.filter((url) => /supabase\.co\/storage\//i.test(url));
 }
 
+function isPlanableRateLimit(error: string): boolean {
+  return /too many requests|rate limit|429/i.test(error);
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function updatePlanablePostWithRetry(
+  postId: string,
+  patch: {
+    plainText?: string;
+    scheduledAt?: string | null;
+    media?: string[];
+  }
+): Promise<
+  | { ok: true; post?: PlanableRawPost }
+  | { ok: false; notFound?: boolean; error: string }
+> {
+  let lastError = "Planable update failed";
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const result = await updatePlanablePost(postId, patch);
+    if (result.ok) return result;
+    lastError = result.error;
+    if (result.notFound || !isPlanableRateLimit(result.error)) return result;
+    await sleep(700 * (attempt + 1));
+  }
+  return { ok: false, error: lastError };
+}
+
 async function patchPlanableContent(
   postId: string,
   input: {
     plainText: string;
     scheduledAt: string | null;
     mediaUrls: string[];
+    includeMedia?: boolean;
   }
 ): Promise<
   | { ok: true; mediaApplied: boolean }
   | { ok: false; notFound?: boolean; error: string }
 > {
-  const hubMedia = hubHostedMediaUrls(input.mediaUrls);
-  const mediaAttempts: Array<string[] | undefined> = [
-    input.mediaUrls.length ? input.mediaUrls : undefined,
-    hubMedia.length ? hubMedia : undefined,
-    undefined,
-  ];
+  const includeMedia = input.includeMedia !== false;
+  const hubMedia = includeMedia ? hubHostedMediaUrls(input.mediaUrls) : [];
+  const mediaAttempts: Array<string[] | undefined> = includeMedia
+    ? [
+        input.mediaUrls.length ? input.mediaUrls : undefined,
+        hubMedia.length ? hubMedia : undefined,
+        undefined,
+      ]
+    : [undefined];
   const seen = new Set<string>();
   let lastError = "Planable update failed";
   for (const media of mediaAttempts) {
     const key = media?.join("\n") ?? "";
     if (seen.has(key)) continue;
     seen.add(key);
-    const result = await updatePlanablePost(postId, {
+    const result = await updatePlanablePostWithRetry(postId, {
       plainText: input.plainText,
       scheduledAt: input.scheduledAt,
       ...(media?.length ? { media } : {}),
     });
     if (result.ok) return { ok: true, mediaApplied: Boolean(media?.length) };
     if (result.notFound) return result;
+    // Extra media variants only make rate limits worse.
+    if (isPlanableRateLimit(result.error)) return result;
     lastError = result.error;
   }
   return { ok: false, error: lastError };
@@ -564,19 +600,19 @@ export async function pushContentToPlanable(
         const siblings = (await listPlanableGroupPosts(groupId)).filter(
           (p) => p.id !== current.planable_post_id && !p.published
         );
-        const siblingResults = await Promise.all(
-          siblings.map(async (post) => ({
-            id: post.id,
-            result: await patchPlanableContent(post.id, patchInput()),
-          }))
-        );
-        for (const row of siblingResults) {
-          if (!row.result.ok) {
+        // One at a time, text+date only — parallel media updates trip Planable rate limits.
+        for (const post of siblings) {
+          const siblingResult = await patchPlanableContent(post.id, {
+            ...patchInput(),
+            includeMedia: false,
+          });
+          if (!siblingResult.ok) {
             console.error("[planable] group sibling update failed", {
               id: current.id,
-              postId: row.id,
-              error: row.result.error,
+              postId: post.id,
+              error: siblingResult.error,
             });
+            if (isPlanableRateLimit(siblingResult.error)) break;
           }
         }
       }

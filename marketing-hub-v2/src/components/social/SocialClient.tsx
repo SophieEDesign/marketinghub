@@ -480,6 +480,8 @@ export function SocialClient({
     const post = posts.find((p) => p.id === id);
     if (!post || post.source !== "hub") return;
     if (post.status.toLowerCase() === "published") return;
+    const previousScheduledAt = post.scheduledAt;
+    setError(null);
     setPosts((prev) =>
       prev.map((p) =>
         p.id === id
@@ -487,7 +489,7 @@ export function SocialClient({
           : p
       )
     );
-    await fetch("/api/content", {
+    const res = await fetch("/api/content", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -496,6 +498,19 @@ export function SocialClient({
         patch: { due_date: dueDate },
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, scheduledAt: previousScheduledAt } : p
+        )
+      );
+      setError(data.error || "Could not update date");
+      return;
+    }
+    if (data.planableSyncError) {
+      setError(data.planableSyncError);
+    }
   }
 
   function openCreateOnDate(dateStr: string) {
