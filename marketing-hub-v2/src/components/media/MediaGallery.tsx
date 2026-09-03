@@ -57,6 +57,7 @@ type ListResponse = {
   canDownload?: boolean;
   items?: MediaListItem[];
   categories?: string[];
+  folderShares?: GalleryFolderShare[];
   error?: string;
 };
 
@@ -495,10 +496,17 @@ function photosFromItems(items: MediaListItem[]): GalleryPhoto[] {
   for (const item of items) {
     for (const file of item.files) {
       if (!isImageFile(file)) continue;
+      // When download URLs are redacted, fall back to cover for view-only browse.
+      const url =
+        file.url ||
+        (item.cover_url && isDirectImageUrl(item.cover_url)
+          ? item.cover_url
+          : "");
+      if (!url) continue;
       photos.push({
-        id: `${item.id}__${file.url}`,
+        id: `${item.id}__${file.url || file.name || url}`,
         itemId: item.id,
-        url: file.url,
+        url,
         name: file.name,
         itemName: item.name || itemDisplayName(item),
         publicTitle: item.public_title || "",
@@ -529,6 +537,7 @@ const EMPTY_FORM = {
 
 const VISIBILITY_CONTROL_OPTIONS = [
   { id: "public", label: "Public", icon: Globe },
+  { id: "link", label: "Link only", icon: Link2 },
   { id: "internal", label: "Internal", icon: Lock },
   { id: "admin", label: "Admin only", icon: Shield },
 ] as const;
@@ -607,10 +616,12 @@ export function MediaGallery({
   const [dragActive, setDragActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState<string | null>(null);
+  const [copiedFolder, setCopiedFolder] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [divisionFilter, setDivisionFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const maxUploadBytes = allowManage ? MAX_UPLOAD_BYTES_ADMIN : MAX_UPLOAD_BYTES;
+  const prevCanDownloadRef = useRef(initialCanDownload);
 
   useEffect(() => {
     return onTourPrepare((action) => {
@@ -644,6 +655,14 @@ export function MediaGallery({
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Soft navigation / parent refresh can change auth without remounting; keep in sync.
+  useEffect(() => {
+    if (prevCanDownloadRef.current === initialCanDownload) return;
+    prevCanDownloadRef.current = initialCanDownload;
+    setCanDownload(initialCanDownload);
+    void load();
+  }, [initialCanDownload, load]);
 
   const items = useMemo(() => {
     const all = data?.items ?? [];
@@ -694,6 +713,15 @@ export function MediaGallery({
     [items]
   );
 
+  const folderShareByName = useMemo(() => {
+    const map = new Map<string, GalleryFolderShare>();
+    for (const share of data?.folderShares ?? []) {
+      const key = share.subfolder.trim() || UNSORTED_SUBFOLDER;
+      map.set(key, share);
+    }
+    return map;
+  }, [data?.folderShares]);
+
   const gallerySubfolders = useMemo(() => {
     const names = Array.from(
       new Set(galleryItems.map((i) => itemSubfolder(i)))
@@ -711,15 +739,19 @@ export function MediaGallery({
     return names.map((name) => {
       const inFolder = galleryItems.filter((i) => itemSubfolder(i) === name);
       const photos = photosFromItems(inFolder);
+      const share = folderShareByName.get(name);
       // Folder visibility comes from subfolder_visibility (synced), not item overrides.
-      const visibility: GalleryFolderVisibility =
+      let visibility: GalleryFolderVisibility =
         inFolder.length === 0
-          ? "internal"
+          ? share?.enabled
+            ? "link"
+            : "internal"
           : inFolder.reduce(
               (acc, i) =>
                 moreRestrictiveVisibility(acc, itemFolderVisibility(i)),
               "public" as GalleryFolderVisibility
             );
+      if (share?.enabled && inFolder.length === 0) visibility = "link";
       return {
         name,
         photos,
@@ -733,9 +765,10 @@ export function MediaGallery({
         photoCount: photos.length,
         assetCount: inFolder.length,
         visibility,
+        shareToken: share?.share_token || null,
       };
     });
-  }, [galleryItems, scope]);
+  }, [galleryItems, scope, folderShareByName]);
 
   const knownSubfolders = useMemo(() => {
     const names = new Set(
@@ -1171,6 +1204,23 @@ export function MediaGallery({
     }
   }
 
+  async function copyShareLink(folderName: string, token: string | null) {
+    if (!token) {
+      window.alert("Turn on Link only first to create a share link.");
+      return;
+    }
+    const url = `${window.location.origin}${gallerySharePath(token)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedFolder(folderName);
+      window.setTimeout(() => {
+        setCopiedFolder((current) => (current === folderName ? null : current));
+      }, 2000);
+    } catch {
+      window.prompt("Copy this share link:", url);
+    }
+  }
+
   const manageActions = allowManage ? (
     <button
       type="button"
@@ -1479,7 +1529,7 @@ export function MediaGallery({
             <div>
               <label className="label">Folder visibility</label>
               <div
-                className="inline-flex w-full rounded-xl border border-border bg-sand/60 p-1"
+                className="inline-flex w-full flex-wrap rounded-xl border border-border bg-sand/60 p-1"
                 role="group"
                 aria-label="Folder visibility"
               >
@@ -1510,8 +1560,8 @@ export function MediaGallery({
                 })}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Public appears externally. Internal is staff-only. Admin only is
-                hidden from members.
+                Public is listed on /media. Link only is unlisted (share URL).
+                Internal is staff-only. Admin only is hidden from members.
               </p>
             </div>
           ) : (
@@ -1548,8 +1598,8 @@ export function MediaGallery({
                 })}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Public appears externally. Internal is staff-only. Admin only is
-                hidden from members — use for marketing-only assets.
+                Public is listed externally. Link only uses a share URL.
+                Internal is staff-only. Admin only is hidden from members.
               </p>
             </div>
           )}
@@ -1781,7 +1831,7 @@ export function MediaGallery({
             <p className="mt-1 text-sm text-muted">
               Choose a subfolder to browse images
               {allowManage
-                ? " — Headshots is always listed; set each folder Public, Internal, or Admin only"
+                ? " — Headshots is always listed; set each folder Public, Link only, Internal, or Admin"
                 : ". Headshots live here for staff portraits."}
             </p>
           </div>
@@ -1825,13 +1875,17 @@ export function MediaGallery({
                         "absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                         sf.visibility === "public"
                           ? "bg-white/90 text-brand"
-                          : sf.visibility === "admin"
-                            ? "bg-brand/90 text-white"
-                            : "bg-black/50 text-white"
+                          : sf.visibility === "link"
+                            ? "bg-white/90 text-brand"
+                            : sf.visibility === "admin"
+                              ? "bg-brand/90 text-white"
+                              : "bg-black/50 text-white"
                       )}
                     >
                       {sf.visibility === "public" ? (
                         <Globe className="h-3 w-3" />
+                      ) : sf.visibility === "link" ? (
+                        <Link2 className="h-3 w-3" />
                       ) : sf.visibility === "admin" ? (
                         <Shield className="h-3 w-3" />
                       ) : (
@@ -1842,30 +1896,46 @@ export function MediaGallery({
                   </div>
                 </button>
                 {allowManage ? (
-                  <div className="flex border-t border-border p-1">
-                    {GALLERY_VISIBILITY_OPTIONS.map((option) => (
+                  <div className="border-t border-border">
+                    <div className="flex flex-wrap p-1">
+                      {GALLERY_VISIBILITY_OPTIONS.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          disabled={visibilitySaving === sf.name}
+                          className={cn(
+                            "min-w-[4.5rem] flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
+                            sf.visibility === option.id
+                              ? "bg-accent-soft text-brand"
+                              : "text-muted hover:text-foreground"
+                          )}
+                          onClick={() =>
+                            setSubfolderVisibility(sf.name, option.id)
+                          }
+                        >
+                          {visibilitySaving === sf.name &&
+                          sf.visibility !== option.id
+                            ? "…"
+                            : option.id === "admin"
+                              ? "Admin"
+                              : option.id === "link"
+                                ? "Link"
+                                : option.label}
+                        </button>
+                      ))}
+                    </div>
+                    {sf.visibility === "link" ? (
                       <button
-                        key={option.id}
                         type="button"
-                        disabled={visibilitySaving === sf.name}
-                        className={cn(
-                          "flex-1 rounded-lg px-1.5 py-1.5 text-[11px] font-medium transition sm:text-xs",
-                          sf.visibility === option.id
-                            ? "bg-accent-soft text-brand"
-                            : "text-muted hover:text-foreground"
-                        )}
-                        onClick={() =>
-                          setSubfolderVisibility(sf.name, option.id)
-                        }
+                        className="flex w-full items-center justify-center gap-1.5 border-t border-border px-2 py-2 text-xs font-medium text-brand transition hover:bg-sand/60"
+                        onClick={() => copyShareLink(sf.name, sf.shareToken)}
                       >
-                        {visibilitySaving === sf.name &&
-                        sf.visibility !== option.id
-                          ? "…"
-                          : option.id === "admin"
-                            ? "Admin"
-                            : option.label}
+                        <Link2 className="h-3.5 w-3.5" />
+                        {copiedFolder === sf.name
+                          ? "Link copied"
+                          : "Copy share link"}
                       </button>
-                    ))}
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -1927,34 +1997,57 @@ export function MediaGallery({
                     : " · Click a photo to view"}
               </p>
               {allowManage && inGallery && activeSubfolder ? (
-                <div
-                  className="mt-3 inline-flex rounded-xl border border-border bg-sand/60 p-1"
-                  role="group"
-                  aria-label="Folder visibility"
-                >
-                  {GALLERY_VISIBILITY_OPTIONS.map((option) => {
-                    const current =
-                      gallerySubfolders.find((sf) => sf.name === activeSubfolder)
-                        ?.visibility ?? "internal";
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div
+                    className="inline-flex flex-wrap rounded-xl border border-border bg-sand/60 p-1"
+                    role="group"
+                    aria-label="Folder visibility"
+                  >
+                    {GALLERY_VISIBILITY_OPTIONS.map((option) => {
+                      const current =
+                        gallerySubfolders.find(
+                          (sf) => sf.name === activeSubfolder
+                        )?.visibility ?? "internal";
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          disabled={visibilitySaving === activeSubfolder}
+                          className={cn(
+                            "rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                            current === option.id
+                              ? "bg-white text-brand shadow-sm"
+                              : "text-muted hover:text-foreground"
+                          )}
+                          onClick={() =>
+                            setSubfolderVisibility(activeSubfolder, option.id)
+                          }
+                        >
+                          {option.id === "link" ? "Link only" : option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(() => {
+                    const current = gallerySubfolders.find(
+                      (sf) => sf.name === activeSubfolder
+                    );
+                    if (!current || current.visibility !== "link") return null;
                     return (
                       <button
-                        key={option.id}
                         type="button"
-                        disabled={visibilitySaving === activeSubfolder}
-                        className={cn(
-                          "rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                          current === option.id
-                            ? "bg-white text-brand shadow-sm"
-                            : "text-muted hover:text-foreground"
-                        )}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-sand/60"
                         onClick={() =>
-                          setSubfolderVisibility(activeSubfolder, option.id)
+                          copyShareLink(activeSubfolder, current.shareToken)
                         }
                       >
-                        {option.label}
+                        <Link2 className="h-3.5 w-3.5" />
+                        {copiedFolder === activeSubfolder
+                          ? "Link copied"
+                          : "Copy share link"}
                       </button>
                     );
-                  })}
+                  })()}
                 </div>
               ) : null}
             </div>
@@ -1982,7 +2075,8 @@ export function MediaGallery({
                             subfolder_visibility: photo.subfolderVisibility,
                             visibility: photo.visibility,
                           });
-                          if (vis === "public") return "bg-white/95 text-brand";
+                          if (vis === "public" || vis === "link")
+                            return "bg-white/95 text-brand";
                           if (vis === "admin") return "bg-brand/90 text-white";
                           return "bg-black/70 text-white";
                         })()

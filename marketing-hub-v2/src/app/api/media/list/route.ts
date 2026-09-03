@@ -5,7 +5,9 @@ import { getSessionUser } from "@/lib/auth/session";
 import { redactMediaItemsForPublic } from "@/lib/media/redact";
 import { rateLimitPublic } from "@/lib/security/rate-limit";
 import {
+  listGalleryFolderShares,
   listMediaFromSupabase,
+  type GalleryFolderShare,
   type MediaListScope,
 } from "@/lib/supabase/media-list";
 
@@ -71,6 +73,15 @@ export async function GET(request: Request) {
       new Set(["Gallery", ...fromItems])
     ).sort((a, b) => a.localeCompare(b));
 
+    let folderShares: GalleryFolderShare[] = [];
+    if (scope === "all") {
+      try {
+        folderShares = await listGalleryFolderShares();
+      } catch {
+        folderShares = [];
+      }
+    }
+
     return NextResponse.json({
       configured: true,
       source: "supabase",
@@ -79,6 +90,7 @@ export async function GET(request: Request) {
       scope,
       items: safeItems,
       categories,
+      folderShares,
       total,
       limit,
       offset,

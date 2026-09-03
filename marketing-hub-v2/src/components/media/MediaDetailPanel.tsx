@@ -4,6 +4,7 @@ import {
   Download,
   ExternalLink,
   Globe,
+  Link2,
   Lock,
   Shield,
   Trash2,
@@ -40,6 +41,7 @@ const MEDIA_ACCEPT = UPLOAD_ACCEPT;
 
 const VISIBILITY_CONTROL_OPTIONS = [
   { id: "public", label: "Public", icon: Globe },
+  { id: "link", label: "Link only", icon: Link2 },
   { id: "internal", label: "Internal", icon: Lock },
   { id: "admin", label: "Admin only", icon: Shield },
 ] as const;
@@ -921,6 +923,12 @@ export function MediaDetailPanel({
                       If the folder is Internal or Admin only, all files match
                       the folder.
                     </p>
+                  ) : isGallery && item.subfolder_visibility === "link" ? (
+                    <p className="mt-1 text-xs text-muted">
+                      Folder is Link only — not listed on /media; open via share
+                      link. Set Internal or Admin to hide this file from the
+                      share.
+                    </p>
                   ) : isGallery && item.subfolder_visibility === "internal" ? (
                     <p className="mt-1 text-xs text-muted">
                       Folder is Internal — hidden externally. You can still set
@@ -933,9 +941,8 @@ export function MediaDetailPanel({
                     </p>
                   ) : (
                     <p className="mt-1 text-xs text-muted">
-                      Public appears externally. Internal is staff-only. Admin
-                      only is hidden from members — use for marketing-only
-                      assets.
+                      Public is listed externally. Link only uses a share URL.
+                      Internal is staff-only. Admin only is hidden from members.
                     </p>
                   )}
                 </>
@@ -943,9 +950,10 @@ export function MediaDetailPanel({
                 <p className="field bg-sand/40 text-sm">
                   {visibilityLabel(visibility)}
                   {isGallery &&
-                  item.subfolder_visibility === "public" &&
-                  visibility !== "public"
-                    ? " (overrides public folder)"
+                  (item.subfolder_visibility === "public" ||
+                    item.subfolder_visibility === "link") &&
+                  visibility !== item.subfolder_visibility
+                    ? ` (overrides ${item.subfolder_visibility === "link" ? "link" : "public"} folder)`
                     : ""}
                 </p>
               )}

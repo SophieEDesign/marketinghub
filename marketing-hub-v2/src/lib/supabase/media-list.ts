@@ -26,13 +26,14 @@ export type MediaListItem = {
   /** Optional folder under Gallery (and similar) for sorting images. */
   subfolder: string;
   /**
-   * Gallery subfolder visibility: public (external), internal (staff), or admin.
-   * Non-gallery categories ignore this; missing values treat as internal.
+   * Gallery subfolder visibility: public (listed externally), link (unlisted
+   * share URL), internal (staff), or admin. Non-gallery categories ignore this;
+   * missing values treat as internal.
    */
   subfolder_visibility: GalleryFolderVisibility;
   /**
    * Per-item visibility. More restrictive than the folder wins.
-   * When folder is set to internal/admin, items are cascaded to match.
+   * When folder is set to internal/admin/link, items are cascaded to match.
    */
   visibility: GalleryFolderVisibility;
   /**
@@ -51,15 +52,26 @@ export type MediaListItem = {
   updated_at: string | null;
 };
 
-export type GalleryFolderVisibility = "public" | "internal" | "admin";
+export type GalleryFolderVisibility =
+  | "public"
+  | "link"
+  | "internal"
+  | "admin";
 
 export const GALLERY_CATEGORY = "Gallery";
 
 export const GALLERY_VISIBILITY_OPTIONS = [
   { id: "public", label: "Public" },
+  { id: "link", label: "Link only" },
   { id: "internal", label: "Internal" },
   { id: "admin", label: "Admin only" },
 ] as const;
+
+export type GalleryFolderShare = {
+  subfolder: string;
+  share_token: string;
+  enabled: boolean;
+};
 
 /** Categories visible on the public /media gallery and external library view. */
 export const PUBLIC_MEDIA_CATEGORIES = [
@@ -77,17 +89,26 @@ export function normalizeGalleryVisibility(
   if (value === "admin" || value === "admin only" || value === "admin_only") {
     return "admin";
   }
+  if (
+    value === "link" ||
+    value === "link only" ||
+    value === "link_only" ||
+    value === "unlisted"
+  ) {
+    return "link";
+  }
   if (value === "public") return "public";
   return "internal";
 }
 
 function visibilityRank(value: GalleryFolderVisibility): number {
-  if (value === "admin") return 2;
-  if (value === "internal") return 1;
+  if (value === "admin") return 3;
+  if (value === "internal") return 2;
+  if (value === "link") return 1;
   return 0;
 }
 
-/** More restrictive of two visibility levels (public < internal < admin). */
+/** More restrictive of two levels (public < link < internal < admin). */
 export function moreRestrictiveVisibility(
   a: GalleryFolderVisibility,
   b: GalleryFolderVisibility
@@ -98,7 +119,21 @@ export function moreRestrictiveVisibility(
 export function visibilityLabel(value: GalleryFolderVisibility): string {
   if (value === "admin") return "Admin only";
   if (value === "internal") return "Internal";
+  if (value === "link") return "Link only";
   return "Public";
+}
+
+/** Path for an unlisted Gallery folder share (no login required). */
+export function gallerySharePath(token: string): string {
+  return `/share/gallery/${encodeURIComponent(token)}`;
+}
+
+function generateShareToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 export function normalizeMediaDivision(raw: string | null | undefined): string {
@@ -504,6 +539,10 @@ export async function createMediaInSupabase(
 
   if (error) throw new Error(error.message);
 
+  if (isGallery && subfolder_visibility === "link") {
+    await syncGalleryFolderShare({ subfolder, enabled: true });
+  }
+
   const r = data as Record<string, unknown>;
   const files = parseFiles(r.media);
   return {
@@ -531,18 +570,19 @@ export async function createMediaInSupabase(
   };
 }
 
-/** Set public/internal/admin for every item in a Gallery subfolder (empty = Unsorted).
+/** Set public/link/internal/admin for every item in a Gallery subfolder (empty = Unsorted).
  *
  * Rules:
- * - Folder → admin/internal/public: every file is cascaded to match.
- * - After a public folder is set, an individual file can be set to internal or
- *   admin to override the public folder.
+ * - Folder → admin/internal/public/link: every file is cascaded to match.
+ * - After a public or link folder is set, an individual file can be set to
+ *   internal or admin to override the folder.
+ * - Link only: not listed on /media; accessible via unlisted share token.
  */
 export async function setGallerySubfolderVisibility(input: {
   subfolder: string;
   visibility: GalleryFolderVisibility;
   actorId: string;
-}): Promise<{ updated: number }> {
+}): Promise<{ updated: number; share: GalleryFolderShare | null }> {
   const visibility = normalizeGalleryVisibility(input.visibility);
   const subfolderKey = input.subfolder.trim();
 
@@ -577,7 +617,142 @@ export async function setGallerySubfolderVisibility(input: {
 
   const { data, error } = await query.select("id");
   if (error) throw new Error(error.message);
-  return { updated: data?.length ?? 0 };
+
+  const share = await syncGalleryFolderShare({
+    subfolder: subfolderKey,
+    enabled: visibility === "link",
+  });
+
+  return { updated: data?.length ?? 0, share };
+}
+
+/** Upsert/disable the unlisted share row for a Gallery subfolder. */
+export async function syncGalleryFolderShare(input: {
+  subfolder: string;
+  enabled: boolean;
+}): Promise<GalleryFolderShare> {
+  const subfolder = input.subfolder.trim();
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+
+  const { data: existing, error: readError } = await supabase
+    .from("gallery_folder_shares")
+    .select("subfolder, share_token, enabled")
+    .eq("subfolder", subfolder)
+    .maybeSingle();
+
+  if (readError) throw new Error(readError.message);
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("gallery_folder_shares")
+      .update({ enabled: input.enabled, updated_at: now })
+      .eq("subfolder", subfolder)
+      .select("subfolder, share_token, enabled")
+      .single();
+    if (error) throw new Error(error.message);
+    return {
+      subfolder: asString(data.subfolder),
+      share_token: asString(data.share_token),
+      enabled: Boolean(data.enabled),
+    };
+  }
+
+  const share_token = generateShareToken();
+  const { data, error } = await supabase
+    .from("gallery_folder_shares")
+    .insert({
+      subfolder,
+      share_token,
+      enabled: input.enabled,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("subfolder, share_token, enabled")
+    .single();
+  if (error) throw new Error(error.message);
+  return {
+    subfolder: asString(data.subfolder),
+    share_token: asString(data.share_token),
+    enabled: Boolean(data.enabled),
+  };
+}
+
+/** Staff: all folder share tokens (enabled or not, so links can be re-copied). */
+export async function listGalleryFolderShares(): Promise<GalleryFolderShare[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("gallery_folder_shares")
+    .select("subfolder, share_token, enabled");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    subfolder: asString(row.subfolder),
+    share_token: asString(row.share_token),
+    enabled: Boolean(row.enabled),
+  }));
+}
+
+/** Public share page: resolve token → folder + items visible on the link. */
+export async function listMediaByShareToken(token: string): Promise<{
+  folderName: string;
+  share: GalleryFolderShare;
+  items: MediaListItem[];
+} | null> {
+  const trimmed = token.trim();
+  if (!trimmed || trimmed.length < 16 || trimmed.length > 128) return null;
+
+  const supabase = createServiceClient();
+  const { data: shareRow, error: shareError } = await supabase
+    .from("gallery_folder_shares")
+    .select("subfolder, share_token, enabled")
+    .eq("share_token", trimmed)
+    .maybeSingle();
+
+  if (shareError) throw new Error(shareError.message);
+  if (!shareRow || !shareRow.enabled) return null;
+
+  const share: GalleryFolderShare = {
+    subfolder: asString(shareRow.subfolder),
+    share_token: asString(shareRow.share_token),
+    enabled: Boolean(shareRow.enabled),
+  };
+
+  const tables = await listCoreTables();
+  const mediaTable = findMediaTable(tables);
+  if (!mediaTable) {
+    return {
+      folderName: share.subfolder || "Gallery",
+      share,
+      items: [],
+    };
+  }
+
+  let query = supabase
+    .from(mediaTable.supabase_table)
+    .select("*")
+    .is("deleted_at", null)
+    .ilike("hub_category", GALLERY_CATEGORY)
+    .eq("subfolder_visibility", "link");
+
+  if (share.subfolder) {
+    query = query.eq("subfolder", share.subfolder);
+  } else {
+    query = query.or("subfolder.is.null,subfolder.eq.");
+  }
+
+  const { data, error } = await query.limit(500);
+  if (error) throw new Error(error.message);
+
+  const items = ((data ?? []) as Record<string, unknown>[])
+    .map((r) => mapMediaRow(r, "public"))
+    .filter((item) => effectiveMediaVisibility(item) === "link")
+    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+
+  return {
+    folderName: share.subfolder || "Unsorted",
+    share,
+    items,
+  };
 }
 
 export async function softDeleteMediaInSupabase(
