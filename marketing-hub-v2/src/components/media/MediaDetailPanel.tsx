@@ -4,7 +4,6 @@ import {
   Download,
   ExternalLink,
   Globe,
-  Link2,
   Lock,
   Shield,
   Trash2,
@@ -24,6 +23,7 @@ import {
   normalizeDivision,
 } from "@/lib/events/division-colors";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
+import { downloadMediaFile } from "@/lib/media/download-file";
 import {
   isAllowedUpload,
   MAX_UPLOAD_BYTES_ADMIN,
@@ -41,7 +41,6 @@ const MEDIA_ACCEPT = UPLOAD_ACCEPT;
 
 const VISIBILITY_CONTROL_OPTIONS = [
   { id: "public", label: "Public", icon: Globe },
-  { id: "link", label: "Link only", icon: Link2 },
   { id: "internal", label: "Internal", icon: Lock },
   { id: "admin", label: "Admin only", icon: Shield },
 ] as const;
@@ -490,16 +489,23 @@ export function MediaDetailPanel({
               </button>
             ) : null}
             {focusedFile && canDownload ? (
-              <a
-                href={focusedFile.url}
-                download={fileName || focusedFile.name}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
                 className="btn-secondary"
+                onClick={() => {
+                  void downloadMediaFile(
+                    focusedFile.url,
+                    fileName || focusedFile.name
+                  ).catch((e) => {
+                    window.alert(
+                      e instanceof Error ? e.message : "Download failed"
+                    );
+                  });
+                }}
               >
                 <Download className="h-4 w-4" />
                 Download
-              </a>
+              </button>
             ) : documentLink && canDownload ? (
               <a
                 href={documentLink}
@@ -921,28 +927,23 @@ export function MediaDetailPanel({
                     <p className="mt-1 text-xs text-muted">
                       Overrides the folder when set to Internal or Admin only.
                       If the folder is Internal or Admin only, all files match
-                      the folder.
-                    </p>
-                  ) : isGallery && item.subfolder_visibility === "link" ? (
-                    <p className="mt-1 text-xs text-muted">
-                      Folder is Link only — not listed on /media; open via share
-                      link. Set Internal or Admin to hide this file from the
-                      share.
+                      the folder. Folder Link share is separate.
                     </p>
                   ) : isGallery && item.subfolder_visibility === "internal" ? (
                     <p className="mt-1 text-xs text-muted">
-                      Folder is Internal — hidden externally. You can still set
-                      this file to Admin only.
+                      Folder is Internal — hidden from /media. You can still set
+                      this file to Admin only, and use Link share on the folder.
                     </p>
                   ) : isGallery && item.subfolder_visibility === "admin" ? (
                     <p className="mt-1 text-xs text-muted">
                       Folder is Admin only — this file stays admin-only until
-                      the folder is changed.
+                      the folder is changed. Link share can still be enabled on
+                      the folder.
                     </p>
                   ) : (
                     <p className="mt-1 text-xs text-muted">
-                      Public is listed externally. Link only uses a share URL.
-                      Internal is staff-only. Admin only is hidden from members.
+                      Public is listed externally. Internal is staff-only. Admin
+                      only is hidden from members.
                     </p>
                   )}
                 </>
@@ -950,10 +951,9 @@ export function MediaDetailPanel({
                 <p className="field bg-sand/40 text-sm">
                   {visibilityLabel(visibility)}
                   {isGallery &&
-                  (item.subfolder_visibility === "public" ||
-                    item.subfolder_visibility === "link") &&
-                  visibility !== item.subfolder_visibility
-                    ? ` (overrides ${item.subfolder_visibility === "link" ? "link" : "public"} folder)`
+                  item.subfolder_visibility === "public" &&
+                  visibility !== "public"
+                    ? " (overrides public folder)"
                     : ""}
                 </p>
               )}

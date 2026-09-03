@@ -41,6 +41,7 @@ import {
   normalizeDivision,
 } from "@/lib/events/division-colors";
 import { uploadAssetDirect } from "@/lib/upload/client-upload";
+import { downloadMediaFile } from "@/lib/media/download-file";
 import {
   isAllowedUpload,
   MAX_UPLOAD_BYTES,
@@ -537,7 +538,6 @@ const EMPTY_FORM = {
 
 const VISIBILITY_CONTROL_OPTIONS = [
   { id: "public", label: "Public", icon: Globe },
-  { id: "link", label: "Link only", icon: Link2 },
   { id: "internal", label: "Internal", icon: Lock },
   { id: "admin", label: "Admin only", icon: Shield },
 ] as const;
@@ -616,7 +616,9 @@ export function MediaGallery({
   const [dragActive, setDragActive] = useState(false);
   const [saving, setSaving] = useState(false);
   const [visibilitySaving, setVisibilitySaving] = useState<string | null>(null);
+  const [shareSaving, setShareSaving] = useState<string | null>(null);
   const [copiedFolder, setCopiedFolder] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [divisionFilter, setDivisionFilter] = useState("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -741,17 +743,14 @@ export function MediaGallery({
       const photos = photosFromItems(inFolder);
       const share = folderShareByName.get(name);
       // Folder visibility comes from subfolder_visibility (synced), not item overrides.
-      let visibility: GalleryFolderVisibility =
+      const visibility: GalleryFolderVisibility =
         inFolder.length === 0
-          ? share?.enabled
-            ? "link"
-            : "internal"
+          ? "internal"
           : inFolder.reduce(
               (acc, i) =>
                 moreRestrictiveVisibility(acc, itemFolderVisibility(i)),
               "public" as GalleryFolderVisibility
             );
-      if (share?.enabled && inFolder.length === 0) visibility = "link";
       return {
         name,
         photos,
@@ -765,6 +764,7 @@ export function MediaGallery({
         photoCount: photos.length,
         assetCount: inFolder.length,
         visibility,
+        shareEnabled: Boolean(share?.enabled),
         shareToken: share?.share_token || null,
       };
     });
@@ -1206,7 +1206,7 @@ export function MediaGallery({
 
   async function copyShareLink(folderName: string, token: string | null) {
     if (!token) {
-      window.alert("Turn on Link only first to create a share link.");
+      window.alert("Turn on Link share first to create a share link.");
       return;
     }
     const url = `${window.location.origin}${gallerySharePath(token)}`;
@@ -1218,6 +1218,43 @@ export function MediaGallery({
       }, 2000);
     } catch {
       window.prompt("Copy this share link:", url);
+    }
+  }
+
+  async function setFolderShare(folderName: string, enabled: boolean) {
+    if (!allowManage || shareSaving) return;
+    setShareSaving(folderName);
+    try {
+      const res = await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "set_folder_share",
+          subfolder: folderName === UNSORTED_SUBFOLDER ? "" : folderName,
+          enabled,
+        }),
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Could not update share link");
+      await load();
+    } catch (e) {
+      window.alert(
+        e instanceof Error ? e.message : "Could not update share link"
+      );
+    } finally {
+      setShareSaving(null);
+    }
+  }
+
+  async function handleMediaDownload(url: string, filename: string) {
+    if (!url || downloadingId) return;
+    setDownloadingId(url);
+    try {
+      await downloadMediaFile(url, filename);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -1560,8 +1597,9 @@ export function MediaGallery({
                 })}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Public is listed on /media. Link only is unlisted (share URL).
-                Internal is staff-only. Admin only is hidden from members.
+                Public is listed on /media. Internal is staff-only. Admin only
+                is hidden from members. Use Link share on the folder to share
+                privately.
               </p>
             </div>
           ) : (
@@ -1598,8 +1636,8 @@ export function MediaGallery({
                 })}
               </div>
               <p className="mt-1 text-xs text-muted">
-                Public is listed externally. Link only uses a share URL.
-                Internal is staff-only. Admin only is hidden from members.
+                Public is listed externally. Internal is staff-only. Admin only
+                is hidden from members.
               </p>
             </div>
           )}
@@ -1831,7 +1869,7 @@ export function MediaGallery({
             <p className="mt-1 text-sm text-muted">
               Choose a subfolder to browse images
               {allowManage
-                ? " — Headshots is always listed; set each folder Public, Link only, Internal, or Admin"
+                ? " — set each folder Public, Internal, or Admin, and optionally add a Link share"
                 : ". Headshots live here for staff portraits."}
             </p>
           </div>
@@ -1875,23 +1913,20 @@ export function MediaGallery({
                         "absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
                         sf.visibility === "public"
                           ? "bg-white/90 text-brand"
-                          : sf.visibility === "link"
-                            ? "bg-white/90 text-brand"
-                            : sf.visibility === "admin"
-                              ? "bg-brand/90 text-white"
-                              : "bg-black/50 text-white"
+                          : sf.visibility === "admin"
+                            ? "bg-brand/90 text-white"
+                            : "bg-black/50 text-white"
                       )}
                     >
                       {sf.visibility === "public" ? (
                         <Globe className="h-3 w-3" />
-                      ) : sf.visibility === "link" ? (
-                        <Link2 className="h-3 w-3" />
                       ) : sf.visibility === "admin" ? (
                         <Shield className="h-3 w-3" />
                       ) : (
                         <Lock className="h-3 w-3" />
                       )}
                       {visibilityLabel(sf.visibility)}
+                      {sf.shareEnabled ? " · Link" : ""}
                     </span>
                   </div>
                 </button>
@@ -1918,24 +1953,45 @@ export function MediaGallery({
                             ? "…"
                             : option.id === "admin"
                               ? "Admin"
-                              : option.id === "link"
-                                ? "Link"
-                                : option.label}
+                              : option.label}
                         </button>
                       ))}
                     </div>
-                    {sf.visibility === "link" ? (
+                    <div className="flex border-t border-border">
                       <button
                         type="button"
-                        className="flex w-full items-center justify-center gap-1.5 border-t border-border px-2 py-2 text-xs font-medium text-brand transition hover:bg-sand/60"
-                        onClick={() => copyShareLink(sf.name, sf.shareToken)}
+                        disabled={shareSaving === sf.name}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium transition hover:bg-sand/60",
+                          sf.shareEnabled
+                            ? "bg-accent-soft text-brand"
+                            : "text-muted hover:text-foreground"
+                        )}
+                        onClick={() =>
+                          setFolderShare(sf.name, !sf.shareEnabled)
+                        }
                       >
                         <Link2 className="h-3.5 w-3.5" />
-                        {copiedFolder === sf.name
-                          ? "Link copied"
-                          : "Copy share link"}
+                        {shareSaving === sf.name
+                          ? "…"
+                          : sf.shareEnabled
+                            ? "Link on"
+                            : "Link share"}
                       </button>
-                    ) : null}
+                      {sf.shareEnabled ? (
+                        <button
+                          type="button"
+                          className="flex flex-1 items-center justify-center gap-1.5 border-l border-border px-2 py-2 text-xs font-medium text-brand transition hover:bg-sand/60"
+                          onClick={() =>
+                            copyShareLink(sf.name, sf.shareToken)
+                          }
+                        >
+                          {copiedFolder === sf.name
+                            ? "Copied"
+                            : "Copy link"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -2023,7 +2079,7 @@ export function MediaGallery({
                             setSubfolderVisibility(activeSubfolder, option.id)
                           }
                         >
-                          {option.id === "link" ? "Link only" : option.label}
+                          {option.label}
                         </button>
                       );
                     })}
@@ -2032,20 +2088,49 @@ export function MediaGallery({
                     const current = gallerySubfolders.find(
                       (sf) => sf.name === activeSubfolder
                     );
-                    if (!current || current.visibility !== "link") return null;
+                    if (!current) return null;
                     return (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-sand/60"
-                        onClick={() =>
-                          copyShareLink(activeSubfolder, current.shareToken)
-                        }
-                      >
-                        <Link2 className="h-3.5 w-3.5" />
-                        {copiedFolder === activeSubfolder
-                          ? "Link copied"
-                          : "Copy share link"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={shareSaving === activeSubfolder}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-medium transition",
+                            current.shareEnabled
+                              ? "bg-accent-soft text-brand"
+                              : "bg-white text-muted hover:text-foreground"
+                          )}
+                          onClick={() =>
+                            setFolderShare(
+                              activeSubfolder,
+                              !current.shareEnabled
+                            )
+                          }
+                        >
+                          <Link2 className="h-3.5 w-3.5" />
+                          {shareSaving === activeSubfolder
+                            ? "…"
+                            : current.shareEnabled
+                              ? "Link on"
+                              : "Link share"}
+                        </button>
+                        {current.shareEnabled ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-white px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-sand/60"
+                            onClick={() =>
+                              copyShareLink(
+                                activeSubfolder,
+                                current.shareToken
+                              )
+                            }
+                          >
+                            {copiedFolder === activeSubfolder
+                              ? "Copied"
+                              : "Copy link"}
+                          </button>
+                        ) : null}
+                      </>
                     );
                   })()}
                 </div>
@@ -2075,8 +2160,7 @@ export function MediaGallery({
                             subfolder_visibility: photo.subfolderVisibility,
                             visibility: photo.visibility,
                           });
-                          if (vis === "public" || vis === "link")
-                            return "bg-white/95 text-brand";
+                          if (vis === "public") return "bg-white/95 text-brand";
                           if (vis === "admin") return "bg-brand/90 text-white";
                           return "bg-black/70 text-white";
                         })()
@@ -2139,17 +2223,18 @@ export function MediaGallery({
                       )}
                     </span>
                     {canDownload ? (
-                      <a
-                        href={photo.url}
-                        download={photo.name}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-[10px] font-semibold text-brand shadow-sm hover:bg-white"
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        type="button"
+                        disabled={downloadingId === photo.url}
+                        className="pointer-events-auto inline-flex shrink-0 items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-[10px] font-semibold text-brand shadow-sm hover:bg-white disabled:opacity-60"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleMediaDownload(photo.url, photo.name);
+                        }}
                       >
                         <Download className="h-3 w-3" />
-                        Download
-                      </a>
+                        {downloadingId === photo.url ? "…" : "Download"}
+                      </button>
                     ) : null}
                   </div>
                 </div>
@@ -2244,17 +2329,24 @@ export function MediaGallery({
                         .filter((f) => !isImageFile(f))
                         .map((fileItem) =>
                           canDownload ? (
-                            <a
+                            <button
                               key={fileItem.url}
-                              href={fileItem.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="btn-secondary px-2.5 py-1.5 text-xs"
-                              onClick={(e) => e.stopPropagation()}
+                              type="button"
+                              disabled={downloadingId === fileItem.url}
+                              className="btn-secondary px-2.5 py-1.5 text-xs disabled:opacity-60"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleMediaDownload(
+                                  fileItem.url,
+                                  fileItem.name
+                                );
+                              }}
                             >
                               <Download className="h-3.5 w-3.5" />
-                              {fileItem.name.slice(0, 18)}
-                            </a>
+                              {downloadingId === fileItem.url
+                                ? "…"
+                                : fileItem.name.slice(0, 18)}
+                            </button>
                           ) : (
                             <Link
                               key={fileItem.url}
@@ -2360,16 +2452,22 @@ export function MediaGallery({
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {canDownload ? (
-                <a
-                  href={lightboxPhoto.url}
-                  download={lightboxPhoto.name}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-brand shadow-sm hover:bg-sand"
+                <button
+                  type="button"
+                  disabled={downloadingId === lightboxPhoto.url}
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-brand shadow-sm hover:bg-sand disabled:opacity-60"
+                  onClick={() =>
+                    void handleMediaDownload(
+                      lightboxPhoto.url,
+                      lightboxPhoto.name
+                    )
+                  }
                 >
                   <Download className="h-4 w-4" />
-                  Download
-                </a>
+                  {downloadingId === lightboxPhoto.url
+                    ? "Downloading…"
+                    : "Download"}
+                </button>
               ) : (
                 <Link
                   href={loginHref}

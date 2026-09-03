@@ -26,14 +26,14 @@ export type MediaListItem = {
   /** Optional folder under Gallery (and similar) for sorting images. */
   subfolder: string;
   /**
-   * Gallery subfolder visibility: public (listed externally), link (unlisted
-   * share URL), internal (staff), or admin. Non-gallery categories ignore this;
-   * missing values treat as internal.
+   * Gallery subfolder visibility: public (listed externally), internal (staff),
+   * or admin. Share links are a separate folder flag (see gallery_folder_shares).
+   * Non-gallery categories ignore this; missing values treat as internal.
    */
   subfolder_visibility: GalleryFolderVisibility;
   /**
    * Per-item visibility. More restrictive than the folder wins.
-   * When folder is set to internal/admin/link, items are cascaded to match.
+   * When folder is set to internal/admin, items are cascaded to match.
    */
   visibility: GalleryFolderVisibility;
   /**
@@ -52,17 +52,12 @@ export type MediaListItem = {
   updated_at: string | null;
 };
 
-export type GalleryFolderVisibility =
-  | "public"
-  | "link"
-  | "internal"
-  | "admin";
+export type GalleryFolderVisibility = "public" | "internal" | "admin";
 
 export const GALLERY_CATEGORY = "Gallery";
 
 export const GALLERY_VISIBILITY_OPTIONS = [
   { id: "public", label: "Public" },
-  { id: "link", label: "Link only" },
   { id: "internal", label: "Internal" },
   { id: "admin", label: "Admin only" },
 ] as const;
@@ -89,26 +84,26 @@ export function normalizeGalleryVisibility(
   if (value === "admin" || value === "admin only" || value === "admin_only") {
     return "admin";
   }
+  // Legacy "link" visibility is now Internal + share toggle.
   if (
     value === "link" ||
     value === "link only" ||
     value === "link_only" ||
     value === "unlisted"
   ) {
-    return "link";
+    return "internal";
   }
   if (value === "public") return "public";
   return "internal";
 }
 
 function visibilityRank(value: GalleryFolderVisibility): number {
-  if (value === "admin") return 3;
-  if (value === "internal") return 2;
-  if (value === "link") return 1;
+  if (value === "admin") return 2;
+  if (value === "internal") return 1;
   return 0;
 }
 
-/** More restrictive of two levels (public < link < internal < admin). */
+/** More restrictive of two levels (public < internal < admin). */
 export function moreRestrictiveVisibility(
   a: GalleryFolderVisibility,
   b: GalleryFolderVisibility
@@ -119,7 +114,6 @@ export function moreRestrictiveVisibility(
 export function visibilityLabel(value: GalleryFolderVisibility): string {
   if (value === "admin") return "Admin only";
   if (value === "internal") return "Internal";
-  if (value === "link") return "Link only";
   return "Public";
 }
 
@@ -539,10 +533,6 @@ export async function createMediaInSupabase(
 
   if (error) throw new Error(error.message);
 
-  if (isGallery && subfolder_visibility === "link") {
-    await syncGalleryFolderShare({ subfolder, enabled: true });
-  }
-
   const r = data as Record<string, unknown>;
   const files = parseFiles(r.media);
   return {
@@ -570,19 +560,19 @@ export async function createMediaInSupabase(
   };
 }
 
-/** Set public/link/internal/admin for every item in a Gallery subfolder (empty = Unsorted).
+/** Set public/internal/admin for every item in a Gallery subfolder (empty = Unsorted).
  *
  * Rules:
- * - Folder → admin/internal/public/link: every file is cascaded to match.
- * - After a public or link folder is set, an individual file can be set to
- *   internal or admin to override the folder.
- * - Link only: not listed on /media; accessible via unlisted share token.
+ * - Folder → admin/internal/public: every file is cascaded to match.
+ * - After a public folder is set, an individual file can be set to internal or
+ *   admin to override the folder.
+ * - Share links are independent (see setGalleryFolderShareEnabled).
  */
 export async function setGallerySubfolderVisibility(input: {
   subfolder: string;
   visibility: GalleryFolderVisibility;
   actorId: string;
-}): Promise<{ updated: number; share: GalleryFolderShare | null }> {
+}): Promise<{ updated: number }> {
   const visibility = normalizeGalleryVisibility(input.visibility);
   const subfolderKey = input.subfolder.trim();
 
@@ -617,13 +607,18 @@ export async function setGallerySubfolderVisibility(input: {
 
   const { data, error } = await query.select("id");
   if (error) throw new Error(error.message);
+  return { updated: data?.length ?? 0 };
+}
 
-  const share = await syncGalleryFolderShare({
-    subfolder: subfolderKey,
-    enabled: visibility === "link",
+/** Enable or disable the unlisted share link for a Gallery subfolder. */
+export async function setGalleryFolderShareEnabled(input: {
+  subfolder: string;
+  enabled: boolean;
+}): Promise<GalleryFolderShare> {
+  return syncGalleryFolderShare({
+    subfolder: input.subfolder,
+    enabled: input.enabled,
   });
-
-  return { updated: data?.length ?? 0, share };
 }
 
 /** Upsert/disable the unlisted share row for a Gallery subfolder. */
@@ -731,8 +726,7 @@ export async function listMediaByShareToken(token: string): Promise<{
     .from(mediaTable.supabase_table)
     .select("*")
     .is("deleted_at", null)
-    .ilike("hub_category", GALLERY_CATEGORY)
-    .eq("subfolder_visibility", "link");
+    .ilike("hub_category", GALLERY_CATEGORY);
 
   if (share.subfolder) {
     query = query.eq("subfolder", share.subfolder);
@@ -745,7 +739,12 @@ export async function listMediaByShareToken(token: string): Promise<{
 
   const items = ((data ?? []) as Record<string, unknown>[])
     .map((r) => mapMediaRow(r, "public"))
-    .filter((item) => effectiveMediaVisibility(item) === "link")
+    // Hide items that are more restrictive than the folder (e.g. admin
+    // override on an internal shared folder).
+    .filter((item) => {
+      const folderVis = item.subfolder_visibility;
+      return moreRestrictiveVisibility(folderVis, item.visibility) === folderVis;
+    })
     .sort((a, b) => a.display_name.localeCompare(b.display_name));
 
   return {

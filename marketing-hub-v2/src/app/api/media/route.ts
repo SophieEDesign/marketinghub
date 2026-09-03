@@ -7,6 +7,7 @@ import {
   deleteMediaFileInSupabase,
   normalizeGalleryVisibility,
   renameMediaFileInSupabase,
+  setGalleryFolderShareEnabled,
   setGallerySubfolderVisibility,
   softDeleteMediaInSupabase,
   updateMediaItemInSupabase,
@@ -150,6 +151,17 @@ export async function POST(request: NextRequest) {
         actorId: user.id,
       });
       return jsonOk({ ok: true, ...result, visibility });
+    }
+
+    if (action === "set_folder_share") {
+      const subfolder =
+        typeof body.subfolder === "string" ? body.subfolder : "";
+      const enabled = body.enabled === true;
+      const share = await setGalleryFolderShareEnabled({
+        subfolder,
+        enabled,
+      });
+      return jsonOk({ ok: true, share });
     }
 
     const name = typeof body.name === "string" ? body.name : "";

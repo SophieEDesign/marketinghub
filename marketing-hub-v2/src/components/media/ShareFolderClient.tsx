@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import { downloadMediaFile } from "@/lib/media/download-file";
 import type { MediaListItem } from "@/lib/supabase/media-list";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ export function ShareFolderClient({ token }: { token: string }) {
   const [folderName, setFolderName] = useState("Shared gallery");
   const [items, setItems] = useState<MediaListItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +82,18 @@ export function ShareFolderClient({ token }: { token: string }) {
 
   const lightboxPhoto =
     lightboxIndex != null ? photos[lightboxIndex] ?? null : null;
+
+  async function handleDownload(photo: Photo) {
+    if (downloadingId) return;
+    setDownloadingId(photo.id);
+    try {
+      await downloadMediaFile(photo.url, photo.name, { shareToken: token });
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Download failed");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (lightboxIndex == null) return;
@@ -158,17 +172,18 @@ export function ShareFolderClient({ token }: { token: string }) {
                       className="w-full object-cover transition duration-300 group-hover:scale-[1.02]"
                     />
                   </button>
-                  <a
-                    href={photo.url}
-                    download={photo.name}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100"
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    type="button"
+                    className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-black/70 px-2 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-60"
+                    disabled={downloadingId === photo.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handleDownload(photo);
+                    }}
                   >
                     <Download className="h-3 w-3" />
-                    Download
-                  </a>
+                    {downloadingId === photo.id ? "…" : "Download"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -229,16 +244,15 @@ export function ShareFolderClient({ token }: { token: string }) {
               <p className="truncate text-sm">
                 {lightboxPhoto.itemName || lightboxPhoto.name}
               </p>
-              <a
-                href={lightboxPhoto.url}
-                download={lightboxPhoto.name}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-brand"
+              <button
+                type="button"
+                disabled={downloadingId === lightboxPhoto.id}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-brand disabled:opacity-60"
+                onClick={() => void handleDownload(lightboxPhoto)}
               >
                 <Download className="h-4 w-4" />
-                Download
-              </a>
+                {downloadingId === lightboxPhoto.id ? "Downloading…" : "Download"}
+              </button>
             </div>
           </div>
         </div>
