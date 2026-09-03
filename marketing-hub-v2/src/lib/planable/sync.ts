@@ -265,8 +265,25 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     if (match) {
       if (published) lockedPublished += 1;
 
+      // Hub edits must not block Planable schedule/publish from reaching members.
       if (isHubDirty(match) && !published) {
-        // Still refresh published lock / ids if needed
+        if (status === "scheduled") {
+          await updateContent(match.id, {
+            status: "scheduled",
+            due_date: due_date ?? match.due_date,
+            planable_url: planable_url || match.planable_url,
+            planable_post_id: primary.id,
+            planable_group_id: group.groupId || match.planable_group_id,
+            planable_page_ids: pageIds.length
+              ? pageIds
+              : match.planable_page_ids,
+            last_synced_at: now,
+            sync_source: "planable",
+          });
+          updated += 1;
+          continue;
+        }
+        // Still refresh ids if needed; leave Hub caption/status alone.
         if (
           !match.planable_post_id ||
           match.planable_post_id !== primary.id

@@ -287,48 +287,65 @@ export function SocialClient({
         return Boolean(raw?.planable_post_id);
       });
 
-      // Hub-first: prefer synced (or any) Hub social rows; live Planable only as fallback.
-      let nextPosts =
-        fromHub.length > 0
-          ? fromHub
-          : ((planable.posts ?? []) as Array<{
-              id: string;
-              text: string;
-              status: string;
-              scheduledAt: string | null;
-              url: string | null;
-              pageName: string | null;
-              mediaUrl?: string | null;
-              mediaUrls?: string[];
-              platforms?: string[];
-            }>).map((p) => {
-              const platforms = (p.platforms?.length
-                ? p.platforms
-                : p.pageName
-                  ? [p.pageName]
-                  : ["Social"]
-              ).map(normalizePlatform);
-              const mediaUrls = (p.mediaUrls?.length
-                ? p.mediaUrls
-                : p.mediaUrl
-                  ? [p.mediaUrl]
-                  : []
-              ).filter(Boolean);
-              const images = mediaUrls.filter(isPreviewableImageUrl);
-              return {
-                id: `pl_${p.id}`,
-                text: stripHtml(p.text),
-                html: null,
-                status: normalizeStatus(p.status),
-                scheduledAt: p.scheduledAt,
-                url: p.url,
-                platform: platforms[0] ?? "Social",
-                platforms,
-                mediaUrl: images[0] ?? mediaUrls[0] ?? null,
-                mediaUrls: images.length ? images : mediaUrls,
-                source: "planable" as const,
-              };
-            });
+      const fromPlanable: SocialPost[] = (
+        (planable.posts ?? []) as Array<{
+          id: string;
+          text: string;
+          status: string;
+          scheduledAt: string | null;
+          url: string | null;
+          pageName: string | null;
+          mediaUrl?: string | null;
+          mediaUrls?: string[];
+          platforms?: string[];
+        }>
+      ).map((p) => {
+        const platforms = (p.platforms?.length
+          ? p.platforms
+          : p.pageName
+            ? [p.pageName]
+            : ["Social"]
+        ).map(normalizePlatform);
+        const mediaUrls = (p.mediaUrls?.length
+          ? p.mediaUrls
+          : p.mediaUrl
+            ? [p.mediaUrl]
+            : []
+        ).filter(Boolean);
+        const images = mediaUrls.filter(isPreviewableImageUrl);
+        return {
+          id: `pl_${p.id}`,
+          text: stripHtml(p.text),
+          html: null,
+          status: normalizeStatus(p.status),
+          scheduledAt: p.scheduledAt,
+          url: p.url,
+          platform: platforms[0] ?? "Social",
+          platforms,
+          mediaUrl: images[0] ?? mediaUrls[0] ?? null,
+          mediaUrls: images.length ? images : mediaUrls,
+          source: "planable" as const,
+        };
+      });
+
+      // Hub-first: prefer Hub social rows; live Planable fills gaps (esp. members).
+      let nextPosts: SocialPost[] =
+        fromHub.length > 0 ? fromHub : fromPlanable;
+
+      if (memberView && fromHub.length > 0) {
+        const hubPlanableIds = new Set(
+          contentItems
+            .map((c) => c.planable_post_id)
+            .filter((id): id is string => Boolean(id))
+        );
+        const extras = fromPlanable.filter((p) => {
+          const planableId = p.id.startsWith("pl_") ? p.id.slice(3) : p.id;
+          if (hubPlanableIds.has(planableId)) return false;
+          const s = p.status.toLowerCase();
+          return s === "scheduled" || s === "published";
+        });
+        if (extras.length) nextPosts = [...fromHub, ...extras];
+      }
 
       if (memberView) {
         nextPosts = nextPosts.filter((p) => {

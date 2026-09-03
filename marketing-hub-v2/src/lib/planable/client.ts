@@ -811,8 +811,8 @@ export function hubStatusFromPlanable(post: {
   scheduledSet?: boolean;
 }): ContentStatus {
   if (post.published) return "published";
-  // Scheduled in the Hub only when approved AND actually scheduled.
-  if (post.approved && post.scheduledSet === true) return "scheduled";
+  // On the Planable calendar / queue to publish → Scheduled in the Hub.
+  if (post.scheduledSet === true) return "scheduled";
   if (post.approved) return "review";
   return "draft";
 }
