@@ -36,6 +36,8 @@ export type PlanablePost = {
   mediaUrl: string | null;
   mediaUrls: string[];
   platforms: string[];
+  /** Cross-network sibling group in Planable (multi-platform = one Hub card). */
+  groupId: string | null;
 };
 
 /** Raw Planable post shape used by sync (keeps ids / group / published). */
@@ -67,6 +69,55 @@ function authHeaders(token: string, json = false): HeadersInit {
   };
 }
 
+function isVideoMediaUrl(url: string): boolean {
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+}
+
+function isImageMediaUrl(url: string): boolean {
+  return (
+    /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(url) ||
+    (!isVideoMediaUrl(url) && !/\.pdf(\?|$)/i.test(url) && /image/i.test(url))
+  );
+}
+
+/**
+ * One display URL per image (prefer full file over thumbnail CDN variant).
+ * For videos keep cover/thumbnail + file once each so the calendar can preview.
+ */
+function pushMediaItem(
+  out: string[],
+  item: {
+    url?: string;
+    thumbnailUrl?: string;
+    thumbnail?: string;
+    type?: string;
+    mediaType?: string;
+  }
+) {
+  const push = (u: string | null | undefined) => {
+    const s = (u ?? "").trim();
+    if (s && !out.includes(s)) out.push(s);
+  };
+  const url = (item.url ?? "").trim();
+  const thumb = (item.thumbnailUrl || item.thumbnail || "").trim();
+  const typeHint = `${item.type || ""} ${item.mediaType || ""}`;
+  const looksVideo =
+    isVideoMediaUrl(url) ||
+    (!url && isVideoMediaUrl(thumb)) ||
+    /video|reel/i.test(typeHint);
+
+  if (looksVideo) {
+    if (thumb && !isVideoMediaUrl(thumb)) push(thumb);
+    if (url) push(url);
+    else if (thumb) push(thumb);
+    return;
+  }
+
+  // Images / documents: never store both thumb + full (Planable CDN duplicates).
+  if (url) push(url);
+  else if (thumb) push(thumb);
+}
+
 function pickMediaUrls(p: Record<string, unknown>): string[] {
   const out: string[] = [];
   const push = (u: string | null | undefined) => {
@@ -80,47 +131,91 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
     for (const item of media) {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
-        const m = item as {
-          url?: string;
-          thumbnailUrl?: string;
-          thumbnail?: string;
-        };
-        // Keep thumbnail for calendar previews; keep the file URL for playback.
-        push(m.thumbnailUrl || m.thumbnail);
-        push(m.url);
+        pushMediaItem(
+          out,
+          item as {
+            url?: string;
+            thumbnailUrl?: string;
+            thumbnail?: string;
+            type?: string;
+            mediaType?: string;
+          }
+        );
       }
     }
   }
 
   const attachments = p.attachments as
-    | Array<{ url?: string; thumbnail?: string; thumbnailUrl?: string } | string>
+    | Array<
+        | {
+            url?: string;
+            thumbnail?: string;
+            thumbnailUrl?: string;
+            type?: string;
+            mediaType?: string;
+          }
+        | string
+      >
     | undefined;
   if (Array.isArray(attachments)) {
     for (const item of attachments) {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
-        push(item.thumbnailUrl || item.thumbnail);
-        push(item.url);
+        pushMediaItem(out, item);
       }
     }
   }
 
-  const hasImage = out.some(
-    (u) =>
-      /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u) ||
-      (!/\.(mp4|mov|webm|m4v|pdf)(\?|$)/i.test(u) && /image/i.test(u))
-  );
-  const hasVideo = out.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
+  const hasImage = out.some((u) => isImageMediaUrl(u));
+  const hasVideo = out.some((u) => isVideoMediaUrl(u));
 
   // Cover/thumbnail: always useful for video-only posts; otherwise only when empty
   // so carousels do not duplicate the first slide as a resized cover.
   if (out.length === 0 || (hasVideo && !hasImage)) {
+    push(p.videoThumbnailUrl as string | undefined);
     push(p.thumbnailUrl as string | undefined);
     push(p.thumbnail as string | undefined);
     push(p.imageUrl as string | undefined);
     push(p.coverUrl as string | undefined);
   }
   return out;
+}
+
+/** Humanize a Planable media filename when the post has no caption. */
+export function titleFromPlanableMediaUrls(urls: string[]): string {
+  // Prefer video filenames — thumbnails are often opaque ids ("thumb.jpg").
+  const ordered = [
+    ...urls.filter((u) => isVideoMediaUrl(u)),
+    ...urls.filter((u) => !isVideoMediaUrl(u)),
+  ];
+  for (const raw of ordered) {
+    try {
+      const path = new URL(raw).pathname;
+      const file = decodeURIComponent(path.split("/").pop() || "");
+      if (!file) continue;
+      let base = file.replace(/\.[a-z0-9]+$/i, "");
+      base = base
+        .replace(/_transcoded$/i, "")
+        .replace(/_web-?\d+p$/i, "")
+        .replace(/_pintura[a-f0-9]+$/i, "")
+        .replace(/_\d{5}(\.\d+)?$/i, "");
+      // Drop leading Planable id chunks (e.g. MExpMbHd2j-p-and-m-athens)
+      base = base.replace(/^[A-Za-z0-9]{8,}-/, "");
+      const words = base
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (words.length < 2) continue;
+      if (/^(thumb(nail)?|cover|preview|untitled|image|video|media)$/i.test(words)) {
+        continue;
+      }
+      const titled = words.replace(/\b\w/g, (c) => c.toUpperCase());
+      return titled.slice(0, 120);
+    } catch {
+      /* ignore bad urls */
+    }
+  }
+  return "";
 }
 
 function pickPlatforms(
@@ -460,23 +555,41 @@ export async function fetchPlanablePosts(): Promise<{
   const result = await listAllPlanablePosts({ maxPosts: 300 });
   return {
     configured: result.configured,
-    posts: result.posts.map((p) => ({
-      id: p.id,
-      text: p.plainText.slice(0, 280) || "Untitled post",
-      status: (() => {
-        const hub = hubStatusFromPlanable(p);
-        if (hub === "published") return "Published";
-        if (hub === "scheduled") return "Scheduled";
-        if (hub === "review" || hub === "approved") return "Approved";
-        return "Draft";
-      })(),
-      scheduledAt: p.scheduledAt,
-      url: p.url,
-      pageName: p.pageName,
-      mediaUrl: p.mediaUrls[0] ?? null,
-      mediaUrls: p.mediaUrls,
-      platforms: p.platforms,
-    })),
+    posts: result.posts.map((p) => {
+      const fromText = p.plainText.trim().slice(0, 280);
+      const fromMedia = titleFromPlanableMediaUrls(p.mediaUrls);
+      const kind = (p.type || "").toLowerCase();
+      const fallback =
+        fromMedia ||
+        (kind.includes("reel")
+          ? "Reel"
+          : kind.includes("story")
+            ? "Story"
+            : p.mediaUrls.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u))
+              ? "Video post"
+              : "Untitled post");
+      return {
+        id: p.id,
+        text: fromText || fallback,
+        status: (() => {
+          const hub = hubStatusFromPlanable(p);
+          if (hub === "published") return "Published";
+          if (hub === "scheduled") return "Scheduled";
+          if (hub === "review" || hub === "approved") return "Approved";
+          return "Draft";
+        })(),
+        scheduledAt: p.scheduledAt,
+        url: p.url,
+        pageName: p.pageName,
+        mediaUrl:
+          p.mediaUrls.find((u) => isImageMediaUrl(u)) ??
+          p.mediaUrls[0] ??
+          null,
+        mediaUrls: p.mediaUrls,
+        platforms: p.platforms,
+        groupId: p.groupId,
+      };
+    }),
     openUrl: result.openUrl,
     ...(result.error ? { error: result.error } : {}),
   };

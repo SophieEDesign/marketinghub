@@ -26,6 +26,7 @@ import {
   listPlanablePages,
   planableDeepLink,
   scheduledAtFromDueDate,
+  titleFromPlanableMediaUrls,
   updatePlanablePost,
   type PlanableRawPost,
 } from "@/lib/planable/client";
@@ -78,8 +79,29 @@ function captionFromGroup(posts: PlanableRawPost[]): string {
 }
 
 function titleFromCaption(caption: string): string {
-  const line = caption.split(/\n/)[0]?.trim() || "Untitled post";
-  return line.slice(0, 120);
+  const line = caption.split(/\n/)[0]?.trim() || "";
+  return line ? line.slice(0, 120) : "";
+}
+
+function titleForPlanableGroup(
+  caption: string,
+  assetUrl: string,
+  classificationOrType?: string | null
+): string {
+  const fromCaption = titleFromCaption(caption);
+  if (fromCaption) return fromCaption;
+  const fromMedia = titleFromPlanableMediaUrls(
+    assetUrl
+      .split(/\n+/)
+      .map((u) => u.trim())
+      .filter(Boolean)
+  );
+  if (fromMedia) return fromMedia;
+  const kind = (classificationOrType || "").trim().toLowerCase();
+  if (kind === "reels" || kind === "reel") return "Reel";
+  if (kind === "story" || kind === "stories") return "Story";
+  if (kind === "video") return "Video post";
+  return "Untitled post";
 }
 
 function channelsFromGroup(posts: PlanableRawPost[]): string[] {
@@ -98,14 +120,26 @@ function channelsFromGroup(posts: PlanableRawPost[]): string[] {
   return Array.from(set);
 }
 
+/**
+ * Prefer one page's media set — Planable gives each platform its own CDN
+ * copies of the same assets, so unioning FB+IG+LI triples (or worse) the list.
+ * Prefer sets that include an image thumb (video calendar preview).
+ */
 function mediaFromGroup(posts: PlanableRawPost[]): string {
-  const urls: string[] = [];
+  let best: string[] = [];
+  let bestScore = -1;
   for (const p of posts) {
-    for (const u of p.mediaUrls) {
-      if (u && !urls.includes(u)) urls.push(u);
+    const urls = (p.mediaUrls || []).map((u) => u.trim()).filter(Boolean);
+    const hasImage = urls.some((u) =>
+      /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u)
+    );
+    const score = urls.length * 10 + (hasImage ? 5 : 0);
+    if (score > bestScore) {
+      best = urls;
+      bestScore = score;
     }
   }
-  return joinAssetUrls(urls);
+  return joinAssetUrls(best);
 }
 
 function findExistingForGroup(
@@ -262,6 +296,11 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     });
     const planable_url =
       primary.url || planableDeepLink(primary.id, config);
+    const nextTitle = titleForPlanableGroup(
+      caption,
+      asset_url,
+      primary.type || primary.platforms[0]
+    );
 
     const match = findExistingForGroup(existing, group);
     if (match) {
@@ -278,7 +317,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
             match.status === "draft" ||
             match.status === "idea")
         ) {
-          await updateContent(match.id, {
+          const patch: Record<string, unknown> = {
             status: "scheduled",
             due_date: due_date ?? match.due_date,
             planable_url: planable_url || match.planable_url,
@@ -289,30 +328,70 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
               : match.planable_page_ids,
             last_synced_at: now,
             sync_source: "planable",
-          });
+          };
+          if (
+            !match.title?.trim() ||
+            /^untitled post$/i.test(match.title.trim())
+          ) {
+            patch.title = nextTitle;
+          }
+          // Refresh media when Hub has none, or Planable now includes a thumb.
+          if (
+            asset_url &&
+            (!match.asset_url ||
+              (!/\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(match.asset_url) &&
+                /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(asset_url)))
+          ) {
+            patch.asset_url = asset_url;
+          }
+          await updateContent(match.id, patch);
           updated += 1;
           continue;
         }
-        // Still refresh ids if needed; leave Hub caption/status alone.
+        // Still refresh ids / Untitled titles / thumbs; leave Hub caption/status alone.
+        const soft: Record<string, unknown> = {};
         if (
           !match.planable_post_id ||
           match.planable_post_id !== primary.id
         ) {
-          await updateContent(match.id, {
-            planable_post_id: primary.id,
-            planable_group_id: group.groupId || match.planable_group_id,
-            planable_page_ids: pageIds.length
-              ? pageIds
-              : match.planable_page_ids,
-            planable_url: match.planable_url || planable_url,
-          });
+          soft.planable_post_id = primary.id;
+          soft.planable_group_id = group.groupId || match.planable_group_id;
+          soft.planable_page_ids = pageIds.length
+            ? pageIds
+            : match.planable_page_ids;
+          soft.planable_url = match.planable_url || planable_url;
         }
-        skipped += 1;
+        if (
+          !match.title?.trim() ||
+          /^untitled post$/i.test(match.title.trim())
+        ) {
+          soft.title = nextTitle;
+        }
+        if (
+          asset_url &&
+          (!match.asset_url ||
+            (!/\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(match.asset_url) &&
+              /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(asset_url)))
+        ) {
+          soft.asset_url = asset_url;
+        }
+        if (Object.keys(soft).length) {
+          await updateContent(match.id, soft);
+          updated += 1;
+        } else {
+          skipped += 1;
+        }
         continue;
       }
 
+      const existingTitle = match.title?.trim() || "";
+      const keepTitle =
+        existingTitle && !/^untitled post$/i.test(existingTitle)
+          ? existingTitle
+          : nextTitle;
+
       await updateContent(match.id, {
-        title: match.title?.trim() || titleFromCaption(caption),
+        title: keepTitle,
         caption: caption || match.caption,
         channel: channels.length ? channels : match.channel,
         content_type: "Social",
@@ -333,7 +412,7 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     }
 
     const item = await createContent({
-      title: titleFromCaption(caption),
+      title: nextTitle,
       channel: channels.length ? channels : ["Social"],
       content_type: "Social",
       owner: "",

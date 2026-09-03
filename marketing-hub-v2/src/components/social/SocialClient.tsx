@@ -51,6 +51,10 @@ type SocialPost = {
   mediaUrl: string | null;
   mediaUrls: string[];
   source: "planable" | "hub";
+  /** Planable cross-post group — used to collapse platform copies in member view. */
+  planableGroupId?: string | null;
+  /** All Planable sibling ids in the same group (member-view dedupe). */
+  planableSiblingIds?: string[];
 };
 
 const HUB_STATUS_OPTIONS = CONTENT_STATUS.filter(
@@ -60,6 +64,105 @@ const HUB_STATUS_OPTIONS = CONTENT_STATUS.filter(
 function normalizePlatform(raw: string | null | undefined): string {
   const key = platformKey(raw ?? "");
   return PLATFORM_META[key].label;
+}
+
+type PlanableApiPost = {
+  id: string;
+  text: string;
+  status: string;
+  scheduledAt: string | null;
+  url: string | null;
+  pageName: string | null;
+  mediaUrl?: string | null;
+  mediaUrls?: string[];
+  platforms?: string[];
+  groupId?: string | null;
+};
+
+function planableMemberGroupKey(p: PlanableApiPost): string {
+  if (p.groupId) return `g:${p.groupId}`;
+  const day = (p.scheduledAt || "").slice(0, 10);
+  const text = (p.text || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 180);
+  if (text && day) return `t:${text}|${day}`;
+  return `id:${p.id}`;
+}
+
+function statusRank(status: string): number {
+  const s = status.toLowerCase();
+  if (s === "published") return 3;
+  if (s === "scheduled") return 2;
+  if (s === "approved" || s === "review") return 1;
+  return 0;
+}
+
+/** One calendar card per Planable cross-post group (admin Hub already does this). */
+function collapsePlanableForMemberView(raw: PlanableApiPost[]): SocialPost[] {
+  const map = new Map<string, PlanableApiPost[]>();
+  for (const p of raw) {
+    const key = planableMemberGroupKey(p);
+    const list = map.get(key) ?? [];
+    list.push(p);
+    map.set(key, list);
+  }
+
+  return Array.from(map.values()).map((siblings) => {
+    const primary =
+      siblings.find((p) => p.text.trim()) ||
+      [...siblings].sort(
+        (a, b) => statusRank(b.status) - statusRank(a.status)
+      )[0] ||
+      siblings[0];
+    const platforms = Array.from(
+      new Set(
+        siblings.flatMap((p) =>
+          (p.platforms?.length
+            ? p.platforms
+            : p.pageName
+              ? [p.pageName]
+              : ["Social"]
+          ).map(normalizePlatform)
+        )
+      )
+    );
+    const mediaUrls = Array.from(
+      new Set(
+        siblings.flatMap((p) =>
+          (p.mediaUrls?.length
+            ? p.mediaUrls
+            : p.mediaUrl
+              ? [p.mediaUrl]
+              : []
+          ).filter(Boolean)
+        )
+      )
+    );
+    const preview = [
+      ...mediaUrls.filter(isPreviewableImageUrl),
+      ...mediaUrls.filter(isVideoUrl),
+    ];
+    const bestStatus = [...siblings].sort(
+      (a, b) => statusRank(b.status) - statusRank(a.status)
+    )[0];
+    return {
+      id: `pl_${primary.id}`,
+      text: stripHtml(primary.text),
+      html: null,
+      status: normalizeStatus(bestStatus?.status || primary.status),
+      scheduledAt: primary.scheduledAt,
+      url: primary.url,
+      platform: platforms[0] ?? "Social",
+      platforms,
+      mediaUrl: preview[0] ?? mediaUrls[0] ?? null,
+      mediaUrls: preview.length ? preview : mediaUrls,
+      source: "planable" as const,
+      planableGroupId: primary.groupId ?? null,
+      planableSiblingIds: siblings.map((s) => s.id),
+    };
+  });
 }
 
 /** Split + normalize channel tags so multi-network posts keep IG/FB/LI separate. */
@@ -296,19 +399,10 @@ export function SocialClient({
         return Boolean(raw?.planable_post_id);
       });
 
-      const fromPlanable: SocialPost[] = (
-        (planable.posts ?? []) as Array<{
-          id: string;
-          text: string;
-          status: string;
-          scheduledAt: string | null;
-          url: string | null;
-          pageName: string | null;
-          mediaUrl?: string | null;
-          mediaUrls?: string[];
-          platforms?: string[];
-        }>
-      ).map((p) => {
+      const fromPlanableRaw = (
+        (planable.posts ?? []) as PlanableApiPost[]
+      );
+      const fromPlanable: SocialPost[] = fromPlanableRaw.map((p) => {
         const platforms = (p.platforms?.length
           ? p.platforms
           : p.pageName
@@ -337,6 +431,8 @@ export function SocialClient({
           mediaUrl: preview[0] ?? mediaUrls[0] ?? null,
           mediaUrls: preview.length ? preview : mediaUrls,
           source: "planable" as const,
+          planableGroupId: p.groupId ?? null,
+          planableSiblingIds: [p.id],
         };
       });
 
@@ -348,19 +444,29 @@ export function SocialClient({
       let nextPosts: SocialPost[];
 
       if (memberView) {
-        // Planable is source of truth for what members can see; Hub fills unlinked gaps.
-        const planableVisible = fromPlanable.filter((p) =>
-          isMemberVisible(p.status)
+        // Planable is source of truth, but collapse multi-platform siblings
+        // so attendance/scheduled posts match admin (one card per group).
+        const planableVisible = collapsePlanableForMemberView(
+          fromPlanableRaw.filter((p) => isMemberVisible(normalizeStatus(p.status)))
         );
         const planableIds = new Set(
-          planableVisible.map((p) =>
-            p.id.startsWith("pl_") ? p.id.slice(3) : p.id
-          )
+          planableVisible.flatMap((p) => p.planableSiblingIds ?? [])
+        );
+        const planableGroupIds = new Set(
+          planableVisible
+            .map((p) => p.planableGroupId)
+            .filter((id): id is string => Boolean(id))
         );
         const hubOnly = fromHub.filter((p) => {
           if (!isMemberVisible(p.status)) return false;
           const raw = contentItems.find((c) => c.id === p.id);
           if (raw?.planable_post_id && planableIds.has(raw.planable_post_id)) {
+            return false;
+          }
+          if (
+            raw?.planable_group_id &&
+            planableGroupIds.has(raw.planable_group_id)
+          ) {
             return false;
           }
           return true;

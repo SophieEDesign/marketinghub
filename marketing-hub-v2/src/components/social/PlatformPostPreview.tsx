@@ -222,8 +222,13 @@ export function CompactMultiImageThumb({
   canvaUrl?: string | null;
   className?: string;
 }) {
-  const extraHidden = Math.max(0, images.length - 2);
-  if (images.length === 0) {
+  const uniqueImages: string[] = [];
+  for (const src of images) {
+    const u = (src ?? "").trim();
+    if (u && !uniqueImages.includes(u)) uniqueImages.push(u);
+  }
+  const extraHidden = Math.max(0, uniqueImages.length - 2);
+  if (uniqueImages.length === 0) {
     if (canvaUrl && isCanvaUrl(canvaUrl)) {
       return <CanvaPreviewTile url={canvaUrl} compact className={className} />;
     }
@@ -246,13 +251,13 @@ export function CompactMultiImageThumb({
         className
       )}
     >
-      {images.length === 1 ? (
-        <MediaThumb url={images[0]} />
+      {uniqueImages.length === 1 ? (
+        <MediaThumb url={uniqueImages[0]} />
       ) : (
         <div className="grid h-full grid-cols-2 gap-[2px]">
-          <MediaThumb url={images[0]} />
+          <MediaThumb url={uniqueImages[0]} />
           <div className="relative min-h-0">
-            <MediaThumb url={images[1]} />
+            <MediaThumb url={uniqueImages[1]} />
             {extraHidden > 0 ? (
               <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-semibold text-white">
                 +{extraHidden}

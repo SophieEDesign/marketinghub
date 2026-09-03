@@ -56,7 +56,9 @@ export function extractAssetUrl(raw: string): string {
 /** Parse one or more asset URLs (newline-separated, JSON array, or single). */
 export function parseAssetUrls(raw: string | string[] | null | undefined): string[] {
   if (Array.isArray(raw)) {
-    return raw.map((u) => extractAssetUrl(String(u ?? ""))).filter(Boolean);
+    return dedupeAssetUrls(
+      raw.map((u) => extractAssetUrl(String(u ?? ""))).filter(Boolean)
+    );
   }
   const s = (raw ?? "").trim();
   if (!s) return [];
@@ -64,18 +66,94 @@ export function parseAssetUrls(raw: string | string[] | null | undefined): strin
     try {
       const parsed = JSON.parse(s) as unknown;
       if (Array.isArray(parsed)) {
-        return parsed
-          .map((u) => extractAssetUrl(String(u ?? "")))
-          .filter(Boolean);
+        return dedupeAssetUrls(
+          parsed
+            .map((u) => extractAssetUrl(String(u ?? "")))
+            .filter(Boolean)
+        );
       }
     } catch {
       // fall through
     }
   }
-  return s
-    .split(/\n+/)
-    .map((line) => extractAssetUrl(line))
-    .filter(Boolean);
+  return dedupeAssetUrls(
+    s
+      .split(/\n+/)
+      .map((line) => extractAssetUrl(line))
+      .filter(Boolean)
+  );
+}
+
+function assetUrlBasename(url: string): string {
+  try {
+    const path = new URL(url).pathname;
+    const base = decodeURIComponent(path.split("/").pop() || "");
+    return base.toLowerCase();
+  } catch {
+    const cleaned = url.split(/[?#]/)[0] || url;
+    const base = cleaned.split("/").pop() || cleaned;
+    return base.toLowerCase();
+  }
+}
+
+/**
+ * Collapse exact + Planable CDN near-duplicates (thumb vs full path, same basename).
+ * Prefers the longer URL when one filename is a suffix of another.
+ */
+export function dedupeAssetUrls(urls: string[]): string[] {
+  const exact: string[] = [];
+  for (const raw of urls) {
+    const u = (raw ?? "").trim();
+    if (u && !exact.includes(u)) exact.push(u);
+  }
+  if (exact.length <= 1) return exact;
+
+  const byBase = new Map<string, string>();
+  const order: string[] = [];
+  for (const u of exact) {
+    const base = assetUrlBasename(u);
+    if (!base) {
+      order.push(u);
+      continue;
+    }
+    const existing = byBase.get(base);
+    if (!existing) {
+      byBase.set(base, u);
+      order.push(u);
+      continue;
+    }
+    if (u.length > existing.length) {
+      byBase.set(base, u);
+      const idx = order.indexOf(existing);
+      if (idx >= 0) order[idx] = u;
+    }
+  }
+
+  const result: string[] = [];
+  for (const u of order) {
+    const base = assetUrlBasename(u);
+    let replaced = false;
+    for (let i = 0; i < result.length; i += 1) {
+      const other = result[i];
+      const otherBase = assetUrlBasename(other);
+      // Require a meaningful stem so short names like "1.png" do not swallow others.
+      if (!base || !otherBase || base === otherBase) continue;
+      if (base.length < 10 && otherBase.length < 10) continue;
+      if (otherBase.endsWith(base) && base.length >= 10) {
+        // `u` is a shorter thumb/path variant of `other` — drop it.
+        replaced = true;
+        break;
+      }
+      if (base.endsWith(otherBase) && otherBase.length >= 10) {
+        // `u` is the fuller variant — replace the shorter one.
+        result[i] = u;
+        replaced = true;
+        break;
+      }
+    }
+    if (!replaced) result.push(u);
+  }
+  return result;
 }
 
 export function joinAssetUrls(urls: string[]): string {
