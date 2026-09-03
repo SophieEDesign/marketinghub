@@ -76,7 +76,12 @@ export function ContentSocialHub({
           title="Social calendar"
           description="Scheduled and published posts only — drafts stay with the marketing team."
         />
-        <SocialClient hideHeader memberView initialContent={initialContent} />
+        <SocialClient
+          key="member-social"
+          hideHeader
+          memberView
+          initialContent={initialContent}
+        />
       </div>
     );
   }

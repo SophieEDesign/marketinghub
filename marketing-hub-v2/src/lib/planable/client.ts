@@ -323,7 +323,11 @@ function toRawPost(
     scheduledAt: scheduled,
     published: p.published === true,
     approved: p.approved === true,
-    scheduledSet: p.scheduledSet === true,
+    scheduledSet: Boolean(
+      p.scheduledSet === true ||
+        p.scheduledSet === "true" ||
+        (p as { scheduled_set?: unknown }).scheduled_set === true
+    ),
     archived: p.archived === true,
     mediaUrls: pickMediaUrls(p),
     platforms:
@@ -825,8 +829,10 @@ export function hubStatusFromPlanable(post: {
   scheduledSet?: boolean;
 }): ContentStatus {
   if (post.published) return "published";
-  // On the Planable calendar / queue to publish → Scheduled in the Hub.
+  // Planable "scheduled to publish" → Hub Scheduled (members can see it).
   if (post.scheduledSet === true) return "scheduled";
+  // Approved in Planable with a date is treated as scheduled for the Hub.
+  if (post.approved && post.scheduledAt) return "scheduled";
   if (post.approved) return "review";
   return "draft";
 }

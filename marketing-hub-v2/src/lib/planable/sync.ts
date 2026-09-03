@@ -156,12 +156,14 @@ export function shouldPushSocialToPlanable(item: ContentItem): boolean {
   );
 }
 
-/** Keep Hub Approved/Scheduled when Planable still has an unapproved draft. */
+/** Map Planable status onto Hub; always promote Approved → Scheduled when Planable schedules. */
 function inboundStatusForExisting(
   existing: ContentStatus,
   mapped: ContentStatus
 ): ContentStatus {
   if (mapped === "published") return "published";
+  // Planable schedule wins over Hub Approved/review.
+  if (mapped === "scheduled") return "scheduled";
   if (
     mapped === "draft" &&
     (existing === "review" ||
@@ -266,8 +268,16 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
       if (published) lockedPublished += 1;
 
       // Hub edits must not block Planable schedule/publish from reaching members.
+      // Always flip Hub Approved → Scheduled (or Published) when Planable says so.
       if (isHubDirty(match) && !published) {
-        if (status === "scheduled") {
+        if (
+          status === "scheduled" &&
+          (match.status === "review" ||
+            match.status === "approved" ||
+            match.status === "scheduled" ||
+            match.status === "draft" ||
+            match.status === "idea")
+        ) {
           await updateContent(match.id, {
             status: "scheduled",
             due_date: due_date ?? match.due_date,

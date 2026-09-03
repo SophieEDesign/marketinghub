@@ -238,10 +238,16 @@ export function SocialClient({
     setError(null);
     try {
       let contentItems: ContentItem[];
-      if (skipContentFetchRef.current && initialContent) {
+      // Member view always refetches — SSR/admin payload can be stale after Planable sync.
+      if (
+        !memberView &&
+        skipContentFetchRef.current &&
+        initialContent
+      ) {
         contentItems = initialContent;
         skipContentFetchRef.current = false;
       } else {
+        skipContentFetchRef.current = false;
         const contentRes = await fetch("/api/content");
         const contentData = await contentRes.json();
         contentItems = (contentData.content ?? []) as ContentItem[];
@@ -334,38 +340,42 @@ export function SocialClient({
         };
       });
 
-      // Hub-first: prefer Hub social rows; live Planable fills gaps (esp. members).
-      let nextPosts: SocialPost[] =
-        fromHub.length > 0 ? fromHub : fromPlanable;
+      const isMemberVisible = (status: string) => {
+        const s = status.toLowerCase();
+        return s === "scheduled" || s === "published";
+      };
 
-      if (memberView && fromHub.length > 0) {
-        const hubPlanableIds = new Set(
-          contentItems
-            .map((c) => c.planable_post_id)
-            .filter((id): id is string => Boolean(id))
-        );
-        const extras = fromPlanable.filter((p) => {
-          const planableId = p.id.startsWith("pl_") ? p.id.slice(3) : p.id;
-          if (hubPlanableIds.has(planableId)) return false;
-          const s = p.status.toLowerCase();
-          return s === "scheduled" || s === "published";
-        });
-        if (extras.length) nextPosts = [...fromHub, ...extras];
-      }
+      let nextPosts: SocialPost[];
 
       if (memberView) {
-        nextPosts = nextPosts.filter((p) => {
-          const s = p.status.toLowerCase();
-          return s === "scheduled" || s === "published";
+        // Planable is source of truth for what members can see; Hub fills unlinked gaps.
+        const planableVisible = fromPlanable.filter((p) =>
+          isMemberVisible(p.status)
+        );
+        const planableIds = new Set(
+          planableVisible.map((p) =>
+            p.id.startsWith("pl_") ? p.id.slice(3) : p.id
+          )
+        );
+        const hubOnly = fromHub.filter((p) => {
+          if (!isMemberVisible(p.status)) return false;
+          const raw = contentItems.find((c) => c.id === p.id);
+          if (raw?.planable_post_id && planableIds.has(raw.planable_post_id)) {
+            return false;
+          }
+          return true;
         });
+        nextPosts = [...planableVisible, ...hubOnly];
         setSourceLabel("Scheduled & published");
       } else if (fromHub.length > 0) {
+        nextPosts = fromHub;
         setSourceLabel(
           syncedHub.length > 0
             ? "Hub (synced with Planable)"
             : "Hub Social Posts"
         );
       } else {
+        nextPosts = fromPlanable;
         setSourceLabel(
           planable.configured ? "Planable (live)" : "Social Posts"
         );
