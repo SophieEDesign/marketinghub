@@ -60,6 +60,12 @@ export function isImageUrl(url: string | null | undefined): boolean {
   return /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u) || u.includes("image");
 }
 
+/** True for common video file URLs. */
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url.trim());
+}
+
 /** Images plus CDN/signed media URLs with no file extension (Planable, Drive). */
 export function isPreviewableImageUrl(url: string | null | undefined): boolean {
   if (!url) return false;

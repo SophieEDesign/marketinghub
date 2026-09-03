@@ -1,7 +1,7 @@
 /** Shared clean-up for hub store + Supabase import. */
 
 import { normalizeRichTextStorage } from "@/lib/sanitize";
-import { isCanvaUrl, isPreviewableImageUrl } from "@/lib/social/platforms";
+import { isCanvaUrl, isPreviewableImageUrl, isVideoUrl } from "@/lib/social/platforms";
 
 const PLATFORM_HINTS: { re: RegExp; channel: string }[] = [
   { re: /\binstagram\b|\big\b|#instagram|\breel\b/i, channel: "Instagram" },
@@ -93,6 +93,23 @@ export function imageAssetUrls(
   raw: string | string[] | null | undefined
 ): string[] {
   return parseAssetUrls(raw).filter((u) => isPreviewableImageUrl(u));
+}
+
+/** Video file URLs among assets. */
+export function videoAssetUrls(
+  raw: string | string[] | null | undefined
+): string[] {
+  return parseAssetUrls(raw).filter((u) => isVideoUrl(u));
+}
+
+/** Images first, then videos — for calendar / preview thumbs. */
+export function previewAssetUrls(
+  raw: string | string[] | null | undefined
+): string[] {
+  const urls = parseAssetUrls(raw);
+  const images = urls.filter((u) => isPreviewableImageUrl(u));
+  const videos = urls.filter((u) => isVideoUrl(u));
+  return [...images, ...videos.filter((u) => !images.includes(u))];
 }
 
 /** First image URL among assets (skips Canva / PDF / other links). */

@@ -16,9 +16,9 @@ import { cn } from "@/lib/utils";
 import { CONTENT_STATUS } from "@/lib/data/collections";
 import type { ContentItem, ContentStatus } from "@/lib/types";
 import {
-  imageAssetUrls,
   isSocialContentItem,
   normalizeChannels,
+  previewAssetUrls,
   primaryCanvaUrl,
   stripHtml,
 } from "@/lib/data/normalize";
@@ -26,6 +26,7 @@ import {
   PLATFORM_META,
   isCanvaUrl,
   isPreviewableImageUrl,
+  isVideoUrl,
   platformKey,
 } from "@/lib/social/platforms";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
@@ -128,7 +129,9 @@ function PostCard({
   const platforms = post.platforms.length
     ? post.platforms
     : [post.platform];
-  const images = post.mediaUrls.filter(isPreviewableImageUrl);
+  const images = post.mediaUrls.filter(
+    (u) => isPreviewableImageUrl(u) || isVideoUrl(u)
+  );
   const canvaUrl =
     images.length === 0 && isCanvaUrl(post.mediaUrl) ? post.mediaUrl : null;
   const time =
@@ -261,7 +264,7 @@ export function SocialClient({
           const text =
             stripHtml(c.caption || c.title || c.notes || "Untitled post") ||
             "Untitled post";
-          const images = imageAssetUrls(c.asset_url);
+          const preview = previewAssetUrls(c.asset_url);
           const canva = primaryCanvaUrl(c.asset_url);
           return {
             id: c.id,
@@ -273,8 +276,8 @@ export function SocialClient({
             url: c.planable_url || null,
             platform,
             platforms: unique,
-            mediaUrl: images[0] || canva || null,
-            mediaUrls: images,
+            mediaUrl: preview[0] || canva || null,
+            mediaUrls: preview,
             source: "hub" as const,
           };
         })
@@ -312,7 +315,10 @@ export function SocialClient({
             ? [p.mediaUrl]
             : []
         ).filter(Boolean);
-        const images = mediaUrls.filter(isPreviewableImageUrl);
+        const preview = [
+          ...mediaUrls.filter(isPreviewableImageUrl),
+          ...mediaUrls.filter(isVideoUrl),
+        ];
         return {
           id: `pl_${p.id}`,
           text: stripHtml(p.text),
@@ -322,8 +328,8 @@ export function SocialClient({
           url: p.url,
           platform: platforms[0] ?? "Social",
           platforms,
-          mediaUrl: images[0] ?? mediaUrls[0] ?? null,
-          mediaUrls: images.length ? images : mediaUrls,
+          mediaUrl: preview[0] ?? mediaUrls[0] ?? null,
+          mediaUrls: preview.length ? preview : mediaUrls,
           source: "planable" as const,
         };
       });
@@ -1091,7 +1097,9 @@ export function SocialClient({
                 }
                 caption={selected.text}
                 captionHtml={selected.html}
-                images={selected.mediaUrls.filter(isPreviewableImageUrl)}
+                images={selected.mediaUrls.filter(
+                  (u) => isPreviewableImageUrl(u) || isVideoUrl(u)
+                )}
                 canvaUrl={
                   isCanvaUrl(selected.mediaUrl) ? selected.mediaUrl : null
                 }

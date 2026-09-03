@@ -80,27 +80,41 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
     for (const item of media) {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
-        const m = item as { url?: string; thumbnailUrl?: string };
-        push(m.url || m.thumbnailUrl);
+        const m = item as {
+          url?: string;
+          thumbnailUrl?: string;
+          thumbnail?: string;
+        };
+        // Keep thumbnail for calendar previews; keep the file URL for playback.
+        push(m.thumbnailUrl || m.thumbnail);
+        push(m.url);
       }
     }
   }
 
   const attachments = p.attachments as
-    | Array<{ url?: string; thumbnail?: string } | string>
+    | Array<{ url?: string; thumbnail?: string; thumbnailUrl?: string } | string>
     | undefined;
   if (Array.isArray(attachments)) {
     for (const item of attachments) {
       if (typeof item === "string") push(item);
       else if (item && typeof item === "object") {
-        push(item.url || item.thumbnail);
+        push(item.thumbnailUrl || item.thumbnail);
+        push(item.url);
       }
     }
   }
 
-  // Cover/thumbnail only when the post has no media array — otherwise they
-  // duplicate the first slide as a different resized URL.
-  if (out.length === 0) {
+  const hasImage = out.some(
+    (u) =>
+      /\.(png|jpe?g|gif|webp|avif)(\?|$)/i.test(u) ||
+      (!/\.(mp4|mov|webm|m4v|pdf)(\?|$)/i.test(u) && /image/i.test(u))
+  );
+  const hasVideo = out.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u));
+
+  // Cover/thumbnail: always useful for video-only posts; otherwise only when empty
+  // so carousels do not duplicate the first slide as a resized cover.
+  if (out.length === 0 || (hasVideo && !hasImage)) {
     push(p.thumbnailUrl as string | undefined);
     push(p.thumbnail as string | undefined);
     push(p.imageUrl as string | undefined);

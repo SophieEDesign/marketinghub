@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PLATFORM_META, isCanvaUrl, platformKey, type PlatformKey } from "@/lib/social/platforms";
+import { PLATFORM_META, isCanvaUrl, isVideoUrl, platformKey, type PlatformKey } from "@/lib/social/platforms";
 import { CanvaPreviewTile } from "@/components/content/CanvaPreviewTile";
 import { RichTextView } from "@/components/ui/RichTextView";
 import { stripHtml } from "@/lib/data/normalize";
@@ -23,6 +23,35 @@ function uniquePlatformKeys(platforms: string[]): PlatformKey[] {
     if (!keys.includes(key)) keys.push(key);
   }
   return keys.length ? keys : ["social"];
+}
+
+function MediaThumb({
+  url,
+  className,
+}: {
+  url: string;
+  className?: string;
+}) {
+  if (isVideoUrl(url)) {
+    return (
+      <video
+        src={url}
+        muted
+        playsInline
+        preload="metadata"
+        className={cn("h-full w-full object-cover", className)}
+      />
+    );
+  }
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={url}
+      alt=""
+      className={cn("h-full w-full object-cover", className)}
+      loading="lazy"
+    />
+  );
 }
 
 function Caption({
@@ -71,12 +100,7 @@ function CarouselMedia({
 
   return (
     <div className={cn("relative w-full overflow-hidden bg-slate-100", aspectClass)}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={images[current]}
-        alt=""
-        className="h-full w-full object-cover"
-      />
+      <MediaThumb url={images[current]} />
       {total > 1 ? (
         <>
           <button
@@ -141,8 +165,7 @@ function CollageMedia({
   if (count === 1) {
     return (
       <div className={cn("overflow-hidden bg-slate-100", aspectClass)}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={shown[0]} alt="" className="h-full w-full object-cover" />
+        <MediaThumb url={shown[0]} />
       </div>
     );
   }
@@ -152,8 +175,7 @@ function CollageMedia({
       <div className={cn("grid grid-cols-2 gap-[2px] bg-white", aspectClass)}>
         {shown.map((src) => (
           <div key={src} className="relative min-h-0 overflow-hidden bg-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="h-full w-full object-cover" />
+            <MediaThumb url={src} />
           </div>
         ))}
       </div>
@@ -164,13 +186,11 @@ function CollageMedia({
     return (
       <div className={cn("grid grid-cols-2 grid-rows-2 gap-[2px] bg-white", aspectClass)}>
         <div className="relative row-span-2 min-h-0 overflow-hidden bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={shown[0]} alt="" className="h-full w-full object-cover" />
+          <MediaThumb url={shown[0]} />
         </div>
         {shown.slice(1).map((src) => (
           <div key={src} className="relative min-h-0 overflow-hidden bg-slate-100">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={src} alt="" className="h-full w-full object-cover" />
+            <MediaThumb url={src} />
           </div>
         ))}
       </div>
@@ -181,8 +201,7 @@ function CollageMedia({
     <div className={cn("grid grid-cols-2 grid-rows-2 gap-[2px] bg-white", aspectClass)}>
       {shown.map((src, i) => (
         <div key={src} className="relative min-h-0 overflow-hidden bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="" className="h-full w-full object-cover" />
+          <MediaThumb url={src} />
           {i === 3 && extra > 0 ? (
             <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-lg font-semibold text-white">
               +{extra}
@@ -228,15 +247,12 @@ export function CompactMultiImageThumb({
       )}
     >
       {images.length === 1 ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={images[0]} alt="" className="h-full w-full object-cover" loading="lazy" />
+        <MediaThumb url={images[0]} />
       ) : (
         <div className="grid h-full grid-cols-2 gap-[2px]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={images[0]} alt="" className="h-full w-full object-cover" loading="lazy" />
+          <MediaThumb url={images[0]} />
           <div className="relative min-h-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={images[1]} alt="" className="h-full w-full object-cover" loading="lazy" />
+            <MediaThumb url={images[1]} />
             {extraHidden > 0 ? (
               <div className="absolute inset-0 flex items-center justify-center bg-black/45 text-[11px] font-semibold text-white">
                 +{extraHidden}
