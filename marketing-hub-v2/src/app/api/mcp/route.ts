@@ -19,7 +19,8 @@ const mcpHandler = createMcpHandler(
   {
     serverInfo: {
       name: "peters-may-marketing-hub",
-      version: "1.1.0",
+      // Bump when tools are added so ChatGPT/MCP clients re-fetch tools/list.
+      version: "1.2.0",
     },
     instructions: `You are connected to the Peters & May Marketing Hub MCP.
 
