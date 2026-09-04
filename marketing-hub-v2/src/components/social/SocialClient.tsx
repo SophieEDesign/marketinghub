@@ -29,6 +29,7 @@ import {
   isVideoUrl,
   platformKey,
 } from "@/lib/social/platforms";
+import { titleFromPlanableMediaUrls, mediaFingerprintFromUrls } from "@/lib/planable/client";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
 import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
 import {
@@ -79,15 +80,38 @@ type PlanableApiPost = {
   groupId?: string | null;
 };
 
-function planableMemberGroupKey(p: PlanableApiPost): string {
-  if (p.groupId) return `g:${p.groupId}`;
-  const day = (p.scheduledAt || "").slice(0, 10);
-  const text = (p.text || "")
+function planableTextDayKey(text: string, scheduledAt: string | null): string {
+  const day = (scheduledAt || "").slice(0, 10);
+  const normalized = text
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ")
     .slice(0, 180);
-  if (text && day) return `t:${text}|${day}`;
+  if (normalized && day) return `t:${normalized}|${day}`;
+  return "";
+}
+
+function planableMediaDayKey(
+  mediaUrls: string[] | undefined,
+  mediaUrl: string | null | undefined,
+  scheduledAt: string | null
+): string {
+  const day = (scheduledAt || "").slice(0, 10);
+  const urls = [
+    ...(mediaUrls || []),
+    ...(mediaUrl ? [mediaUrl] : []),
+  ].filter(Boolean);
+  const media = mediaFingerprintFromUrls(urls);
+  if (media && day) return `m:${media}|${day}`;
+  return "";
+}
+
+function planableMemberGroupKey(p: PlanableApiPost): string {
+  if (p.groupId) return `g:${p.groupId}`;
+  const byText = planableTextDayKey(p.text || "", p.scheduledAt);
+  if (byText) return byText;
+  const byMedia = planableMediaDayKey(p.mediaUrls, p.mediaUrl, p.scheduledAt);
+  if (byMedia) return byMedia;
   return `id:${p.id}`;
 }
 
@@ -108,6 +132,55 @@ function collapsePlanableForMemberView(raw: PlanableApiPost[]): SocialPost[] {
     list.push(p);
     map.set(key, list);
   }
+
+  const mergeBy = (
+    keyFn: (siblings: PlanableApiPost[]) => string
+  ) => {
+    const index = new Map<string, string>();
+    for (const [key, siblings] of [...map.entries()]) {
+      const mergeKey = keyFn(siblings);
+      if (!mergeKey) continue;
+      const existing = index.get(mergeKey);
+      if (!existing) {
+        index.set(mergeKey, key);
+        continue;
+      }
+      if (existing === key) continue;
+      const target = map.get(existing);
+      if (!target) continue;
+      target.push(...siblings);
+      map.delete(key);
+    }
+  };
+
+  // Merge groups that share caption+day or the same media file+day.
+  mergeBy((siblings) => {
+    const sample = siblings.find((p) => p.text.trim()) || siblings[0];
+    return sample
+      ? planableTextDayKey(sample.text, sample.scheduledAt)
+      : "";
+  });
+  mergeBy((siblings) => {
+    const sample = siblings[0];
+    if (!sample) return "";
+    const texts = new Set(
+      siblings
+        .map((p) =>
+          (p.text || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .slice(0, 180)
+        )
+        .filter(Boolean)
+    );
+    if (texts.size > 1) return "";
+    return planableMediaDayKey(
+      siblings.flatMap((p) => p.mediaUrls || []),
+      sample.mediaUrl,
+      sample.scheduledAt
+    );
+  });
 
   return Array.from(map.values()).map((siblings) => {
     const primary =
@@ -147,6 +220,8 @@ function collapsePlanableForMemberView(raw: PlanableApiPost[]): SocialPost[] {
     const bestStatus = [...siblings].sort(
       (a, b) => statusRank(b.status) - statusRank(a.status)
     )[0];
+    const groupId =
+      siblings.map((s) => s.groupId).find((id) => Boolean(id)) ?? null;
     return {
       id: `pl_${primary.id}`,
       text: stripHtml(primary.text),
@@ -159,7 +234,7 @@ function collapsePlanableForMemberView(raw: PlanableApiPost[]): SocialPost[] {
       mediaUrl: preview[0] ?? mediaUrls[0] ?? null,
       mediaUrls: preview.length ? preview : mediaUrls,
       source: "planable" as const,
-      planableGroupId: primary.groupId ?? null,
+      planableGroupId: groupId,
       planableSiblingIds: siblings.map((s) => s.id),
     };
   });
@@ -207,6 +282,35 @@ function statusTone(status: string) {
 
 function looksLikeHtml(input: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(input);
+}
+
+/** Calendar label: caption first; never fall back to a media filename title. */
+function hubPostDisplayText(c: {
+  caption?: string | null;
+  title?: string | null;
+  notes?: string | null;
+  asset_url?: string | null;
+}): string {
+  const caption = stripHtml(c.caption || "").trim();
+  if (caption) return caption;
+  const title = stripHtml(c.title || "").trim();
+  const fromMedia = titleFromPlanableMediaUrls(
+    (c.asset_url || "")
+      .split(/\n+/)
+      .map((u) => u.trim())
+      .filter(Boolean)
+  );
+  if (
+    title &&
+    !/^(untitled post|reel|video post|story)$/i.test(title) &&
+    (!fromMedia || fromMedia.toLowerCase() !== title.toLowerCase())
+  ) {
+    return title;
+  }
+  const notes = stripHtml(c.notes || "").trim();
+  if (notes) return notes;
+  if (/\.(mp4|mov|webm|m4v)(\?|$)/i.test(c.asset_url || "")) return "Video post";
+  return title || "Untitled post";
 }
 
 function PlatformBadge({ name }: { name: string }) {
@@ -370,9 +474,7 @@ export function SocialClient({
           );
           const platform = unique[0] ?? "Social";
           const rawCaption = c.caption || c.notes || "";
-          const text =
-            stripHtml(c.caption || c.title || c.notes || "Untitled post") ||
-            "Untitled post";
+          const text = hubPostDisplayText(c);
           const preview = previewAssetUrls(c.asset_url);
           const canva = primaryCanvaUrl(c.asset_url);
           return {
@@ -444,34 +546,40 @@ export function SocialClient({
       let nextPosts: SocialPost[];
 
       if (memberView) {
-        // Planable is source of truth, but collapse multi-platform siblings
-        // so attendance/scheduled posts match admin (one card per group).
-        const planableVisible = collapsePlanableForMemberView(
-          fromPlanableRaw.filter((p) => isMemberVisible(normalizeStatus(p.status)))
-        );
-        const planableIds = new Set(
-          planableVisible.flatMap((p) => p.planableSiblingIds ?? [])
-        );
-        const planableGroupIds = new Set(
-          planableVisible
-            .map((p) => p.planableGroupId)
-            .filter((id): id is string => Boolean(id))
-        );
-        const hubOnly = fromHub.filter((p) => {
-          if (!isMemberVisible(p.status)) return false;
+        // Hub already stores one row per Planable group — prefer that so
+        // multi-network posts (attendance, etc.) show once like admin.
+        // Add collapsed Planable only for scheduled/published gaps.
+        const hubVisible = fromHub.filter((p) => isMemberVisible(p.status));
+        const hubPostIds = new Set<string>();
+        const hubGroupIds = new Set<string>();
+        const hubTextDays = new Set<string>();
+        for (const p of hubVisible) {
           const raw = contentItems.find((c) => c.id === p.id);
-          if (raw?.planable_post_id && planableIds.has(raw.planable_post_id)) {
-            return false;
-          }
+          if (raw?.planable_post_id) hubPostIds.add(raw.planable_post_id);
+          if (raw?.planable_group_id) hubGroupIds.add(raw.planable_group_id);
+          const textKey = planableTextDayKey(p.text, p.scheduledAt);
+          if (textKey) hubTextDays.add(textKey);
+        }
+
+        const planableOnly = collapsePlanableForMemberView(
+          fromPlanableRaw.filter((p) =>
+            isMemberVisible(normalizeStatus(p.status))
+          )
+        ).filter((p) => {
           if (
-            raw?.planable_group_id &&
-            planableGroupIds.has(raw.planable_group_id)
+            (p.planableSiblingIds ?? []).some((id) => hubPostIds.has(id))
           ) {
             return false;
           }
+          if (p.planableGroupId && hubGroupIds.has(p.planableGroupId)) {
+            return false;
+          }
+          const textKey = planableTextDayKey(p.text, p.scheduledAt);
+          if (textKey && hubTextDays.has(textKey)) return false;
           return true;
         });
-        nextPosts = [...planableVisible, ...hubOnly];
+
+        nextPosts = [...hubVisible, ...planableOnly];
         setSourceLabel("Scheduled & published");
       } else if (fromHub.length > 0) {
         nextPosts = fromHub;
