@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Download } from "lucide-react";
-import type { WebEnquiry } from "@/lib/types";
+import type { HubEnquiry } from "@/lib/types";
 import {
   computeEnquiryStats,
   enquiryInDateRange,
@@ -15,12 +15,20 @@ import {
 } from "@/lib/data/web-enquiries-stats";
 import { PageHeader, EmptyState } from "@/components/ui/PageHeader";
 import { FilterBar, matchesSearch } from "@/components/ui/FilterBar";
+import { SegmentFilter } from "@/components/ui/SegmentFilter";
 import { EnquiryYearCompare } from "@/components/enquiries/EnquiryYearCompare";
 import { useHubView } from "@/lib/hub-view";
 import { cn } from "@/lib/utils";
 import { RecordDrawer } from "@/components/ui/RecordDrawer";
 
 const MARKETING_SOURCE_UPDATE_KEY = "web-enquiries-marketing-source-1.3.24";
+
+type IntakeTab = "web" | "whatsapp";
+
+const INTAKE_TABS: { id: IntakeTab; label: string }[] = [
+  { id: "web", label: "Web" },
+  { id: "whatsapp", label: "WhatsApp" },
+];
 
 type AttrRow = { label: string; value: string };
 
@@ -30,6 +38,8 @@ function channelChipClass(label: string): string {
       return "border-sky-200 bg-sky-50 text-sky-900";
     case "Meta Ads":
       return "border-indigo-200 bg-indigo-50 text-indigo-900";
+    case "WhatsApp":
+      return "border-emerald-300 bg-emerald-50 text-emerald-900";
     case "Organic search":
       return "border-emerald-200 bg-emerald-50 text-emerald-900";
     case "Referral":
@@ -145,15 +155,18 @@ function asString(value: unknown): string {
   return "";
 }
 
-function vesselLabel(e: WebEnquiry): string {
+function vesselLabel(e: HubEnquiry): string {
+  if (e.channel === "whatsapp" && e.vessel_cargo) return e.vessel_cargo;
   const raw = asRecord(e.raw_payload);
   const shipment = asRecord(raw.shipment);
   const form = asRecord(raw.form_fields);
   const make = asRecord(e.make_fields);
   return (
+    asString(e.vessel_cargo) ||
     asString(shipment.yacht_vessel_name) ||
     asString(form["Yacht Name"]) ||
     asString(make.yacht_vessel_name) ||
+    asString(make.vessel_cargo) ||
     asString(shipment.make_model) ||
     asString(form["Make & Model"]) ||
     ""
@@ -171,7 +184,7 @@ function formatDate(value: string | null | undefined) {
   }
 }
 
-function enquiryMessage(e: WebEnquiry): string {
+function enquiryMessage(e: HubEnquiry): string {
   const raw = asRecord(e.raw_payload);
   if (asString(raw.message)) return asString(raw.message);
   const make = asRecord(e.make_fields);
@@ -246,7 +259,7 @@ function DetailSection({
   );
 }
 
-function buildDetailSections(e: WebEnquiry) {
+function buildDetailSections(e: HubEnquiry) {
   const raw = asRecord(e.raw_payload);
   const customer = asRecord(raw.customer);
   const membership = asRecord(raw.membership);
@@ -262,21 +275,48 @@ function buildDetailSections(e: WebEnquiry) {
 
   const customerRows = [
     { label: "Name", value: e.customer_name || asString(customer.name) },
+    {
+      label: "Company",
+      value:
+        e.company ||
+        asString(customer.company) ||
+        asString(make.company),
+    },
     { label: "Email", value: e.customer_email || asString(customer.email) },
     { label: "Phone", value: e.customer_phone || asString(customer.phone) },
     {
       label: "Country",
       value: e.customer_country || asString(customer.country),
     },
-    {
-      label: "Company",
-      value: asString(customer.company) || asString(make.company),
-    },
   ].filter((r) => r.value);
+
+  const trackerRows: AttrRow[] =
+    e.channel === "whatsapp"
+      ? [
+          { label: "Tracker ID", value: e.submission_id },
+          { label: "Tracker status", value: e.tracker_status || "" },
+          { label: "Category", value: e.category || "" },
+          {
+            label: "Sent to office",
+            value: e.sent_to_office_at
+              ? formatDate(e.sent_to_office_at)
+              : "",
+          },
+          {
+            label: "Follow-up / chase",
+            value: e.follow_up_at ? formatDate(e.follow_up_at) : "",
+          },
+          { label: "Email subject", value: e.email_subject || "" },
+          { label: "Source", value: e.tracker_source || "" },
+          { label: "Dimensions", value: e.dimensions || "" },
+          { label: "Declared value", value: e.declared_value || "" },
+          { label: "Timeframe", value: e.preferred_timeframe || "" },
+        ].filter((r) => r.value)
+      : [];
 
   const serviceRows = [
     {
-      label: "Service",
+      label: "Enquiry type",
       value: (e.final_service_category || e.user_selected_service || "").replace(
         /_/g,
         " "
@@ -284,20 +324,26 @@ function buildDetailSections(e: WebEnquiry) {
     },
     {
       label: "User selected",
-      value: e.user_selected_service.replace(/_/g, " "),
+      value:
+        e.channel === "whatsapp"
+          ? ""
+          : e.user_selected_service.replace(/_/g, " "),
     },
-    { label: "Office", value: e.selected_office },
+    { label: "Office / team", value: e.selected_office },
     { label: "Office email", value: e.office_email },
-    { label: "Routing", value: e.routing_reason },
+    { label: "Routing / notes", value: e.routing_reason },
   ].filter((r) => r.value);
 
-  const vesselName = pickField(
-    shipment.yacht_vessel_name,
-    form["Yacht Name"],
-    nonEmpty.yacht_vessel_name,
-    nonEmpty.yacht_name,
-    make.yacht_vessel_name
-  );
+  const vesselName =
+    e.channel === "whatsapp"
+      ? e.vessel_cargo || ""
+      : pickField(
+          shipment.yacht_vessel_name,
+          form["Yacht Name"],
+          nonEmpty.yacht_vessel_name,
+          nonEmpty.yacht_name,
+          make.yacht_vessel_name
+        );
   const makeModel = pickField(
     shipment.make_model,
     form["Make & Model"],
@@ -306,23 +352,38 @@ function buildDetailSections(e: WebEnquiry) {
   );
 
   const vesselRows = [
-    { label: "Yacht / vessel name", value: vesselName },
-    { label: "Make & model", value: makeModel },
     {
-      label: "Year of build",
-      value: pickField(
-        shipment.yacht_year_of_build,
-        form["Year of build"],
-        nonEmpty.yacht_year_of_build
-      ),
+      label: e.channel === "whatsapp" ? "Vessel / cargo" : "Yacht / vessel name",
+      value: vesselName,
     },
     {
-      label: "Length",
-      value: pickField(shipment.length, form.Length, nonEmpty.length),
+      label: "Make & model",
+      value: e.channel === "whatsapp" ? "" : makeModel,
+    },
+    {
+      label: "Year of build",
+      value:
+        e.channel === "whatsapp"
+          ? ""
+          : pickField(
+              shipment.yacht_year_of_build,
+              form["Year of build"],
+              nonEmpty.yacht_year_of_build
+            ),
+    },
+    {
+      label: e.channel === "whatsapp" ? "Dimensions / specs" : "Length",
+      value:
+        e.channel === "whatsapp"
+          ? e.dimensions || ""
+          : pickField(shipment.length, form.Length, nonEmpty.length),
     },
     {
       label: "Width",
-      value: pickField(shipment.width, form.Width, nonEmpty.width),
+      value:
+        e.channel === "whatsapp"
+          ? ""
+          : pickField(shipment.width, form.Width, nonEmpty.width),
     },
     {
       label: "Draft",
@@ -442,6 +503,10 @@ function buildDetailSections(e: WebEnquiry) {
 
   // Friendly fields only — technical click IDs live in trackingRows.
   const attributionRows: AttrRow[] = [
+    {
+      label: "Intake",
+      value: e.channel === "whatsapp" ? "WhatsApp" : "Web form",
+    },
     { label: "Channel", value: channel },
     { label: "Campaign", value: attr.utmCampaign },
     { label: "Source / Medium", value: sourceMedium },
@@ -566,6 +631,7 @@ function buildDetailSections(e: WebEnquiry) {
     vesselName,
     makeModel,
     customerRows,
+    trackerRows,
     serviceRows,
     vesselRows,
     journeyRows,
@@ -582,9 +648,10 @@ function buildDetailSections(e: WebEnquiry) {
   };
 }
 
-function downloadCsv(rows: WebEnquiry[]) {
+function downloadCsv(rows: HubEnquiry[]) {
   const headers = [
     "submission_id",
+    "channel",
     "created_at",
     "customer_name",
     "customer_email",
@@ -612,6 +679,7 @@ function downloadCsv(rows: WebEnquiry[]) {
     ...rows.map((r) =>
       [
         r.submission_id,
+        r.channel,
         r.created_at ?? "",
         r.customer_name,
         r.customer_email,
@@ -648,7 +716,7 @@ export function EnquiriesClient({
   initial,
   configured: initialConfigured,
 }: {
-  initial: WebEnquiry[];
+  initial: HubEnquiry[];
   configured: boolean;
 }) {
   const { canToggleAdminView } = useHubView();
@@ -661,12 +729,13 @@ export function EnquiriesClient({
   const [dateTo, setDateTo] = useState("");
   const [officeFilter, setOfficeFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [intakeTab, setIntakeTab] = useState<IntakeTab>("web");
   const [referrerFilter, setReferrerFilter] = useState("all");
   const [manualRouteOnly, setManualRouteOnly] = useState(false);
   const [showTest, setShowTest] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
   const [showAdsCampaigns, setShowAdsCampaigns] = useState(false);
-  const [selected, setSelected] = useState<WebEnquiry | null>(null);
+  const [selected, setSelected] = useState<HubEnquiry | null>(null);
   const [saving, setSaving] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
   const [showSourceUpdate, setShowSourceUpdate] = useState(false);
@@ -702,20 +771,21 @@ export function EnquiriesClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync by id only
   }, [items, selected?.id]);
 
-  /** Date + test filter — base pool for list/options. */
+  /** Date + test + intake tab — base pool for list/options. */
   const dated = useMemo(() => {
     return items.filter((e) => {
+      if (e.channel !== intakeTab) return false;
       if (!showTest && e.is_test) return false;
       return enquiryInDateRange(e, dateFrom, dateTo);
     });
-  }, [items, showTest, dateFrom, dateTo]);
+  }, [items, showTest, dateFrom, dateTo, intakeTab]);
 
   const offices = useMemo(() => {
     const set = new Set(dated.map((e) => e.selected_office).filter(Boolean));
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [dated]);
 
-  function matchesListFilters(e: WebEnquiry): boolean {
+  function matchesListFilters(e: HubEnquiry): boolean {
     if (manualRouteOnly && !e.needs_manual_review) return false;
     if (officeFilter !== "all") {
       const office = e.selected_office?.trim() || "Unassigned";
@@ -740,6 +810,11 @@ export function EnquiriesClient({
       e.delivery_location,
       e.selected_office,
       e.routing_reason,
+      e.channel,
+      e.company,
+      e.category,
+      e.vessel_cargo,
+      e.tracker_status,
       enquiryMessage(e),
       enquirySourceLabel(e),
       enquiryReferrerKey(e),
@@ -768,6 +843,7 @@ export function EnquiriesClient({
   /** YoY table respects attribute filters, but not the date range (needs full years). */
   const yearCompareItems = useMemo(() => {
     return items.filter((e) => {
+      if (e.channel !== intakeTab) return false;
       if (!showTest && e.is_test) return false;
       return matchesListFilters(e);
     });
@@ -775,6 +851,7 @@ export function EnquiriesClient({
   }, [
     items,
     showTest,
+    intakeTab,
     search,
     officeFilter,
     sourceFilter,
@@ -795,7 +872,15 @@ export function EnquiriesClient({
     setManualRouteOnly(false);
   }
 
-  async function remove(id: string) {
+  function selectIntakeTab(next: IntakeTab) {
+    setIntakeTab(next);
+    setSelected(null);
+    setShowRaw(false);
+    setSourceFilter("all");
+    setReferrerFilter("all");
+  }
+
+  async function remove(e: HubEnquiry) {
     if (!canDelete) return;
     if (!confirm("Delete this enquiry from the hub?")) return;
     setSaving(true);
@@ -803,7 +888,11 @@ export function EnquiriesClient({
       await fetch("/api/enquiries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "delete", id }),
+        body: JSON.stringify({
+          action: "delete",
+          id: e.id,
+          channel: e.channel,
+        }),
       });
       setSelected(null);
       await refresh();
@@ -822,8 +911,12 @@ export function EnquiriesClient({
   return (
     <div>
       <PageHeader
-        title="Web Enquiries"
-        description="Website quote form submissions — live via WordPress webhook, with imported history. Marketing source (channel, campaign, UTM) shows when available."
+        title="Enquiries"
+        description={
+          intakeTab === "whatsapp"
+            ? "WhatsApp enquiry tracker — updated via Hub MCP (ChatGPT). Fields match the spreadsheet."
+            : "Website quote form submissions — live via WordPress webhook, with imported history."
+        }
         actions={
           <button
             type="button"
@@ -837,7 +930,16 @@ export function EnquiriesClient({
         }
       />
 
-      {showSourceUpdate ? (
+      <SegmentFilter
+        label="Enquiry type"
+        value={intakeTab}
+        onChange={selectIntakeTab}
+        options={INTAKE_TABS}
+        size="lg"
+        tourIdPrefix="enquiries-tab"
+      />
+
+      {intakeTab === "web" && showSourceUpdate ? (
         <div className="mb-6 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-sm text-foreground">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -888,7 +990,11 @@ export function EnquiriesClient({
       <FilterBar
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search name, email, vessel, route, office…"
+        searchPlaceholder={
+          intakeTab === "whatsapp"
+            ? "Search name, phone, vessel, office, status…"
+            : "Search name, email, vessel, route, office…"
+        }
         resultCount={filtered.length}
         totalCount={dated.length}
         dateRange={{
@@ -972,25 +1078,36 @@ export function EnquiriesClient({
             {rangeStats.total}
           </p>
         </div>
-        <button
-          type="button"
-          className={cn(
-            "surface-card p-4 text-left transition hover:-translate-y-0.5 hover:border-accent",
-            sourceFilter === "Google Ads" && "border-brand bg-accent-soft/40"
-          )}
-          onClick={() =>
-            setSourceFilter((cur) =>
-              cur === "Google Ads" ? "all" : "Google Ads"
-            )
-          }
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-            Google Ads
-          </p>
-          <p className="mt-1 font-display text-2xl text-brand">
-            {rangeStats.googleAds}
-          </p>
-        </button>
+        {intakeTab === "web" ? (
+          <button
+            type="button"
+            className={cn(
+              "surface-card p-4 text-left transition hover:-translate-y-0.5 hover:border-accent",
+              sourceFilter === "Google Ads" && "border-brand bg-accent-soft/40"
+            )}
+            onClick={() =>
+              setSourceFilter((cur) =>
+                cur === "Google Ads" ? "all" : "Google Ads"
+              )
+            }
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Google Ads
+            </p>
+            <p className="mt-1 font-display text-2xl text-brand">
+              {rangeStats.googleAds}
+            </p>
+          </button>
+        ) : (
+          <div className="surface-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+              Needs review
+            </p>
+            <p className="mt-1 font-display text-2xl text-brand">
+              {rangeStats.needsReview}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mb-6 grid gap-4 lg:grid-cols-2">
@@ -1025,7 +1142,7 @@ export function EnquiriesClient({
           </div>
         ) : null}
 
-        {rangeStats.topSources.length > 0 ? (
+        {intakeTab === "web" && rangeStats.topSources.length > 0 ? (
           <div className="surface-card p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">
               Channel
@@ -1062,7 +1179,7 @@ export function EnquiriesClient({
         ) : null}
       </div>
 
-      {rangeStats.googleAdsByReferrer.length > 0 ? (
+      {intakeTab === "web" && rangeStats.googleAdsByReferrer.length > 0 ? (
         <div className="surface-card mb-6 overflow-hidden">
           <button
             type="button"
@@ -1126,6 +1243,7 @@ export function EnquiriesClient({
         </div>
       ) : null}
 
+      {intakeTab === "web" ? (
       <div className="mb-6">
         <button
           type="button"
@@ -1138,11 +1256,16 @@ export function EnquiriesClient({
           <EnquiryYearCompare items={yearCompareItems} includeTest />
         ) : null}
       </div>
+      ) : null}
 
       {filtered.length === 0 ? (
         <EmptyState
           title="No enquiries match"
-          description="Try clearing the date range or filters. New submissions appear when the Quote Builder webhook is connected."
+          description={
+            intakeTab === "whatsapp"
+              ? "Try clearing filters, or add a WhatsApp enquiry via Hub MCP (ChatGPT)."
+              : "Try clearing the date range or filters. New submissions appear when the Quote Builder webhook is connected."
+          }
         />
       ) : (
         <div className="surface-card overflow-x-auto">
@@ -1186,7 +1309,11 @@ export function EnquiriesClient({
                       <p className="font-medium text-foreground">
                         {e.customer_name || "—"}
                       </p>
-                      <p className="text-xs text-muted">{e.customer_email}</p>
+                      <p className="text-xs text-muted">
+                        {e.channel === "whatsapp"
+                          ? e.customer_phone || e.customer_email
+                          : e.customer_email || e.customer_phone}
+                      </p>
                     </td>
                     <td className="max-w-[140px] truncate px-4 py-3 text-muted">
                       {vessel || "—"}
@@ -1213,7 +1340,14 @@ export function EnquiriesClient({
                     </td>
                     <td className="px-4 py-3">
                       <ChannelChip label={attr.sourceLabel} />
-                      {attr.utmCampaign ? (
+                      {e.channel === "whatsapp" && e.tracker_status ? (
+                        <p
+                          className="mt-1 max-w-[160px] truncate text-[11px] text-muted"
+                          title={e.tracker_status}
+                        >
+                          {e.tracker_status}
+                        </p>
+                      ) : attr.utmCampaign ? (
                         <p
                           className="mt-1 max-w-[160px] truncate text-[11px] text-muted"
                           title={attr.utmCampaign}
@@ -1253,7 +1387,7 @@ export function EnquiriesClient({
                   type="button"
                   className="btn-ghost text-[var(--danger)]"
                   disabled={saving}
-                  onClick={() => void remove(selected.id)}
+                  onClick={() => void remove(selected)}
                 >
                   Delete
                 </button>
@@ -1264,13 +1398,18 @@ export function EnquiriesClient({
               <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-xs text-muted">
-                  Submitted{" "}
+                  {selected.channel === "whatsapp" ? "Sent " : "Submitted "}
                   {formatDate(selected.created_at ?? selected.received_at)}
                 </p>
                 <OfficeChip
                   office={selected.selected_office || "Unassigned"}
                 />
                 <ChannelChip label={detail.channel} />
+                {selected.channel === "whatsapp" && selected.tracker_status ? (
+                  <span className="inline-flex max-w-full items-center truncate rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-900">
+                    {selected.tracker_status}
+                  </span>
+                ) : null}
                 {detail.campaign ? (
                   <span
                     className="max-w-[220px] truncate text-xs text-muted"
@@ -1281,6 +1420,9 @@ export function EnquiriesClient({
                 ) : null}
               </div>
 
+              {selected.channel === "whatsapp" ? (
+                <DetailSection title="WhatsApp tracker" rows={detail.trackerRows} />
+              ) : (
               <div className="rounded-xl border border-border bg-sand/30 p-3">
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
                   Marketing source
@@ -1329,6 +1471,7 @@ export function EnquiriesClient({
                   </details>
                 ) : null}
               </div>
+              )}
 
               <DetailSection title="Customer" rows={detail.customerRows} />
               <DetailSection title="Vessel / cargo" rows={detail.vesselRows} />

@@ -47,7 +47,7 @@ See [`.env.example`](.env.example).
 - **Drive:** Service account with Viewer on the gallery folder + `DRIVE_GALLERY_ROOT_FOLDER_ID`.
 - **Planable:** `PLANABLE_API_TOKEN` (Write scope) + `PLANABLE_WORKSPACE_ID`. Draft Social in the Hub with a caption or image; **Approved** sends one Facebook draft on the due date (not all LinkedIn pages). Add other platforms, approve, and **publish only in Planable**, then **Sync from Planable** to lock the Hub piece.
 - **Alerts:** Set `RESEND_API_KEY` (and optional `RESEND_FROM_EMAIL`, `MARKETING_ALERT_EMAIL`) so marketing gets a short email when a clothing/asset/social request or feedback is submitted — type only, no details.
-- **ChatGPT (MCP):** Set `HUB_MCP_API_KEY`, deploy, then add a ChatGPT connector (Developer mode) at `https://<your-hub-domain>/api/mcp` using **User-Defined OAuth Client**. Client ID defaults to `marketing-hub-chatgpt`; client secret = `HUB_MCP_API_KEY`. Auth URL: `/api/mcp/oauth/authorize`, Token URL: `/api/mcp/oauth/token`.
+- **ChatGPT (MCP):** Set `HUB_MCP_API_KEY`, deploy, then add a ChatGPT connector (Developer mode) at `https://<your-hub-domain>/api/mcp` using **User-Defined OAuth Client**. Client ID defaults to `marketing-hub-chatgpt`; client secret = `HUB_MCP_API_KEY`. Auth URL: `/api/mcp/oauth/authorize`, Token URL: `/api/mcp/oauth/token`. WhatsApp enquiry tracker tools: `create_whatsapp_enquiry`, `update_whatsapp_enquiry`, `list_enquiries` (fields match the Excel tracker; shown with web enquiries in one Hub tab).
 
 SQL for a dedicated Supabase project: [`supabase/migrations/001_hub_v2_schema.sql`](supabase/migrations/001_hub_v2_schema.sql).
 

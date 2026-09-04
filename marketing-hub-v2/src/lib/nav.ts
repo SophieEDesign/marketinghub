@@ -98,8 +98,8 @@ export const STAFF_NAV: NavItem[] = [
   },
   {
     href: "/app/enquiries",
-    label: "Web Enquiries",
-    description: "Website quote form submissions",
+    label: "Enquiries",
+    description: "Web quote form and WhatsApp tracker",
     icon: Inbox,
     member: true,
   },

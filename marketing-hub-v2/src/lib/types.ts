@@ -473,6 +473,8 @@ export type AccessRequest = {
 /** WordPress Quote Builder → hub webhook enquiries. */
 export type WebEnquiryStatus = "new" | "in_progress" | "done";
 
+export type EnquiryIntake = "web" | "whatsapp";
+
 export type WebEnquiry = {
   id: string;
   submission_id: string;
@@ -498,9 +500,67 @@ export type WebEnquiry = {
   updated_at: string;
 };
 
+/** WhatsApp → Hub MCP enquiries (own table; shown with web in one tab). */
+export type WhatsAppEnquiry = {
+  id: string;
+  external_id: string;
+  created_at: string | null;
+  /** Spreadsheet: Date Sent to Office */
+  sent_to_office_at: string | null;
+  /** Spreadsheet: Follow-up / Chase Date */
+  follow_up_at: string | null;
+  customer_name: string;
+  company: string;
+  customer_email: string;
+  customer_phone: string;
+  customer_country: string;
+  category: string;
+  /** Spreadsheet: Enquiry Type */
+  service: string;
+  vessel_cargo: string;
+  collection_location: string;
+  delivery_location: string;
+  dimensions: string;
+  declared_value: string;
+  preferred_timeframe: string;
+  /** Spreadsheet: Team / Office Sent To */
+  selected_office: string;
+  office_email: string;
+  /** Spreadsheet free-text Status (Sent to office, Quoted, …) */
+  tracker_status: string;
+  email_subject: string;
+  source: string;
+  message: string;
+  notes: string;
+  needs_manual_review: boolean;
+  is_test: boolean;
+  /** Hub workflow bucket derived from tracker_status */
+  status: WebEnquiryStatus;
+  raw_payload: Record<string, unknown>;
+  received_at: string;
+  updated_at: string;
+};
+
+/** Unified list row for the Enquiries tab (web + WhatsApp). */
+export type HubEnquiry = WebEnquiry & {
+  channel: EnquiryIntake;
+  company?: string;
+  category?: string;
+  vessel_cargo?: string;
+  dimensions?: string;
+  declared_value?: string;
+  preferred_timeframe?: string;
+  tracker_status?: string;
+  follow_up_at?: string | null;
+  sent_to_office_at?: string | null;
+  email_subject?: string;
+  tracker_source?: string;
+};
+
 /** Singleton page reference notes (HTML), keyed by page id. */
 export type HubPageNotes = {
   social_monthly_plan?: string;
+  social_monthly_tasks?: string;
 };
 
 export type BudgetGroup = "committed" | "uncommitted";

@@ -271,7 +271,7 @@ export function PaidMediaPanel({
               href="/app/enquiries"
               className="text-brand underline-offset-2 hover:underline"
             >
-              Web Enquiries
+              Enquiries
             </Link>
             .
           </p>

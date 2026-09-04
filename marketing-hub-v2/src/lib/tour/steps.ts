@@ -227,8 +227,8 @@ export const MEMBER_TOUR_STEPS: TourStep[] = [
   {
     id: "enquiries",
     selector: '[data-tour="nav-enquiries"]',
-    title: "Web Enquiries",
-    body: "Quote requests submitted through the website — for your information.",
+    title: "Enquiries",
+    body: "Website quote form and WhatsApp tracker — use the Web and WhatsApp tabs.",
     href: "/app/enquiries",
     placement: "right",
   },
@@ -299,8 +299,8 @@ export const ADMIN_TOUR_STEPS: TourStep[] = [
   {
     id: "enquiries",
     selector: '[data-tour="nav-enquiries"]',
-    title: "Web Enquiries",
-    body: "Quote requests submitted through the website — for your information.",
+    title: "Enquiries",
+    body: "Website quote form and WhatsApp tracker — use the Web and WhatsApp tabs.",
     href: "/app/enquiries",
     placement: "right",
   },

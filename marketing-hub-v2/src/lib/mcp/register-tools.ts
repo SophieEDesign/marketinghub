@@ -9,6 +9,11 @@ import {
   listUpcomingEvents,
   updateSocialPost,
 } from "@/lib/mcp/content";
+import {
+  createWhatsAppEnquiryFromMcp,
+  listEnquiriesForMcp,
+  updateWhatsAppEnquiryFromMcp,
+} from "@/lib/mcp/enquiries";
 
 function jsonText(data: unknown) {
   return {
@@ -30,6 +35,8 @@ const contentStatus = z.enum([
   "approved",
   "scheduled",
 ]);
+
+const enquiryChannel = z.enum(["web", "whatsapp"]);
 
 export function registerHubMcpTools(server: McpServer) {
   server.registerTool(
@@ -172,5 +179,122 @@ export function registerHubMcpTools(server: McpServer) {
       }),
     },
     async (args) => jsonText(await listUpcomingEvents(args.limit))
+  );
+
+  const whatsappEnquiryFields = {
+    external_id: z
+      .string()
+      .optional()
+      .describe(
+        "Tracker ID e.g. WA-051. Omit on create to auto-allocate next WA-###."
+      ),
+    sent_to_office_at: z
+      .string()
+      .optional()
+      .describe("Date sent to office (ISO or YYYY-MM-DD)"),
+    follow_up_at: z
+      .string()
+      .nullable()
+      .optional()
+      .describe("Follow-up / chase date (ISO or YYYY-MM-DD)"),
+    customer_name: z.string().optional(),
+    company: z.string().optional(),
+    customer_phone: z.string().optional().describe("Telephone"),
+    customer_email: z.string().optional(),
+    customer_country: z.string().optional(),
+    category: z
+      .string()
+      .optional()
+      .describe("Sales, Accounts, Non-sales, …"),
+    enquiry_type: z
+      .string()
+      .optional()
+      .describe("Enquiry Type e.g. Yacht transport"),
+    service: z.string().optional().describe("Alias for enquiry_type"),
+    vessel_cargo: z.string().optional().describe("Vessel / Cargo"),
+    collection_location: z.string().optional().describe("Origin / Collection"),
+    delivery_location: z.string().optional().describe("Destination"),
+    dimensions: z.string().optional().describe("Dimensions / Key Specs"),
+    declared_value: z.string().optional().describe("Declared / Insured Value"),
+    preferred_timeframe: z.string().optional(),
+    selected_office: z
+      .string()
+      .optional()
+      .describe("Team / Office Sent To"),
+    office_email: z.string().optional(),
+    tracker_status: z
+      .string()
+      .optional()
+      .describe(
+        "Spreadsheet Status e.g. Sent to office, Contacted, Quoted, Follow-up required"
+      ),
+    email_subject: z.string().optional(),
+    source: z.string().optional().describe("Source file / channel note"),
+    message: z.string().optional().describe("Chat summary / message"),
+    notes: z.string().optional(),
+    is_test: z.boolean().optional(),
+  };
+
+  server.registerTool(
+    "create_whatsapp_enquiry",
+    {
+      title: "Create WhatsApp enquiry",
+      description:
+        "Add a WhatsApp enquiry to the Marketing Hub enquiry tracker (whatsapp_enquiries). Fields match the Excel tracker. Prefer omitting external_id so the Hub allocates the next WA-###. Call once per new enquiry after drafting the handover.",
+      inputSchema: z.object(whatsappEnquiryFields),
+    },
+    async (args) => {
+      try {
+        const enquiry = await createWhatsAppEnquiryFromMcp(args);
+        return jsonText({ ok: true, enquiry });
+      } catch (err) {
+        return errorText(err instanceof Error ? err.message : "Create failed");
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_whatsapp_enquiry",
+    {
+      title: "Update WhatsApp enquiry",
+      description:
+        "Update an existing WhatsApp enquiry tracker row (chase, quote, status, office). Identify by external_id (WA-###) or id. Only send fields that changed.",
+      inputSchema: z.object({
+        id: z.string().optional().describe("Hub row id"),
+        ...whatsappEnquiryFields,
+        external_id: z
+          .string()
+          .optional()
+          .describe("Tracker ID e.g. WA-012 (preferred)"),
+      }),
+    },
+    async (args) => {
+      try {
+        if (!args.id && !args.external_id) {
+          return errorText("Provide external_id (WA-###) or id");
+        }
+        const enquiry = await updateWhatsAppEnquiryFromMcp(args);
+        return jsonText({ ok: true, enquiry });
+      } catch (err) {
+        return errorText(err instanceof Error ? err.message : "Update failed");
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_enquiries",
+    {
+      title: "List enquiries",
+      description:
+        "List Marketing Hub enquiries from web_enquiries + whatsapp_enquiries (one combined Enquiries tab). Filter by intake channel.",
+      inputSchema: z.object({
+        channel: enquiryChannel
+          .optional()
+          .describe("web = quote form, whatsapp = WhatsApp tracker"),
+        include_test: z.boolean().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    },
+    async (args) => jsonText(await listEnquiriesForMcp(args))
   );
 }

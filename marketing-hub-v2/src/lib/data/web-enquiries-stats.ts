@@ -1,4 +1,4 @@
-import type { WebEnquiry } from "@/lib/types";
+import type { HubEnquiry, WebEnquiry } from "@/lib/types";
 import {
   ENQUIRY_HISTORY_BASE_YEARS,
   HISTORICAL_MONTHLY_ENQUIRIES,
@@ -77,7 +77,31 @@ export type EnquiryAttribution = {
 };
 
 /** Pull page, referrer, and Google Ads URL parameters from an enquiry. */
-export function getEnquiryAttribution(e: WebEnquiry): EnquiryAttribution {
+export function getEnquiryAttribution(
+  e: WebEnquiry | HubEnquiry
+): EnquiryAttribution {
+  if ("channel" in e && e.channel === "whatsapp") {
+    return {
+      pageUrl: "",
+      referrer: "",
+      gclid: "",
+      gbraid: "",
+      wbraid: "",
+      utmSource: "whatsapp",
+      utmMedium: "messaging",
+      utmCampaign: "",
+      utmTerm: "",
+      utmContent: "",
+      hsaCam: "",
+      hsaAd: "",
+      hsaGrp: "",
+      heardAbout: "WhatsApp",
+      isGoogleAds: false,
+      sourceLabel: "WhatsApp",
+      adsGroupLabel: "",
+    };
+  }
+
   const raw = asRecord(e.raw_payload);
   const tracking = asRecord(raw.tracking);
   const make = asRecord(e.make_fields);
@@ -259,16 +283,16 @@ function enquiryReferrerKeyFromStrings(referrer: string, pageUrl: string): strin
 }
 
 /** Heard-about / UTM / gclid helpers for attribution stats. */
-export function enquirySourceLabel(e: WebEnquiry): string {
+export function enquirySourceLabel(e: WebEnquiry | HubEnquiry): string {
   return getEnquiryAttribution(e).sourceLabel;
 }
 
-export function isGoogleAdsEnquiry(e: WebEnquiry): boolean {
+export function isGoogleAdsEnquiry(e: WebEnquiry | HubEnquiry): boolean {
   return getEnquiryAttribution(e).isGoogleAds;
 }
 
 /** Raw referrer URL from tracking / make / form fields. */
-export function enquiryReferrerRaw(e: WebEnquiry): string {
+export function enquiryReferrerRaw(e: WebEnquiry | HubEnquiry): string {
   return getEnquiryAttribution(e).referrer;
 }
 
@@ -276,7 +300,7 @@ export function enquiryReferrerRaw(e: WebEnquiry): string {
  * Grouping key for referrer links — strips hash/query noise where possible,
  * keeps host + path so Ad landing variants still group sensibly.
  */
-export function enquiryReferrerKey(e: WebEnquiry): string {
+export function enquiryReferrerKey(e: WebEnquiry | HubEnquiry): string {
   const a = getEnquiryAttribution(e);
   if (a.isGoogleAds && a.adsGroupLabel) return a.adsGroupLabel;
   const raw = a.referrer;

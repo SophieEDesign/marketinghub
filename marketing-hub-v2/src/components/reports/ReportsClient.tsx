@@ -147,11 +147,11 @@ export function ReportsClient({
             <strong>Looker Studio</strong> (Data Studio) — one shared dashboard that pulls the above together
           </li>
           <li>
-            <strong>Web Enquiries</strong> — quote form submissions are in the{" "}
+            <strong>Enquiries</strong> — quote form submissions are in the{" "}
             <Link href="/app/enquiries" className="text-brand underline-offset-2 hover:underline">
-              Web Enquiries
+              Enquiries
             </Link>{" "}
-            tab (WordPress webhook)
+            module (Web tab; WordPress webhook)
           </li>
         </ul>
         <p className="mt-3">

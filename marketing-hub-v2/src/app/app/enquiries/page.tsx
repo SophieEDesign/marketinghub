@@ -1,13 +1,13 @@
 import { EnquiriesClient } from "@/components/enquiries/EnquiriesClient";
-import { listWebEnquiries } from "@/lib/data/web-enquiries";
+import { listHubEnquiries } from "@/lib/data/hub-enquiries";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 
 export default async function EnquiriesPage() {
   const configured = hasServiceRoleKey();
-  let initial: Awaited<ReturnType<typeof listWebEnquiries>> = [];
+  let initial: Awaited<ReturnType<typeof listHubEnquiries>> = [];
   if (configured) {
     try {
-      initial = await listWebEnquiries({ includeTest: false });
+      initial = await listHubEnquiries({ includeTest: false });
     } catch {
       initial = [];
     }

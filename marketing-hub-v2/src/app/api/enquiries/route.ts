@@ -1,19 +1,23 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireAdmin, requireStaff } from "@/lib/api";
+import { listHubEnquiries } from "@/lib/data/hub-enquiries";
 import {
   deleteWebEnquiry,
-  listWebEnquiries,
   requireWebhookSecret,
   updateWebEnquiry,
   upsertWebEnquiryFromWebhook,
 } from "@/lib/data/web-enquiries";
-import type { WebEnquiryStatus } from "@/lib/types";
+import {
+  deleteWhatsAppEnquiry,
+  updateWhatsAppEnquiry,
+} from "@/lib/data/whatsapp-enquiries";
+import type { EnquiryIntake, WebEnquiryStatus } from "@/lib/types";
 import { hasServiceRoleKey } from "@/lib/supabase/admin";
 import { rateLimitPublic } from "@/lib/security/rate-limit";
 
 /**
- * Staff list: GET with session.
- * Webhook ingest: POST with X-Webhook-Secret / Bearer (no session).
+ * Staff list: GET with session — web + WhatsApp merged.
+ * Webhook ingest: POST with X-Webhook-Secret / Bearer (no session) — web only.
  * Staff mutations: POST with session + action update|delete (delete = admin only).
  */
 export async function GET(request: NextRequest) {
@@ -27,16 +31,19 @@ export async function GET(request: NextRequest) {
   const includeTest =
     request.nextUrl.searchParams.get("include_test") === "1" ||
     request.nextUrl.searchParams.get("include_test") === "true";
+  const channelRaw = request.nextUrl.searchParams.get("channel");
+  const channel =
+    channelRaw === "web" || channelRaw === "whatsapp"
+      ? (channelRaw as EnquiryIntake)
+      : undefined;
   const limitRaw = request.nextUrl.searchParams.get("limit");
-  const offsetRaw = request.nextUrl.searchParams.get("offset");
   const limit = limitRaw ? Number(limitRaw) : undefined;
-  const offset = offsetRaw ? Number(offsetRaw) : undefined;
 
   try {
-    const enquiries = await listWebEnquiries({
+    const enquiries = await listHubEnquiries({
       includeTest,
+      channel,
       ...(Number.isFinite(limit) ? { limit } : {}),
-      ...(Number.isFinite(offset) ? { offset } : {}),
     });
     return jsonOk({ enquiries, configured: true });
   } catch (err) {
@@ -65,11 +72,18 @@ export async function POST(request: NextRequest) {
       return jsonError("Enquiries storage is not configured", 503);
     }
 
+    const channel =
+      body.channel === "whatsapp" ? "whatsapp" : ("web" as EnquiryIntake);
+
     try {
       if (action === "delete") {
         const id = String(body.id ?? "");
         if (!id) return jsonError("id is required");
-        await deleteWebEnquiry(id);
+        if (channel === "whatsapp") {
+          await deleteWhatsAppEnquiry(id);
+        } else {
+          await deleteWebEnquiry(id);
+        }
         return jsonOk({ ok: true });
       }
 
@@ -80,7 +94,10 @@ export async function POST(request: NextRequest) {
           ? (body.patch as { status?: WebEnquiryStatus })
           : {};
       const status = patch.status ?? (body.status as WebEnquiryStatus | undefined);
-      const updated = await updateWebEnquiry(id, { status });
+      const updated =
+        channel === "whatsapp"
+          ? await updateWhatsAppEnquiry({ id, status })
+          : await updateWebEnquiry(id, { status });
       if (!updated) return jsonError("Not found", 404);
       return jsonOk({ item: updated });
     } catch (err) {
