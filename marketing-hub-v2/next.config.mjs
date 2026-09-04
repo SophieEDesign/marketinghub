@@ -49,22 +49,47 @@ const nextConfig = {
     ];
   },
   async rewrites() {
+    const protectedResource = "/api/mcp/oauth/metadata/protected-resource";
+    const authorizationServer =
+      "/api/mcp/oauth/metadata/authorization-server";
+
     return [
-      {
-        source: "/api/mcp/.well-known/oauth-protected-resource",
-        destination: "/api/mcp/oauth/metadata/protected-resource",
-      },
+      // Root + path-aware discovery (ChatGPT prefers .../mcp and .../api/mcp suffixes).
       {
         source: "/.well-known/oauth-protected-resource",
-        destination: "/api/mcp/oauth/metadata/protected-resource",
+        destination: protectedResource,
       },
       {
-        source: "/api/mcp/oauth/.well-known/oauth-authorization-server",
-        destination: "/api/mcp/oauth/metadata/authorization-server",
+        source: "/.well-known/oauth-protected-resource/mcp",
+        destination: protectedResource,
+      },
+      {
+        source: "/.well-known/oauth-protected-resource/api/mcp",
+        destination: protectedResource,
+      },
+      {
+        source: "/api/mcp/.well-known/oauth-protected-resource",
+        destination: protectedResource,
       },
       {
         source: "/.well-known/oauth-authorization-server",
-        destination: "/api/mcp/oauth/metadata/authorization-server",
+        destination: authorizationServer,
+      },
+      {
+        source: "/.well-known/oauth-authorization-server/mcp",
+        destination: authorizationServer,
+      },
+      {
+        source: "/.well-known/oauth-authorization-server/api/mcp",
+        destination: authorizationServer,
+      },
+      {
+        source: "/.well-known/oauth-authorization-server/api/mcp/oauth",
+        destination: authorizationServer,
+      },
+      {
+        source: "/api/mcp/oauth/.well-known/oauth-authorization-server",
+        destination: authorizationServer,
       },
     ];
   },

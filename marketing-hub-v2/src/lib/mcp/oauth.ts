@@ -1,10 +1,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-const ACCESS_TOKEN_TTL_SEC = 60 * 60;
-const AUTH_CODE_TTL_SEC = 5 * 60;
+/** 24h access tokens — fewer ChatGPT reconnect races than 1h expiry. */
+const ACCESS_TOKEN_TTL_SEC = 60 * 60 * 24;
+/** Sliding refresh window. */
+const REFRESH_TOKEN_TTL_SEC = 60 * 60 * 24 * 90;
+const AUTH_CODE_TTL_SEC = 10 * 60;
 
 type TokenPayload = {
-  type: "access" | "code";
+  type: "access" | "code" | "refresh";
   clientId: string;
   scope: string;
   exp: number;
@@ -54,7 +57,12 @@ export function verifySignedToken(token: string): TokenPayload | null {
   const expected = createHmac("sha256", secret)
     .update(`${header}.${body}`)
     .digest();
-  const actual = base64UrlDecode(signature);
+  let actual: Buffer;
+  try {
+    actual = base64UrlDecode(signature);
+  } catch {
+    return null;
+  }
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     return null;
   }
@@ -73,10 +81,14 @@ export function verifySignedToken(token: string): TokenPayload | null {
 }
 
 function secretsMatch(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  try {
+    const a = Buffer.from(provided);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 export function getMcpApiKey(): string | null {
@@ -130,9 +142,20 @@ export function verifyMcpClient(
 ): boolean {
   if (!isMcpConfigured()) return false;
   if (!secretsMatch(clientId, getMcpOAuthClientId())) return false;
-  if (clientSecret == null) return true;
+  // PKCE public clients may omit secret on authorize; token exchange should send it.
+  if (clientSecret == null || clientSecret === "") return true;
   const expected = getMcpOAuthClientSecret();
   return Boolean(expected && secretsMatch(clientSecret, expected));
+}
+
+function issueRefreshToken(clientId: string, scope: string) {
+  const exp = Math.floor(Date.now() / 1000) + REFRESH_TOKEN_TTL_SEC;
+  return signPayload({
+    type: "refresh",
+    clientId,
+    scope,
+    exp,
+  });
 }
 
 export function issueAccessToken(clientId: string, scope = "mcp:tools") {
@@ -145,9 +168,11 @@ export function issueAccessToken(clientId: string, scope = "mcp:tools") {
   });
   return {
     access_token: token,
-    token_type: "Bearer" as const,
+    // Lowercase matches Cloudflare MCP reference; some clients are picky.
+    token_type: "bearer" as const,
     expires_in: ACCESS_TOKEN_TTL_SEC,
     scope,
+    refresh_token: issueRefreshToken(clientId, scope),
   };
 }
 
@@ -208,17 +233,41 @@ export function exchangeAuthorizationCode(input: {
   return { token: issueAccessToken(input.clientId, payload.scope) };
 }
 
+export function exchangeRefreshToken(input: {
+  refreshToken: string;
+  clientId: string;
+  clientSecret?: string | null;
+}) {
+  if (!verifyMcpClient(input.clientId, input.clientSecret)) {
+    return { error: "invalid_client" as const };
+  }
+
+  const payload = verifySignedToken(input.refreshToken);
+  if (!payload || payload.type !== "refresh") {
+    return { error: "invalid_grant" as const };
+  }
+  if (payload.clientId !== input.clientId) {
+    return { error: "invalid_grant" as const };
+  }
+
+  // Issue a fresh access + refresh pair (sliding window). Old refresh stays
+  // valid until its own expiry so concurrent retries don't strand the client.
+  return { token: issueAccessToken(input.clientId, payload.scope) };
+}
+
 export function verifyMcpAccessToken(
   bearerToken?: string | null
 ): { clientId: string; scope: string } | null {
   if (!bearerToken) return null;
+  const token = bearerToken.trim();
+  if (!token) return null;
 
   const apiKey = getMcpApiKey();
-  if (apiKey && secretsMatch(bearerToken, apiKey)) {
+  if (apiKey && secretsMatch(token, apiKey)) {
     return { clientId: getMcpOAuthClientId(), scope: "mcp:tools" };
   }
 
-  const payload = verifySignedToken(bearerToken);
+  const payload = verifySignedToken(token);
   if (!payload || payload.type !== "access") return null;
   return { clientId: payload.clientId, scope: payload.scope };
 }
@@ -226,11 +275,18 @@ export function verifyMcpAccessToken(
 export function isAllowedRedirectUri(redirectUri: string): boolean {
   try {
     const url = new URL(redirectUri);
-    if (url.protocol !== "https:") return false;
+    if (url.protocol !== "https:" && url.hostname !== "localhost") {
+      return false;
+    }
+    const host = url.hostname.toLowerCase();
     return (
-      url.hostname === "chatgpt.com" ||
-      url.hostname.endsWith(".chatgpt.com") ||
-      url.hostname === "localhost"
+      host === "chatgpt.com" ||
+      host.endsWith(".chatgpt.com") ||
+      host === "openai.com" ||
+      host.endsWith(".openai.com") ||
+      host === "claude.ai" ||
+      host.endsWith(".claude.ai") ||
+      host === "localhost"
     );
   } catch {
     return false;
@@ -244,13 +300,17 @@ export function oauthAuthorizationServerMetadata(request?: Request) {
     authorization_endpoint: `${issuer}/authorize`,
     token_endpoint: `${issuer}/token`,
     response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "client_credentials"],
+    grant_types_supported: [
+      "authorization_code",
+      "refresh_token",
+      "client_credentials",
+    ],
     token_endpoint_auth_methods_supported: [
       "client_secret_post",
       "client_secret_basic",
       "none",
     ],
-    code_challenge_methods_supported: ["S256"],
+    code_challenge_methods_supported: ["S256", "plain"],
     scopes_supported: ["mcp:tools"],
   };
 }

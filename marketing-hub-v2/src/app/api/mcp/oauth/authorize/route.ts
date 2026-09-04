@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mcpCorsPreflight } from "@/lib/mcp/cors";
 import {
   createAuthorizationCode,
   getMcpOAuthClientId,
@@ -9,12 +10,25 @@ import {
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 function errorPage(message: string, status = 400) {
   return new NextResponse(
     `<!doctype html><html><body style="font-family:system-ui;padding:2rem"><h1>Marketing Hub</h1><p>${message}</p></body></html>`,
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return mcpCorsPreflight(request);
 }
 
 export async function GET(request: NextRequest) {
@@ -28,7 +42,8 @@ export async function GET(request: NextRequest) {
   const redirectUri = params.get("redirect_uri")?.trim() ?? "";
   const state = params.get("state")?.trim() ?? "";
   const codeChallenge = params.get("code_challenge")?.trim() ?? undefined;
-  const codeChallengeMethod = params.get("code_challenge_method")?.trim() ?? undefined;
+  const codeChallengeMethod =
+    params.get("code_challenge_method")?.trim() ?? undefined;
 
   if (responseType !== "code") {
     return errorPage("Unsupported response_type.");
@@ -58,12 +73,12 @@ export async function GET(request: NextRequest) {
   </head>
   <body>
     <h1>Connect ChatGPT to Marketing Hub</h1>
-    <p>Allow ChatGPT to read themes, events, and social posts and save draft copy back to the Hub.</p>
-    <form method="get" action="${next.pathname}">
+    <p>Allow ChatGPT to use Hub tools: social drafts, themes, events, and the WhatsApp enquiry tracker.</p>
+    <form method="get" action="${escapeAttr(next.pathname)}">
       ${Array.from(next.searchParams.entries())
         .map(
           ([key, value]) =>
-            `<input type="hidden" name="${key}" value="${value.replace(/"/g, "&quot;")}" />`
+            `<input type="hidden" name="${escapeAttr(key)}" value="${escapeAttr(value)}" />`
         )
         .join("")}
       <button type="submit">Allow access</button>
@@ -82,8 +97,9 @@ export async function GET(request: NextRequest) {
     codeChallengeMethod,
   });
 
+  // 302 (not 303) — ChatGPT/Claude connectors are picky about consent redirects.
   const target = new URL(redirectUri);
   target.searchParams.set("code", code);
   if (state) target.searchParams.set("state", state);
-  return NextResponse.redirect(target);
+  return NextResponse.redirect(target, 302);
 }
