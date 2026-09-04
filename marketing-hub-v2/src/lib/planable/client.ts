@@ -59,6 +59,8 @@ export type PlanableRawPost = {
   pageName: string | null;
   url: string | null;
   type: string | null;
+  /** Planable classification: post | reels | story | … */
+  classification: string | null;
 };
 
 function authHeaders(token: string, json = false): HeadersInit {
@@ -181,9 +183,8 @@ function pickMediaUrls(p: Record<string, unknown>): string[] {
   return out;
 }
 
-/** Humanize a Planable media filename when the post has no caption. */
-export function titleFromPlanableMediaUrls(urls: string[]): string {
-  // Prefer video filenames — thumbnails are often opaque ids ("thumb.jpg").
+/** Stable media identity for grouping orphans (empty caption, no groupId). */
+export function mediaFingerprintFromUrls(urls: string[]): string {
   const ordered = [
     ...urls.filter((u) => isVideoMediaUrl(u)),
     ...urls.filter((u) => !isVideoMediaUrl(u)),
@@ -199,23 +200,33 @@ export function titleFromPlanableMediaUrls(urls: string[]): string {
         .replace(/_web-?\d+p$/i, "")
         .replace(/_pintura[a-f0-9]+$/i, "")
         .replace(/_\d{5}(\.\d+)?$/i, "");
-      // Drop leading Planable id chunks (e.g. MExpMbHd2j-p-and-m-athens)
       base = base.replace(/^[A-Za-z0-9]{8,}-/, "");
-      const words = base
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ")
+      const stem = base
+        .toLowerCase()
+        .replace(/[_-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
         .trim();
-      if (words.length < 2) continue;
-      if (/^(thumb(nail)?|cover|preview|untitled|image|video|media)$/i.test(words)) {
+      if (stem.length < 3) continue;
+      if (/^(thumb(nail)?|cover|preview|untitled|image|video|media)$/i.test(stem)) {
         continue;
       }
-      const titled = words.replace(/\b\w/g, (c) => c.toUpperCase());
-      return titled.slice(0, 120);
+      return stem.slice(0, 120);
     } catch {
-      /* ignore bad urls */
+      /* ignore */
     }
   }
   return "";
+}
+
+/** Humanize a Planable media filename when the post has no caption. */
+export function titleFromPlanableMediaUrls(urls: string[]): string {
+  const stem = mediaFingerprintFromUrls(urls);
+  if (!stem) return "";
+  return stem
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .slice(0, 120);
 }
 
 function pickPlatforms(
@@ -244,19 +255,15 @@ function pickPlatforms(
     }
   }
 
+  // Use this post's page only — groupPageIds would paint every sibling with
+  // every network icon and make member-calendar duplicates look identical.
   const pageId = p.pageId != null ? String(p.pageId) : null;
-  const groupPageIds = Array.isArray(p.groupPageIds)
-    ? (p.groupPageIds as unknown[]).map(String).filter(Boolean)
-    : [];
-  const pageIds = Array.from(
-    new Set([...groupPageIds, ...(pageId ? [pageId] : [])])
-  );
-  for (const id of pageIds) {
-    const page = pagesById.get(id);
-    if (!page) continue;
-    push(page.platform);
-    // Only fall back to page name when platform is missing
-    if (!page.platform) push(page.name);
+  if (pageId) {
+    const page = pagesById.get(pageId);
+    if (page) {
+      push(page.platform);
+      if (!page.platform) push(page.name);
+    }
   }
 
   const pageName =
@@ -434,6 +441,8 @@ function toRawPost(
     pageName: page?.name ?? null,
     url: (p.url as string | undefined) ?? null,
     type: p.type != null ? String(p.type) : null,
+    classification:
+      p.classification != null ? String(p.classification) : null,
   };
 }
 
@@ -556,18 +565,16 @@ export async function fetchPlanablePosts(): Promise<{
   return {
     configured: result.configured,
     posts: result.posts.map((p) => {
+      // Caption only — never promote the video/image filename into calendar text.
       const fromText = p.plainText.trim().slice(0, 280);
-      const fromMedia = titleFromPlanableMediaUrls(p.mediaUrls);
-      const kind = (p.type || "").toLowerCase();
-      const fallback =
-        fromMedia ||
-        (kind.includes("reel")
-          ? "Reel"
-          : kind.includes("story")
-            ? "Story"
-            : p.mediaUrls.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u))
-              ? "Video post"
-              : "Untitled post");
+      const kind = `${p.classification || ""} ${p.type || ""}`.toLowerCase();
+      const fallback = kind.includes("reel")
+        ? "Reel"
+        : kind.includes("story")
+          ? "Story"
+          : p.mediaUrls.some((u) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u))
+            ? "Video post"
+            : "Untitled post";
       return {
         id: p.id,
         text: fromText || fallback,

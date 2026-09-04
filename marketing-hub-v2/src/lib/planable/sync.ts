@@ -27,6 +27,7 @@ import {
   planableDeepLink,
   scheduledAtFromDueDate,
   titleFromPlanableMediaUrls,
+  mediaFingerprintFromUrls,
   updatePlanablePost,
   type PlanableRawPost,
 } from "@/lib/planable/client";
@@ -48,15 +49,88 @@ type PostGroup = {
   posts: PlanableRawPost[];
 };
 
-function groupKey(post: PlanableRawPost): string {
+export function groupKey(post: PlanableRawPost): string {
   if (post.groupId) return `g:${post.groupId}`;
   const day = dueDateFromScheduledAt(post.scheduledAt) ?? "";
-  const text = post.plainText.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 180);
+  const text = post.plainText
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, 180);
   if (text && day) return `t:${text}|${day}`;
+  const media = mediaFingerprintFromUrls(post.mediaUrls);
+  if (media && day) return `m:${media}|${day}`;
   return `id:${post.id}`;
 }
 
-function groupPlanablePosts(posts: PlanableRawPost[]): PostGroup[] {
+function groupMediaDayKey(posts: PlanableRawPost[]): string {
+  const day =
+    dueDateFromScheduledAt(
+      posts.map((p) => p.scheduledAt).find(Boolean) ?? null
+    ) ?? "";
+  const media = mediaFingerprintFromUrls(posts.flatMap((p) => p.mediaUrls));
+  if (!day || !media) return "";
+  return `${media}|${day}`;
+}
+
+/** Merge platform orphans that share the same video/image + day into one group. */
+function consolidatePlanableGroups(groups: PostGroup[]): PostGroup[] {
+  const byMediaDay = new Map<string, PostGroup[]>();
+  const passthrough: PostGroup[] = [];
+  for (const group of groups) {
+    const key = groupMediaDayKey(group.posts);
+    if (!key) {
+      passthrough.push(group);
+      continue;
+    }
+    const list = byMediaDay.get(key) ?? [];
+    list.push(group);
+    byMediaDay.set(key, list);
+  }
+  const merged: PostGroup[] = [];
+  for (const [, siblings] of byMediaDay) {
+    if (siblings.length === 1) {
+      merged.push(siblings[0]);
+      continue;
+    }
+    const captions = new Set(
+      siblings
+        .map((g) =>
+          captionFromGroup(g.posts)
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .slice(0, 180)
+        )
+        .filter(Boolean)
+    );
+    // Different captions on the same file are different posts — keep separate.
+    if (captions.size > 1) {
+      merged.push(...siblings);
+      continue;
+    }
+    const preferred =
+      siblings.find((g) => g.groupId) ||
+      siblings.find((g) => g.posts.some((p) => p.plainText.trim())) ||
+      siblings[0];
+    const seen = new Set<string>();
+    const uniquePosts = siblings.flatMap((g) => g.posts).filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+    merged.push({
+      key: preferred.key,
+      groupId:
+        preferred.groupId ||
+        uniquePosts.find((p) => p.groupId)?.groupId ||
+        "",
+      posts: uniquePosts,
+    });
+  }
+  return [...passthrough, ...merged];
+}
+
+export function groupPlanablePosts(posts: PlanableRawPost[]): PostGroup[] {
   const map = new Map<string, PlanableRawPost[]>();
   for (const post of posts) {
     if (post.archived) continue;
@@ -66,11 +140,12 @@ function groupPlanablePosts(posts: PlanableRawPost[]): PostGroup[] {
     list.push(post);
     map.set(key, list);
   }
-  return Array.from(map.entries()).map(([key, groupPosts]) => ({
+  const groups = Array.from(map.entries()).map(([key, groupPosts]) => ({
     key,
     groupId: groupPosts.find((p) => p.groupId)?.groupId || "",
     posts: groupPosts,
   }));
+  return consolidatePlanableGroups(groups);
 }
 
 function captionFromGroup(posts: PlanableRawPost[]): string {
@@ -83,25 +158,56 @@ function titleFromCaption(caption: string): string {
   return line ? line.slice(0, 120) : "";
 }
 
-function titleForPlanableGroup(
+function assetUrlList(assetUrl: string): string[] {
+  return assetUrl
+    .split(/\n+/)
+    .map((u) => u.trim())
+    .filter(Boolean);
+}
+
+/** True when Hub title is a placeholder or was derived from a media filename. */
+export function isReplaceablePlanableTitle(title: string, assetUrl: string): boolean {
+  const t = title.trim();
+  if (!t) return true;
+  if (/^(untitled post|reel|video post|story)$/i.test(t)) return true;
+  const fromMedia = titleFromPlanableMediaUrls(assetUrlList(assetUrl));
+  return Boolean(fromMedia && fromMedia.toLowerCase() === t.toLowerCase());
+}
+
+export function titleForPlanableGroup(
   caption: string,
   assetUrl: string,
   classificationOrType?: string | null
 ): string {
   const fromCaption = titleFromCaption(caption);
   if (fromCaption) return fromCaption;
-  const fromMedia = titleFromPlanableMediaUrls(
-    assetUrl
-      .split(/\n+/)
-      .map((u) => u.trim())
-      .filter(Boolean)
-  );
-  if (fromMedia) return fromMedia;
+  // Do not use the video filename as the title — members expect the caption.
   const kind = (classificationOrType || "").trim().toLowerCase();
-  if (kind === "reels" || kind === "reel") return "Reel";
-  if (kind === "story" || kind === "stories") return "Story";
-  if (kind === "video") return "Video post";
+  if (kind.includes("reel")) return "Reel";
+  if (kind.includes("story")) return "Story";
+  if (
+    kind.includes("video") ||
+    assetUrlList(assetUrl).some((u) =>
+      /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u)
+    )
+  ) {
+    return "Video post";
+  }
   return "Untitled post";
+}
+
+export function resolveSyncedTitle(
+  existingTitle: string | null | undefined,
+  nextTitle: string,
+  caption: string,
+  assetUrl: string
+): string {
+  const fromCaption = titleFromCaption(caption);
+  if (fromCaption) return fromCaption;
+  if (isReplaceablePlanableTitle(existingTitle || "", assetUrl)) {
+    return nextTitle;
+  }
+  return (existingTitle || "").trim() || nextTitle;
 }
 
 function channelsFromGroup(posts: PlanableRawPost[]): string[] {
@@ -142,37 +248,72 @@ function mediaFromGroup(posts: PlanableRawPost[]): string {
   return joinAssetUrls(best);
 }
 
-function findExistingForGroup(
+function findAllExistingForGroup(
   content: ContentItem[],
   group: PostGroup
-): ContentItem | undefined {
+): ContentItem[] {
   const postIds = new Set(group.posts.map((p) => p.id));
-  const byPost = content.find(
-    (c) => c.planable_post_id && postIds.has(c.planable_post_id)
-  );
-  if (byPost) return byPost;
+  const mediaDay = groupMediaDayKey(group.posts);
+  const seen = new Set<string>();
+  const out: ContentItem[] = [];
+  const push = (item: ContentItem | undefined) => {
+    if (!item || seen.has(item.id)) return;
+    seen.add(item.id);
+    out.push(item);
+  };
 
-  if (group.groupId) {
-    const byGroup = content.find(
-      (c) => c.planable_group_id && c.planable_group_id === group.groupId
-    );
-    if (byGroup) return byGroup;
+  for (const c of content) {
+    if (!isSocialContentItem(c)) continue;
+    if (c.planable_post_id && postIds.has(c.planable_post_id)) {
+      push(c);
+      continue;
+    }
+    if (group.groupId && c.planable_group_id === group.groupId) {
+      push(c);
+      continue;
+    }
+    if (
+      mediaDay &&
+      !c.planable_group_id &&
+      groupMediaDayKeyFromHub(c) === mediaDay
+    ) {
+      push(c);
+    }
   }
 
   for (const p of group.posts) {
-    const byUrl = content.find(
-      (c) =>
-        c.planable_url &&
-        (c.planable_url.includes(p.id) ||
-          (p.url && c.planable_url.includes(p.url)))
+    push(
+      content.find(
+        (c) =>
+          c.planable_url &&
+          (c.planable_url.includes(p.id) ||
+            (p.url && c.planable_url.includes(p.url)))
+      )
     );
-    if (byUrl) return byUrl;
   }
 
-  return undefined;
+  return out;
 }
 
-function isHubDirty(item: ContentItem): boolean {
+function groupMediaDayKeyFromHub(item: ContentItem): string {
+  const day = (item.due_date || "").slice(0, 10);
+  const media = mediaFingerprintFromUrls(assetUrlList(item.asset_url || ""));
+  if (!day || !media) return "";
+  return `${media}|${day}`;
+}
+
+function hubDuplicateScore(item: ContentItem): number {
+  const captionLen = (item.caption || "").length;
+  const channelLen = Array.isArray(item.channel)
+    ? item.channel.join(",").length
+    : String(item.channel || "").length;
+  const assetLen = (item.asset_url || "").length;
+  const hasGroup = item.planable_group_id ? 50 : 0;
+  const updated = Date.parse(item.updated_at || "") || 0;
+  return captionLen * 4 + channelLen + assetLen + hasGroup + updated / 1e12;
+}
+
+export function isHubDirty(item: ContentItem): boolean {
   if (item.sync_source !== "hub") return false;
   if (!item.last_synced_at) return true;
   return (
@@ -191,7 +332,7 @@ export function shouldPushSocialToPlanable(item: ContentItem): boolean {
 }
 
 /** Map Planable status onto Hub; always promote Approved → Scheduled when Planable schedules. */
-function inboundStatusForExisting(
+export function inboundStatusForExisting(
   existing: ContentStatus,
   mapped: ContentStatus
 ): ContentStatus {
@@ -212,7 +353,8 @@ function inboundStatusForExisting(
 /** Pull Planable → Hub social ContentItems. */
 export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
   const config = getPlanableConfig();
-  const listed = await listAllPlanablePosts();
+  // Always fresh — Sync from Planable must not serve a 120s cached list.
+  const listed = await listAllPlanablePosts({ cache: "no-store" });
   if (!listed.configured) {
     return {
       configured: false,
@@ -299,11 +441,25 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     const nextTitle = titleForPlanableGroup(
       caption,
       asset_url,
-      primary.type || primary.platforms[0]
+      primary.classification || primary.type || primary.platforms[0]
     );
 
-    const match = findExistingForGroup(existing, group);
+    const matches = findAllExistingForGroup(existing, group);
+    const match =
+      matches.length > 0
+        ? [...matches].sort(
+            (a, b) => hubDuplicateScore(b) - hubDuplicateScore(a)
+          )[0]
+        : undefined;
     if (match) {
+      // Collapse historical Hub duplicates for this Planable group/post.
+      for (const extra of matches) {
+        if (extra.id === match.id) continue;
+        await deleteContent(extra.id);
+        const idx = existing.findIndex((c) => c.id === extra.id);
+        if (idx >= 0) existing.splice(idx, 1);
+        removed += 1;
+      }
       if (published) lockedPublished += 1;
 
       // Hub edits must not block Planable schedule/publish from reaching members.
@@ -329,12 +485,12 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
             last_synced_at: now,
             sync_source: "planable",
           };
-          if (
-            !match.title?.trim() ||
-            /^untitled post$/i.test(match.title.trim())
-          ) {
-            patch.title = nextTitle;
-          }
+          patch.title = resolveSyncedTitle(
+            match.title,
+            nextTitle,
+            caption || match.caption || "",
+            asset_url || match.asset_url || ""
+          );
           // Refresh media when Hub has none, or Planable now includes a thumb.
           if (
             asset_url &&
@@ -361,11 +517,14 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
             : match.planable_page_ids;
           soft.planable_url = match.planable_url || planable_url;
         }
-        if (
-          !match.title?.trim() ||
-          /^untitled post$/i.test(match.title.trim())
-        ) {
-          soft.title = nextTitle;
+        const softTitle = resolveSyncedTitle(
+          match.title,
+          nextTitle,
+          caption || match.caption || "",
+          asset_url || match.asset_url || ""
+        );
+        if (softTitle !== (match.title || "").trim()) {
+          soft.title = softTitle;
         }
         if (
           asset_url &&
@@ -384,14 +543,13 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
         continue;
       }
 
-      const existingTitle = match.title?.trim() || "";
-      const keepTitle =
-        existingTitle && !/^untitled post$/i.test(existingTitle)
-          ? existingTitle
-          : nextTitle;
-
       await updateContent(match.id, {
-        title: keepTitle,
+        title: resolveSyncedTitle(
+          match.title,
+          nextTitle,
+          caption || match.caption || "",
+          asset_url || match.asset_url || ""
+        ),
         caption: caption || match.caption,
         channel: channels.length ? channels : match.channel,
         content_type: "Social",
@@ -478,6 +636,41 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
     }
   }
 
+  // Final pass: collapse any remaining Hub rows that still share a Planable id/group.
+  const after = (await listContent()).map(withContentPlanableDefaults);
+  const byPost = new Map<string, ContentItem[]>();
+  const byGroup = new Map<string, ContentItem[]>();
+  for (const item of after) {
+    if (!isSocialContentItem(item)) continue;
+    if (item.planable_post_id) {
+      const list = byPost.get(item.planable_post_id) ?? [];
+      list.push(item);
+      byPost.set(item.planable_post_id, list);
+    }
+    if (item.planable_group_id) {
+      const list = byGroup.get(item.planable_group_id) ?? [];
+      list.push(item);
+      byGroup.set(item.planable_group_id, list);
+    }
+  }
+  const alreadyRemoved = new Set<string>();
+  const collapse = async (rows: ContentItem[]) => {
+    if (rows.length < 2) return;
+    const keep = [...rows].sort(
+      (a, b) => hubDuplicateScore(b) - hubDuplicateScore(a)
+    )[0];
+    for (const extra of rows) {
+      if (extra.id === keep.id || alreadyRemoved.has(extra.id)) continue;
+      await deleteContent(extra.id);
+      alreadyRemoved.add(extra.id);
+      removed += 1;
+    }
+  };
+  for (const rows of byPost.values()) await collapse(rows);
+  for (const rows of byGroup.values()) {
+    await collapse(rows.filter((r) => !alreadyRemoved.has(r.id)));
+  }
+
   return {
     configured: true,
     created,
@@ -490,17 +683,56 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
   };
 }
 
-/** Archive linked Planable post(s) when a Hub piece is deleted. */
+/** Archive linked Planable post(s) when a Hub piece is deleted (primary + group siblings). */
 export async function removeContentFromPlanable(
   item: ContentItem
 ): Promise<{ ok: boolean; error?: string }> {
   const current = withContentPlanableDefaults(item);
-  if (!current.planable_post_id) {
+  if (!current.planable_post_id && !current.planable_group_id) {
     return { ok: true };
   }
-  const result = await archivePlanablePost(current.planable_post_id);
-  if (!result.ok) {
-    return { ok: false, error: result.error };
+
+  const config = getPlanableConfig();
+  if (!config.configured) {
+    // Cannot reach Planable — allow Hub delete without remote archive.
+    return { ok: true };
+  }
+
+  const ids = new Set<string>();
+  if (current.planable_post_id) ids.add(current.planable_post_id);
+
+  if (current.planable_group_id) {
+    try {
+      const siblings = await listPlanableGroupPosts(current.planable_group_id);
+      for (const post of siblings) {
+        if (!post.published) ids.add(post.id);
+      }
+    } catch (e) {
+      return {
+        ok: false,
+        error:
+          e instanceof Error
+            ? e.message
+            : "Failed to list Planable group posts for archive.",
+      };
+    }
+  }
+
+  if (!ids.size) return { ok: true };
+
+  const errors: string[] = [];
+  for (const id of ids) {
+    const result = await archivePlanablePost(id);
+    if (!result.ok) errors.push(result.error);
+  }
+  if (errors.length) {
+    return {
+      ok: false,
+      error:
+        errors.length === 1
+          ? errors[0]
+          : `Failed to archive ${errors.length} Planable posts: ${errors[0]}`,
+    };
   }
   return { ok: true };
 }

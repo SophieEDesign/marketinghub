@@ -9,8 +9,33 @@ import {
   listEvents,
   listThemes,
   updateContent,
+  withContentPlanableDefaults,
 } from "@/lib/data/repos";
+import {
+  pushContentToPlanable,
+  shouldPushSocialToPlanable,
+} from "@/lib/planable/sync";
 import type { ContentItem, ContentStatus } from "@/lib/types";
+
+async function maybePushPlanable(
+  item: ContentItem
+): Promise<{ item: ContentItem; planableSyncError?: string }> {
+  if (!shouldPushSocialToPlanable(item)) {
+    return { item };
+  }
+  const result = await pushContentToPlanable(withContentPlanableDefaults(item));
+  if (result.error) {
+    console.error("[planable] mcp push failed", {
+      id: item.id,
+      status: item.status,
+      error: result.error,
+    });
+  }
+  return {
+    item: result.item,
+    ...(result.error ? { planableSyncError: result.error } : {}),
+  };
+}
 
 export type SocialPostSummary = {
   id: string;
@@ -135,7 +160,8 @@ export async function createSocialDraft(input: {
     notes: input.notes ?? "",
   });
 
-  return toSummary(item);
+  const pushed = await maybePushPlanable(withContentPlanableDefaults(item));
+  return toSummary(pushed.item);
 }
 
 export async function updateSocialPost(
@@ -185,7 +211,9 @@ export async function updateSocialPost(
 
   const updated = await updateContent(id, nextPatch);
   if (!updated) return null;
-  return toSummary(updated);
+
+  const pushed = await maybePushPlanable(withContentPlanableDefaults(updated));
+  return toSummary(pushed.item);
 }
 
 export async function listThemeContext() {
@@ -238,7 +266,8 @@ export const BRAND_CONTEXT = {
   ],
   reminders: [
     "Drafts created here land in the Hub Social calendar as idea/draft/review.",
-    "Approve and publish in Planable — the Hub syncs status back.",
+    "Setting status to review/approved/scheduled sends one Facebook draft to Planable (caption or image required).",
+    "Add LinkedIn/Instagram and publish only in Planable — then Sync from Planable to lock the Hub piece.",
     "Link posts to quarterly themes when relevant (use list_themes).",
     "Check upcoming events for timely post ideas (use list_upcoming_events).",
   ],

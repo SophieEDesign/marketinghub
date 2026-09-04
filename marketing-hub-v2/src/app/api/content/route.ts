@@ -109,11 +109,15 @@ export async function POST(request: NextRequest) {
       const planable = await removeContentFromPlanable(
         withContentPlanableDefaults(existing)
       );
+      if (!planable.ok) {
+        return jsonError(
+          planable.error ||
+            "Failed to archive linked Planable post(s). Hub item was not deleted.",
+          502
+        );
+      }
       await deleteContent(body.id);
-      return jsonOk({
-        ok: true,
-        ...(planable.error ? { planableSyncError: planable.error } : {}),
-      });
+      return jsonOk({ ok: true });
     }
     await deleteContent(body.id);
     return jsonOk({ ok: true });
