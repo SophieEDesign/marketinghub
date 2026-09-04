@@ -279,36 +279,36 @@ function folderKindMeta(kind: FolderKind) {
       return {
         label: "Images",
         Icon: ImageIcon,
-        tone: "from-[#0b3a4a] to-[#2a8f9e]",
-        chip: "bg-[#2a8f9e]",
+        tone: "from-[#0B2545] to-[#007DC5]",
+        chip: "bg-[#007DC5]",
       };
     case "presentations":
       return {
         label: "Deck",
         Icon: Presentation,
-        tone: "from-[#134e63] to-[#b5651d]",
+        tone: "from-[#1B3A5B] to-[#b5651d]",
         chip: "bg-[#b5651d]",
       };
     case "links":
       return {
         label: "Links",
         Icon: Link2,
-        tone: "from-[#0b3a4a] to-[#3d4d63]",
-        chip: "bg-[#3d4d63]",
+        tone: "from-[#0B2545] to-[#1B3A5B]",
+        chip: "bg-[#1B3A5B]",
       };
     case "empty":
       return {
         label: "Empty",
         Icon: FolderOpen,
-        tone: "from-[#9aa8b2] to-[#d7dee4]",
-        chip: "bg-[#5b6b76]",
+        tone: "from-[#8A9099] to-[#E3E6E9]",
+        chip: "bg-[#8A9099]",
       };
     case "mixed":
       return {
         label: "Mixed",
         Icon: FolderOpen,
-        tone: "from-[#0b3a4a] to-[#134e63]",
-        chip: "bg-[#0b3a4a]",
+        tone: "from-[#0B2545] to-[#1B3A5B]",
+        chip: "bg-[#0B2545]",
       };
     default:
       return {

@@ -7,7 +7,7 @@
 export const LOGO_URL =
   "https://marketing.petersandmay.com/pm-group-logo.png";
 export const SITE_URL = "https://marketing.petersandmay.com";
-export const BRAND = "#0b3a4a";
+export const BRAND = "#0B2545";
 
 /**
  * @param {{

@@ -2,7 +2,7 @@
 
 All Marketing Hub Auth emails share the same Peters &amp; May header (logo + teal bar) and footer.
 
-CTA links use `/auth/confirm?token_hash=…`. That page **does not** verify on open — the user must click Continue first. This stops Outlook Safe Links / Defender from burning one-time invite tokens on prefetch. Do not switch back to `{{ .ConfirmationURL }}` (hash flow) or restore auto-verify-on-GET.
+CTA links use `/auth/confirm?token_hash=…`. That page does not verify on open — the user must click Continue first (Outlook Safe Links safe). Do not switch back to `{{ .ConfirmationURL }}` or restore auto-verify-on-GET.
 
 ## Apply in Supabase (required for production)
 

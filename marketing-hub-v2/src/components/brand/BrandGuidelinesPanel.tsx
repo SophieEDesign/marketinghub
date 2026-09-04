@@ -1,10 +1,17 @@
-import { Download, ExternalLink } from "lucide-react";
+"use client";
 
-const COLORS = [
-  { name: "Primary Blue", hex: "#0b5dab" },
-  { name: "Accent Red", hex: "#d92b2b" },
-  { name: "Neutral Gray", hex: "#64748b" },
-] as const;
+import { Check, Copy, Download, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { BRAND_AI_SUMMARY } from "@/lib/brand/ai-summary";
+import {
+  BRAND_ISSUED,
+  BRAND_PROMISE,
+  BRAND_VERSION,
+  LOCK_UPS,
+  PALETTE_SWATCHES,
+  PRINCIPLES,
+  TYPOGRAPHY,
+} from "@/lib/brand/tokens";
 
 export function BrandGuidelinesPanel({
   logoUrl,
@@ -15,8 +22,34 @@ export function BrandGuidelinesPanel({
   guideUrl: string;
   showDownloads?: boolean;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copyAiSummary() {
+    try {
+      await navigator.clipboard.writeText(BRAND_AI_SUMMARY);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard may be blocked; user can still select the text block.
+    }
+  }
+
   return (
     <div className="space-y-5">
+      <section className="surface-card p-6 md:p-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+          Brand Guidelines v{BRAND_VERSION} · {BRAND_ISSUED}
+        </p>
+        <p className="mt-2 font-display text-2xl tracking-tight text-brand md:text-3xl">
+          {BRAND_PROMISE}
+        </p>
+        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted md:text-base">
+          Positioning line for internal alignment and considered literature use
+          — not a strapline to lock up with the logo. Principles:{" "}
+          {PRINCIPLES.join(", ").toLowerCase()}.
+        </p>
+      </section>
+
       <section className="surface-card p-6 md:p-8">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">
           Using the logo
@@ -32,9 +65,22 @@ export function BrandGuidelinesPanel({
           </div>
           <div>
             <p className="text-sm leading-relaxed text-muted md:text-base">
-              Always keep clear space equal to the height of the “M” mark around
-              the logo. Never stretch, recolor or place it on a busy background.
+              Clear space on all four sides equals the height of the ampersand.
+              Never stretch, rotate, recolour, add effects, or rebuild the
+              wordmark. Stacked lock-up is primary; horizontal only for shallow
+              spaces. Request artwork from marketing — do not lift from a
+              document or website.
             </p>
+            <ul className="mt-3 space-y-1.5 text-sm text-muted">
+              {LOCK_UPS.map((lockUp) => (
+                <li key={lockUp.name}>
+                  <span className="font-medium text-foreground">
+                    {lockUp.name}
+                  </span>
+                  <span className="text-muted"> — {lockUp.role}</span>
+                </li>
+              ))}
+            </ul>
             {showDownloads ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <a
@@ -66,8 +112,12 @@ export function BrandGuidelinesPanel({
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           Colour palette
         </h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {COLORS.map((color) => (
+        <p className="mb-4 max-w-3xl text-sm text-muted">
+          Navy leads brand and marketing; white leads documents and dashboards.
+          P&amp;M Blue is the single accent. Ensign Red stays in the logo only.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {PALETTE_SWATCHES.map((color) => (
             <article key={color.hex} className="surface-card overflow-hidden">
               <div
                 className="h-24 w-full"
@@ -77,6 +127,9 @@ export function BrandGuidelinesPanel({
               <div className="p-4">
                 <p className="font-medium">{color.name}</p>
                 <p className="mt-1 font-mono text-sm text-muted">{color.hex}</p>
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  {color.role}
+                </p>
               </div>
             </article>
           ))}
@@ -87,16 +140,60 @@ export function BrandGuidelinesPanel({
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
           Typography
         </h2>
-        <p
-          className="text-2xl font-bold tracking-tight text-brand md:text-3xl"
-          style={{ fontFamily: "Manrope, var(--font-sans), sans-serif" }}
-        >
-          Manrope
+        <div className="grid gap-6 md:grid-cols-2">
+          <div>
+            <p
+              className="text-2xl font-bold tracking-tight text-brand md:text-3xl"
+              style={{ fontFamily: "var(--font-display), sans-serif" }}
+            >
+              {TYPOGRAPHY.display.family}
+            </p>
+            <p className="mt-2 text-sm text-muted">{TYPOGRAPHY.display.use}</p>
+          </div>
+          <div>
+            <p
+              className="text-xl font-medium text-foreground md:text-2xl"
+              style={{ fontFamily: "var(--font-sans), sans-serif" }}
+            >
+              {TYPOGRAPHY.body.family}
+            </p>
+            <p className="mt-2 text-sm text-muted">{TYPOGRAPHY.body.use}</p>
+          </div>
+        </div>
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">
+          {TYPOGRAPHY.fallback.family} for operational documents.{" "}
+          {TYPOGRAPHY.logo.family} is in the logo artwork only — never retype
+          the logotype. Sentence case for headlines; 16px minimum on screen.
         </p>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted md:text-base">
-          Manrope — headings &amp; body. Bold for headings, medium for body
-          copy. Avoid mixing in other typefaces.
-        </p>
+      </section>
+
+      <section className="surface-card p-6 md:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+              Brand summary for AI tools
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              Paste into drafting tools so first drafts stay on-brand. No company
+              figures — use the dated factsheet for those.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={copyAiSummary}
+            className="btn-secondary"
+          >
+            {copied ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+            {copied ? "Copied" : "Copy summary"}
+          </button>
+        </div>
+        <pre className="mt-4 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl border border-border bg-sand/40 p-4 text-xs leading-relaxed text-foreground">
+          {BRAND_AI_SUMMARY}
+        </pre>
       </section>
 
       {showDownloads ? (

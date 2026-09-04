@@ -555,7 +555,7 @@ export function createSeedStore(): HubStore {
       {
         id: "res_seed_1",
         title: "Brand guidelines (PDF)",
-        description: "PM-Brand-Guide_FINAL.pdf — also in Library → Brand / SharePoint › Marketing › Brand Guidelines",
+        description: "Brand Guidelines 2026.pdf (v2.0) — also in Library → Brand / SharePoint › Marketing › Brand Guidelines",
         url: "https://hwtycgvclhckglmuwnmw.supabase.co/storage/v1/object/public/attachments/attachments/table_media_1768074185692/19e724de-39c2-4ee5-b545-dae584996d8c/media/4363f3e1-1bb0-49f4-ad10-7f6d92ea52e0.pdf",
         category: "Brand",
         created_at: now,

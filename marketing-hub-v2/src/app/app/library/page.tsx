@@ -8,8 +8,7 @@ export const dynamic = "force-dynamic";
 
 const FALLBACK_LOGO = "/pm-group-logo.png";
 
-const FALLBACK_GUIDE =
-  "https://hwtycgvclhckglmuwnmw.supabase.co/storage/v1/object/public/attachments/attachments/table_media_1768074185692/19e724de-39c2-4ee5-b545-dae584996d8c/media/4363f3e1-1bb0-49f4-ad10-7f6d92ea52e0.pdf";
+const FALLBACK_GUIDE = "/brand-guidelines-2026.pdf";
 
 export default async function LibraryPage() {
   let logoUrl = FALLBACK_LOGO;
@@ -18,11 +17,14 @@ export default async function LibraryPage() {
   if (hasSupabaseConfig()) {
     try {
       const { items } = await listMediaFromSupabase();
-      const guide = items.find(
+      const guideCandidates = items.filter(
         (i) =>
           /brand\s*guidelines?/i.test(i.name) ||
           /brand\s*guidelines?/i.test(i.category)
       );
+      const guide =
+        guideCandidates.find((i) => /2026|v\s*2|version\s*2/i.test(i.name)) ||
+        guideCandidates[0];
       const pdf =
         guide?.files.find((f) => /pdf/i.test(f.type) || /\.pdf$/i.test(f.name))
           ?.url || guide?.document_url;

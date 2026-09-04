@@ -24,7 +24,7 @@ export const STATUS_STYLES: Record<
     bg: "bg-accent-soft",
     text: "text-brand",
     border: "border-accent/30",
-    event: "#2a8f9e",
+    event: "#007DC5",
   },
   idea: {
     bg: "bg-sand",

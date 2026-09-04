@@ -3,26 +3,27 @@
 @tailwind utilities;
 
 :root {
-  --background: #f4f6f8;
-  --foreground: #0f1c24;
+  /* Brand Guidelines v2.0 — Ensign Navy leads; P&M Blue accent; Mist fills */
+  --background: #f5f7f9;
+  --foreground: #071a2e;
   --surface: #ffffff;
-  --muted: #5b6b76;
-  --border: #d7dee4;
-  --brand: #0b3a4a;
-  --brand-soft: #134e63;
-  --accent: #2a8f9e;
-  --accent-soft: #e6f4f6;
-  --sand: #eef1f0;
+  --muted: #4d5c6a;
+  --border: #d5d9de;
+  --brand: #0b2545;
+  --brand-soft: #1b3a5b;
+  --accent: #007dc5;
+  --accent-soft: #e5f3fa;
+  --sand: #e3e6e9;
   --danger: #b42318;
   --success: #0f7a4c;
-  --shadow: 0 10px 30px rgba(15, 28, 36, 0.06);
+  --shadow: 0 10px 30px rgba(11, 37, 69, 0.06);
 }
 
 body {
   color: var(--foreground);
   background:
-    radial-gradient(1200px 500px at 10% -10%, rgba(42, 143, 158, 0.12), transparent 55%),
-    radial-gradient(900px 400px at 100% 0%, rgba(11, 58, 74, 0.08), transparent 50%),
+    radial-gradient(1200px 500px at 10% -10%, rgba(0, 125, 197, 0.1), transparent 55%),
+    radial-gradient(900px 400px at 100% 0%, rgba(11, 37, 69, 0.08), transparent 50%),
     var(--background);
   min-height: 100vh;
 }
@@ -91,7 +92,7 @@ body {
 
   .field:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(42, 143, 158, 0.15);
+    box-shadow: 0 0 0 3px rgba(0, 125, 197, 0.18);
   }
 
   .label {

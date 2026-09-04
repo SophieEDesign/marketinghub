@@ -1,0 +1,55 @@
+---
+description: Peters & May Brand Guidelines v2.0 — voice, colour, type, and AI drafting rules
+alwaysApply: true
+---
+
+# Peters & May Brand Guidelines v2.0 (July 2026)
+
+Working draft Group policy. Supersedes February 2016. Owner: Group Marketing — marketing@petersandmay.com.
+
+## Promise and voice
+
+- Promise: "We bring experienced thinking to complex logistics" — positioning line, not a logo strapline.
+- Principles: expertise, consultation, foresight, control, confidence.
+- Voice: British English; consultative, specific, unhurried; active voice; short sentences.
+- "Peters & May" with ampersand, in full on first mention. "P&M" internally / file names only.
+- Avoid: hype, superlatives, exclamation marks, emoji, "seamless", "solutions provider", "world-class", "revolutionary".
+- Never invent clients, quotes, case studies, or company figures — leave factsheet placeholders.
+
+## Architecture
+
+One brand, three divisions (four lock-ups). No new brands without Group approval.
+
+1. Peters & May — Bespoke Logistics (corporate default)
+2. Peters & May Global Yacht Transport
+3. Peters & May Global Freight Forwarding
+4. Peters & May Commercial Marine Transport
+
+CEC Couriers is separately branded. Netherlands lock-up is legacy — do not use in new templates.
+
+## Colour (hub tokens in `marketing-hub-v2/src/lib/brand/tokens.ts`)
+
+- Ensign Navy `#0B2545` — primary brand
+- Deep Navy `#071A2E` · Slate Navy `#1B3A5B`
+- P&M Blue `#007DC5` — single accent
+- White / Mist `#E3E6E9` — working surfaces and quiet fills
+- Ensign Red `#ED1C24` — **logo artwork only**, never a layout colour
+- Status colours: approved digital greens/ambers/greys + a word or symbol; not brand red
+
+## Typography
+
+- League Spartan — headlines / titles / social
+- Archivo — body, labels, tables, interface
+- Arial — operational documents and email fallback
+- PT Sans is in the logo only — never retype the wordmark
+
+## Logo
+
+Clear space = height of the ampersand. Never stretch, rotate, recolour, add effects, or rebuild. Request artwork from marketing.
+
+## AI / imagery
+
+- AI may draft; human review before publish/client send.
+- Never present generated imagery as real Peters & May work, vessels, ports, or people.
+- Do not enter confidential client/vessel/rate/contract detail into unapproved tools.
+- Hub paste-ready summary: `marketing-hub-v2/src/lib/brand/ai-summary.ts`

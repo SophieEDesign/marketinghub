@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, Fraunces } from "next/font/google";
+import { Archivo, League_Spartan } from "next/font/google";
 import "./globals.css";
 
-const dmSans = DM_Sans({
+const archivo = Archivo({
   subsets: ["latin"],
   variable: "--font-sans",
 });
 
-const fraunces = Fraunces({
+const leagueSpartan = League_Spartan({
   subsets: ["latin"],
   variable: "--font-display",
 });
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b3a4a",
+  themeColor: "#0B2545",
 };
 
 export default function RootLayout({
@@ -57,7 +57,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}>
+      <body
+        className={`${archivo.variable} ${leagueSpartan.variable} font-sans antialiased`}
+      >
         {children}
       </body>
     </html>

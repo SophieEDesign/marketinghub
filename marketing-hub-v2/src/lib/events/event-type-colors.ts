@@ -3,13 +3,13 @@
 export type EventColor = { bg: string; border: string; text: string };
 
 export const EVENT_TYPE_COLORS: Record<string, EventColor> = {
-  "Trade show": { bg: "#2a8f9e", border: "#1f7380", text: "#ffffff" },
-  "Boat show": { bg: "#1d6b9a", border: "#155578", text: "#ffffff" },
+  "Trade show": { bg: "#007DC5", border: "#00639c", text: "#ffffff" },
+  "Boat show": { bg: "#1B3A5B", border: "#0B2545", text: "#ffffff" },
   Race: { bg: "#b42318", border: "#912018", text: "#ffffff" },
   Awards: { bg: "#c47a2c", border: "#a36320", text: "#ffffff" },
   Conference: { bg: "#4a6fa5", border: "#3a5984", text: "#ffffff" },
   Sponsorship: { bg: "#8b5a6b", border: "#6e4654", text: "#ffffff" },
-  Commercial: { bg: "#0b3a4a", border: "#082f3c", text: "#ffffff" },
+  Commercial: { bg: "#0B2545", border: "#071A2E", text: "#ffffff" },
   Meeting: { bg: "#5b6ee1", border: "#4a5bc4", text: "#ffffff" },
   Internal: { bg: "#5b6b76", border: "#4a5761", text: "#ffffff" },
   Event: { bg: "#3d8b5c", border: "#2f6e49", text: "#ffffff" },
