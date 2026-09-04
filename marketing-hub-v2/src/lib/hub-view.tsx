@@ -20,6 +20,8 @@ type HubViewContextValue = {
   ready: boolean;
   canToggleAdminView: boolean;
   canAccessBudget: boolean;
+  /** Allowlisted non-admins only — Budget must not appear for Member preview. */
+  budgetInMemberNav: boolean;
 };
 
 const HubViewContext = createContext<HubViewContextValue | null>(null);
@@ -29,11 +31,13 @@ export function HubViewProvider({
   initialView = "member",
   canToggleAdminView = false,
   canAccessBudget = false,
+  budgetInMemberNav = false,
 }: {
   children: React.ReactNode;
   initialView?: HubViewMode;
   canToggleAdminView?: boolean;
   canAccessBudget?: boolean;
+  budgetInMemberNav?: boolean;
 }) {
   const [view, setViewState] = useState<HubViewMode>(initialView);
   const [ready, setReady] = useState(false);
@@ -72,8 +76,22 @@ export function HubViewProvider({
   );
 
   const value = useMemo(
-    () => ({ view, setView, ready, canToggleAdminView, canAccessBudget }),
-    [view, setView, ready, canToggleAdminView, canAccessBudget]
+    () => ({
+      view,
+      setView,
+      ready,
+      canToggleAdminView,
+      canAccessBudget,
+      budgetInMemberNav,
+    }),
+    [
+      view,
+      setView,
+      ready,
+      canToggleAdminView,
+      canAccessBudget,
+      budgetInMemberNav,
+    ]
   );
 
   return (

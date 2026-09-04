@@ -5,8 +5,8 @@ import { useHubView } from "@/lib/hub-view";
 import { navForView } from "@/lib/nav";
 
 export function HomeModules({ supabaseReady }: { supabaseReady: boolean }) {
-  const { view, canAccessBudget } = useHubView();
-  const modules = navForView(view, { canAccessBudget }).filter(
+  const { view, canAccessBudget, budgetInMemberNav } = useHubView();
+  const modules = navForView(view, { canAccessBudget, budgetInMemberNav }).filter(
     (n) => n.href !== "/app"
   );
 
@@ -14,7 +14,7 @@ export function HomeModules({ supabaseReady }: { supabaseReady: boolean }) {
     <>
       <p className="mb-6 text-sm text-muted">
         {view === "member"
-          ? "Member view — events, partners, awards, library, Requests, and Enquiries. Switch to Admin for Content & Social, Tasks, Themes, Reporting, Contacts, and Logins."
+          ? "Member view — events, partners, awards, library, Requests, and Enquiries. Switch to Admin for Content & Social, Tasks, Themes, Reporting, Budget, Contacts, and Logins."
           : view === "external"
             ? "External view — preview the public library (logos, presentations, and gallery) that media guests see."
             : supabaseReady

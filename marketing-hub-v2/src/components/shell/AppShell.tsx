@@ -84,8 +84,8 @@ function ShellInner({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const { view, setView, canAccessBudget } = useHubView();
-  const nav = navForView(view, { canAccessBudget });
+  const { view, setView, canAccessBudget, budgetInMemberNav } = useHubView();
+  const nav = navForView(view, { canAccessBudget, budgetInMemberNav });
 
   const ensureAdminView = useCallback(() => {
     if (canToggleAdminView) setView("admin");
@@ -218,6 +218,9 @@ export function AppShell({
     role: accessRole,
     email: userEmail ?? "",
   });
+  // Members must not see Budget. Admins only see it in Admin view.
+  // Allowlisted non-admins (Simon / Tom / Michael) still get it in Member nav.
+  const budgetInMemberNav = canAccessBudget && !canToggleAdminView;
   const initialView: HubViewMode =
     accessRole === "admin" ? "admin" : "member";
 
@@ -226,6 +229,7 @@ export function AppShell({
       initialView={initialView}
       canToggleAdminView={canToggleAdminView}
       canAccessBudget={canAccessBudget}
+      budgetInMemberNav={budgetInMemberNav}
     >
       <ShellInner
         userName={userName}

@@ -112,7 +112,7 @@ export const STAFF_NAV: NavItem[] = [
   {
     href: "/app/budget",
     label: "Budget",
-    description: "2026 marketing budget — admins, plus Simon, Tom, and Michael",
+    description: "2026 marketing budget — Admin view only (plus Simon, Tom, and Michael)",
     icon: Wallet,
     budgetAccess: true,
   },
@@ -145,22 +145,30 @@ export const STAFF_NAV: NavItem[] = [
 
 export function navForView(
   view: HubViewMode,
-  options?: { canAccessBudget?: boolean }
+  options?: {
+    canAccessBudget?: boolean;
+    /**
+     * Budget in Member view only for allowlisted non-admins (no Admin toggle).
+     * Admins previewing Member must not see Budget — members never should.
+     */
+    budgetInMemberNav?: boolean;
+  }
 ): NavItem[] {
   const includeBudget = Boolean(options?.canAccessBudget);
+  const budgetInMemberNav = Boolean(options?.budgetInMemberNav);
 
   if (view === "external") {
     return STAFF_NAV.filter((item) => item.external);
   }
 
-  const items =
-    view === "admin"
+  if (view === "admin") {
+    return includeBudget
       ? STAFF_NAV
-      : STAFF_NAV.filter(
-          (item) => item.member || (includeBudget && item.budgetAccess)
-        );
+      : STAFF_NAV.filter((item) => !item.budgetAccess);
+  }
 
-  return includeBudget
-    ? items
-    : items.filter((item) => !item.budgetAccess);
+  // Member view: daily tools only — never Budget for admins previewing Member.
+  return STAFF_NAV.filter(
+    (item) => item.member || (budgetInMemberNav && item.budgetAccess)
+  );
 }
