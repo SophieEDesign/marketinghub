@@ -63,6 +63,9 @@ export async function exportStoreToSupabase(
       division: e.division ?? "",
       notes: e.notes ?? "",
       link_url: e.link_url ?? "",
+      social_media_post_completed: e.social_media_post_completed ?? false,
+      personal_social_media_graphics_completed:
+        e.personal_social_media_graphics_completed ?? false,
       created_by: e.created_by,
       created_at: e.created_at,
       updated_at: e.updated_at,

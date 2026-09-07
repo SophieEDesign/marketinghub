@@ -80,6 +80,9 @@ function migrateEvents(items: EventItem[] | undefined): EventItem[] | undefined 
   return items.map((item) => ({
     ...item,
     division: item.division ?? "",
+    social_media_post_completed: item.social_media_post_completed ?? false,
+    personal_social_media_graphics_completed:
+      item.personal_social_media_graphics_completed ?? false,
   }));
 }
 

@@ -38,6 +38,10 @@ export type EventItem = {
   division: string;
   notes: string;
   link_url: string;
+  /** Admin checklist — company social post for this event is done. */
+  social_media_post_completed: boolean;
+  /** Admin checklist — personal/staff social graphics for this event are done. */
+  personal_social_media_graphics_completed: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

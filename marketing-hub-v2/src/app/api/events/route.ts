@@ -47,6 +47,10 @@ export async function POST(request: NextRequest) {
     division: body.division ?? "",
     notes: body.notes ?? "",
     link_url: body.link_url ?? "",
+    social_media_post_completed: Boolean(body.social_media_post_completed),
+    personal_social_media_graphics_completed: Boolean(
+      body.personal_social_media_graphics_completed
+    ),
     created_by: user.id,
   });
   return jsonOk({ event }, { status: 201 });

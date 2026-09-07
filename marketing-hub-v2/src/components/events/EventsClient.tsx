@@ -66,6 +66,8 @@ const emptyForm = {
   division: "",
   notes: "",
   link_url: "",
+  social_media_post_completed: false,
+  personal_social_media_graphics_completed: false,
 };
 
 type EventForm = typeof emptyForm;
@@ -88,6 +90,10 @@ function toEditForm(event: EventItem): EventForm {
     division: event.division || "",
     notes: event.notes,
     link_url: event.link_url,
+    social_media_post_completed: Boolean(event.social_media_post_completed),
+    personal_social_media_graphics_completed: Boolean(
+      event.personal_social_media_graphics_completed
+    ),
   };
 }
 
@@ -289,11 +295,13 @@ function EventFields({
   onChange,
   eventTypeOptions,
   divisionOptions,
+  showAdminChecks = false,
 }: {
   form: EventForm;
   onChange: (next: EventForm) => void;
   eventTypeOptions: FieldOption[];
   divisionOptions: FieldOption[];
+  showAdminChecks?: boolean;
 }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -370,6 +378,39 @@ function EventFields({
           minHeight="88px"
         />
       </div>
+      {showAdminChecks ? (
+        <div className="md:col-span-2 space-y-2 rounded-lg border border-border bg-sand/40 px-3 py-3">
+          <p className="label !mb-1">Admin checklist</p>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-border"
+              checked={form.social_media_post_completed}
+              onChange={(e) =>
+                onChange({
+                  ...form,
+                  social_media_post_completed: e.target.checked,
+                })
+              }
+            />
+            Social media post completed
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-border"
+              checked={form.personal_social_media_graphics_completed}
+              onChange={(e) =>
+                onChange({
+                  ...form,
+                  personal_social_media_graphics_completed: e.target.checked,
+                })
+              }
+            />
+            Personal social media graphics completed
+          </label>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -510,6 +551,7 @@ export function EventsClient({
   const canDelete = view === "admin";
   const canManageAttendees = view !== "external";
   const showUndatedQueue = view === "admin";
+  const showAdminChecks = view === "admin";
 
   const fieldOptions = useManagedFieldOptions("events", fieldOptionsProp);
   const eventTypeOptions = ensureFieldOption(
@@ -1002,11 +1044,51 @@ export function EventsClient({
             division: edit.division || "",
             notes: edit.notes,
             link_url: edit.link_url,
+            ...(showAdminChecks
+              ? {
+                  social_media_post_completed: edit.social_media_post_completed,
+                  personal_social_media_graphics_completed:
+                    edit.personal_social_media_graphics_completed,
+                }
+              : {}),
           },
         }),
       });
       closeEdit();
       await refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function patchEventAdminChecks(
+    eventId: string,
+    patch: Partial<
+      Pick<
+        EventItem,
+        | "social_media_post_completed"
+        | "personal_social_media_graphics_completed"
+      >
+    >
+  ) {
+    if (!showAdminChecks) return;
+    setSaving(true);
+    try {
+      await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update",
+          id: eventId,
+          patch,
+        }),
+      });
+      setEvents((prev) =>
+        prev.map((e) => (e.id === eventId ? { ...e, ...patch } : e))
+      );
+      setSelected((prev) =>
+        prev?.id === eventId ? { ...prev, ...patch } : prev
+      );
     } finally {
       setSaving(false);
     }
@@ -1279,6 +1361,7 @@ export function EventsClient({
             onChange={setForm}
             eventTypeOptions={eventTypeOptions}
             divisionOptions={divisionOptions}
+            showAdminChecks={showAdminChecks}
           />
           <div className="mt-4 flex gap-2">
             <button
@@ -1509,6 +1592,43 @@ export function EventsClient({
                   </div>
                 </dl>
 
+                {showAdminChecks ? (
+                  <div className="mt-4 space-y-2 rounded-lg border border-border bg-sand/40 px-3 py-3">
+                    <p className="label !mb-1">Admin checklist</p>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        className="rounded border-border"
+                        disabled={saving}
+                        checked={Boolean(selected.social_media_post_completed)}
+                        onChange={(e) =>
+                          void patchEventAdminChecks(selected.id, {
+                            social_media_post_completed: e.target.checked,
+                          })
+                        }
+                      />
+                      Social media post completed
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        className="rounded border-border"
+                        disabled={saving}
+                        checked={Boolean(
+                          selected.personal_social_media_graphics_completed
+                        )}
+                        onChange={(e) =>
+                          void patchEventAdminChecks(selected.id, {
+                            personal_social_media_graphics_completed:
+                              e.target.checked,
+                          })
+                        }
+                      />
+                      Personal social media graphics completed
+                    </label>
+                  </div>
+                ) : null}
+
                 <RelatedTasksPanel
                   className="mt-4"
                   relatedType="event"
@@ -1721,6 +1841,7 @@ export function EventsClient({
             onChange={setEdit}
             eventTypeOptions={eventTypeOptions}
             divisionOptions={divisionOptions}
+            showAdminChecks={showAdminChecks}
           />
           {editingId ? (
             <EventAttendeeManager
