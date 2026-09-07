@@ -634,9 +634,9 @@ export async function createPlanablePost(input: {
     text: input.plainText,
   };
   if (input.scheduledAt) {
+    // Date on the draft only — never queue auto-publish from Hub.
     body.scheduledAt = input.scheduledAt;
-    // Without this, Planable keeps a date on the draft but does not put it on the calendar.
-    body.publishAtScheduledDate = true;
+    body.publishAtScheduledDate = false;
   }
   if (input.media?.length) body.media = input.media;
   if (input.approved === true) body.approved = true;
@@ -733,8 +733,9 @@ export async function updatePlanablePost(
   };
   if (patch.plainText !== undefined) body.text = patch.plainText;
   if (patch.scheduledAt !== undefined && patch.scheduledAt !== null) {
+    // Keep the planned date on the draft; never auto-queue for publish from Hub.
     body.scheduledAt = patch.scheduledAt;
-    body.publishAtScheduledDate = true;
+    body.publishAtScheduledDate = false;
   }
   if (patch.media !== undefined) body.media = patch.media;
   if (patch.approved !== undefined) body.approved = patch.approved;
