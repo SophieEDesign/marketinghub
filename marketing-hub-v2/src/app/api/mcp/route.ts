@@ -21,22 +21,22 @@ export const maxDuration = 60;
 
 const SERVER_INFO = {
   name: "peters-may-marketing-hub",
-  // Bump when transport/tools change so ChatGPT/MCP clients re-fetch tools/list.
-  version: "1.2.1",
+  // Bump when tools/transport change. ChatGPT often still needs delete+re-add.
+  version: "1.3.0",
 };
 
-const INSTRUCTIONS = `You are connected to the Peters & May Marketing Hub MCP.
+const INSTRUCTIONS = `You are connected to the Peters & May Marketing Hub MCP (10 tools).
+
+WhatsApp enquiry tracker (Enquiries → WhatsApp tab) — use these first for new enquiries:
+- create_whatsapp_enquiry for each new WhatsApp enquiry (omit external_id to auto-allocate WA-###).
+- update_whatsapp_enquiry for chase / quote / status / office updates (identify by external_id WA-###).
+- list_enquiries with channel "whatsapp" to review recent tracker rows.
+Fields match the Excel tracker (customer, office, vessel, status, etc.).
 
 Social / content:
 - Use get_brand_context and list_themes before drafting posts.
 - Create drafts with create_social_draft; refine with update_social_post.
-- Publishing happens in Planable — do not set status to published.
-
-WhatsApp enquiry tracker (Enquiries → WhatsApp tab):
-- create_whatsapp_enquiry for each new WhatsApp enquiry (omit external_id to auto-allocate WA-###).
-- update_whatsapp_enquiry for chase / quote / status / office updates (identify by external_id WA-###).
-- list_enquiries with channel "whatsapp" to review recent tracker rows.
-Fields match the Excel tracker (customer, office, vessel, status, etc.).`;
+- Publishing happens in Planable — do not set status to published.`;
 
 function createHubMcpServer() {
   const server = new McpServer(SERVER_INFO, { instructions: INSTRUCTIONS });
@@ -163,6 +163,22 @@ async function mcpCore(request: Request): Promise<Response> {
       contentType: response.headers.get("content-type"),
       durationMs: Date.now() - started,
     });
+
+    // Log advertised tool names so we can confirm ChatGPT should see WhatsApp tools.
+    if (mcpMethod === "tools/list" && response.ok) {
+      try {
+        const payload = await response.clone().json();
+        const tools = payload?.result?.tools;
+        if (Array.isArray(tools)) {
+          console.info("[mcp] tools/list names", {
+            count: tools.length,
+            names: tools.map((t: { name?: string }) => t.name),
+          });
+        }
+      } catch {
+        /* ignore parse failures */
+      }
+    }
 
     return response;
   } catch (err) {

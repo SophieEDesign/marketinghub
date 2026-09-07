@@ -28,6 +28,12 @@ function errorText(message: string) {
   };
 }
 
+/** ChatGPT rejects `anyOf`/`null` unions — use optional string and omit to clear. */
+const optionalDate = z
+  .string()
+  .optional()
+  .describe("ISO date (YYYY-MM-DD or full ISO). Omit if unknown.");
+
 const contentStatus = z.enum([
   "idea",
   "draft",
@@ -38,203 +44,54 @@ const contentStatus = z.enum([
 
 const enquiryChannel = z.enum(["web", "whatsapp"]);
 
+const whatsappEnquiryFields = {
+  external_id: z
+    .string()
+    .optional()
+    .describe(
+      "Tracker ID e.g. WA-051. Omit on create to auto-allocate next WA-###."
+    ),
+  sent_to_office_at: optionalDate.describe(
+    "Date sent to office (ISO or YYYY-MM-DD)"
+  ),
+  follow_up_at: optionalDate.describe(
+    "Follow-up / chase date (ISO or YYYY-MM-DD)"
+  ),
+  customer_name: z.string().optional(),
+  company: z.string().optional(),
+  customer_phone: z.string().optional().describe("Telephone"),
+  customer_email: z.string().optional(),
+  customer_country: z.string().optional(),
+  category: z.string().optional().describe("Sales, Accounts, Non-sales, …"),
+  enquiry_type: z
+    .string()
+    .optional()
+    .describe("Enquiry Type e.g. Yacht transport"),
+  service: z.string().optional().describe("Alias for enquiry_type"),
+  vessel_cargo: z.string().optional().describe("Vessel / Cargo"),
+  collection_location: z.string().optional().describe("Origin / Collection"),
+  delivery_location: z.string().optional().describe("Destination"),
+  dimensions: z.string().optional().describe("Dimensions / Key Specs"),
+  declared_value: z.string().optional().describe("Declared / Insured Value"),
+  preferred_timeframe: z.string().optional(),
+  selected_office: z.string().optional().describe("Team / Office Sent To"),
+  office_email: z.string().optional(),
+  tracker_status: z
+    .string()
+    .optional()
+    .describe(
+      "Spreadsheet Status e.g. Sent to office, Contacted, Quoted, Follow-up required"
+    ),
+  email_subject: z.string().optional(),
+  source: z.string().optional().describe("Source file / channel note"),
+  message: z.string().optional().describe("Chat summary / message"),
+  notes: z.string().optional(),
+  is_test: z.boolean().optional(),
+};
+
 export function registerHubMcpTools(server: McpServer) {
-  server.registerTool(
-    "get_brand_context",
-    {
-      title: "Brand context",
-      description:
-        "Peters & May brand voice, channels, and Hub workflow reminders for drafting social posts.",
-      inputSchema: z.object({}),
-    },
-    async () => jsonText(BRAND_CONTEXT)
-  );
-
-  server.registerTool(
-    "list_social_posts",
-    {
-      title: "List social posts",
-      description:
-        "List social calendar posts from the Marketing Hub. Filter by status, channel, or search text.",
-      inputSchema: z.object({
-        status: contentStatus.optional(),
-        channel: z
-          .string()
-          .optional()
-          .describe("e.g. LinkedIn, Instagram, Facebook"),
-        search: z
-          .string()
-          .optional()
-          .describe("Search title, caption, or notes"),
-        limit: z.number().int().min(1).max(100).optional(),
-      }),
-    },
-    async (args) => jsonText(await listSocialPosts(args))
-  );
-
-  server.registerTool(
-    "get_social_post",
-    {
-      title: "Get social post",
-      description: "Fetch one social post by Hub content id.",
-      inputSchema: z.object({
-        id: z.string().describe("Hub content id, e.g. cnt_..."),
-      }),
-    },
-    async ({ id }) => {
-      const post = await getSocialPost(id);
-      if (!post) return errorText(`Post not found: ${id}`);
-      return jsonText(post);
-    }
-  );
-
-  server.registerTool(
-    "create_social_draft",
-    {
-      title: "Create social draft",
-      description:
-        "Create a new social post draft in the Marketing Hub. Does not publish — use Planable to publish.",
-      inputSchema: z.object({
-        title: z.string().describe("Internal title / headline"),
-        caption: z.string().optional().describe("Post copy / caption"),
-        channels: z
-          .array(z.string())
-          .optional()
-          .describe("Platforms, e.g. ['LinkedIn', 'Instagram']"),
-        due_date: z
-          .string()
-          .nullable()
-          .optional()
-          .describe("Publish date ISO (YYYY-MM-DD or full ISO)"),
-        theme_id: z
-          .string()
-          .nullable()
-          .optional()
-          .describe("Quarterly theme id from list_themes"),
-        owner: z.string().optional(),
-        notes: z.string().optional().describe("Internal notes, not post copy"),
-        status: contentStatus
-          .optional()
-          .describe("Defaults to draft. Cannot be published."),
-      }),
-    },
-    async (args) => {
-      try {
-        const post = await createSocialDraft(args);
-        return jsonText({ ok: true, post });
-      } catch (err) {
-        return errorText(err instanceof Error ? err.message : "Create failed");
-      }
-    }
-  );
-
-  server.registerTool(
-    "update_social_post",
-    {
-      title: "Update social post",
-      description:
-        "Update caption, title, channels, due date, or status on an existing Hub social post. Published posts are locked.",
-      inputSchema: z.object({
-        id: z.string().describe("Hub content id"),
-        title: z.string().optional(),
-        caption: z.string().optional(),
-        channels: z.array(z.string()).optional(),
-        due_date: z.string().nullable().optional(),
-        theme_id: z.string().nullable().optional(),
-        owner: z.string().optional(),
-        notes: z.string().optional(),
-        status: contentStatus.optional(),
-      }),
-    },
-    async ({ id, ...patch }) => {
-      try {
-        const post = await updateSocialPost(id, patch);
-        if (!post) return errorText(`Post not found: ${id}`);
-        return jsonText({ ok: true, post });
-      } catch (err) {
-        return errorText(err instanceof Error ? err.message : "Update failed");
-      }
-    }
-  );
-
-  server.registerTool(
-    "list_themes",
-    {
-      title: "List quarterly themes",
-      description:
-        "Quarterly marketing themes — use summaries when drafting on-brand posts.",
-      inputSchema: z.object({}),
-    },
-    async () => jsonText(await listThemeContext())
-  );
-
-  server.registerTool(
-    "list_upcoming_events",
-    {
-      title: "List upcoming events",
-      description:
-        "Upcoming events from the Hub calendar — useful for timely social post ideas.",
-      inputSchema: z.object({
-        limit: z.number().int().min(1).max(50).optional(),
-      }),
-    },
-    async (args) => jsonText(await listUpcomingEvents(args.limit))
-  );
-
-  const whatsappEnquiryFields = {
-    external_id: z
-      .string()
-      .optional()
-      .describe(
-        "Tracker ID e.g. WA-051. Omit on create to auto-allocate next WA-###."
-      ),
-    sent_to_office_at: z
-      .string()
-      .optional()
-      .describe("Date sent to office (ISO or YYYY-MM-DD)"),
-    follow_up_at: z
-      .string()
-      .nullable()
-      .optional()
-      .describe("Follow-up / chase date (ISO or YYYY-MM-DD)"),
-    customer_name: z.string().optional(),
-    company: z.string().optional(),
-    customer_phone: z.string().optional().describe("Telephone"),
-    customer_email: z.string().optional(),
-    customer_country: z.string().optional(),
-    category: z
-      .string()
-      .optional()
-      .describe("Sales, Accounts, Non-sales, …"),
-    enquiry_type: z
-      .string()
-      .optional()
-      .describe("Enquiry Type e.g. Yacht transport"),
-    service: z.string().optional().describe("Alias for enquiry_type"),
-    vessel_cargo: z.string().optional().describe("Vessel / Cargo"),
-    collection_location: z.string().optional().describe("Origin / Collection"),
-    delivery_location: z.string().optional().describe("Destination"),
-    dimensions: z.string().optional().describe("Dimensions / Key Specs"),
-    declared_value: z.string().optional().describe("Declared / Insured Value"),
-    preferred_timeframe: z.string().optional(),
-    selected_office: z
-      .string()
-      .optional()
-      .describe("Team / Office Sent To"),
-    office_email: z.string().optional(),
-    tracker_status: z
-      .string()
-      .optional()
-      .describe(
-        "Spreadsheet Status e.g. Sent to office, Contacted, Quoted, Follow-up required"
-      ),
-    email_subject: z.string().optional(),
-    source: z.string().optional().describe("Source file / channel note"),
-    message: z.string().optional().describe("Chat summary / message"),
-    notes: z.string().optional(),
-    is_test: z.boolean().optional(),
-  };
-
+  // WhatsApp tools first so ChatGPT surfaces them even if the client caches or
+  // truncates a long list from an older connector snapshot.
   server.registerTool(
     "create_whatsapp_enquiry",
     {
@@ -297,4 +154,168 @@ export function registerHubMcpTools(server: McpServer) {
     },
     async (args) => jsonText(await listEnquiriesForMcp(args))
   );
+
+  server.registerTool(
+    "get_brand_context",
+    {
+      title: "Brand context",
+      description:
+        "Peters & May brand voice, channels, and Hub workflow reminders for drafting social posts.",
+      inputSchema: z.object({}),
+    },
+    async () => jsonText(BRAND_CONTEXT)
+  );
+
+  server.registerTool(
+    "list_social_posts",
+    {
+      title: "List social posts",
+      description:
+        "List social calendar posts from the Marketing Hub. Filter by status, channel, or search text.",
+      inputSchema: z.object({
+        status: contentStatus.optional(),
+        channel: z
+          .string()
+          .optional()
+          .describe("e.g. LinkedIn, Instagram, Facebook"),
+        search: z
+          .string()
+          .optional()
+          .describe("Search title, caption, or notes"),
+        limit: z.number().int().min(1).max(100).optional(),
+      }),
+    },
+    async (args) => jsonText(await listSocialPosts(args))
+  );
+
+  server.registerTool(
+    "get_social_post",
+    {
+      title: "Get social post",
+      description: "Fetch one social post by Hub content id.",
+      inputSchema: z.object({
+        id: z.string().describe("Hub content id, e.g. cnt_..."),
+      }),
+    },
+    async ({ id }) => {
+      const post = await getSocialPost(id);
+      if (!post) return errorText(`Post not found: ${id}`);
+      return jsonText(post);
+    }
+  );
+
+  server.registerTool(
+    "create_social_draft",
+    {
+      title: "Create social draft",
+      description:
+        "Create a new social post draft in the Marketing Hub. Does not publish — use Planable to publish.",
+      inputSchema: z.object({
+        title: z.string().describe("Internal title / headline"),
+        caption: z.string().optional().describe("Post copy / caption"),
+        channels: z
+          .array(z.string())
+          .optional()
+          .describe("Platforms, e.g. ['LinkedIn', 'Instagram']"),
+        due_date: optionalDate.describe(
+          "Publish date ISO (YYYY-MM-DD or full ISO)"
+        ),
+        theme_id: z
+          .string()
+          .optional()
+          .describe("Quarterly theme id from list_themes"),
+        owner: z.string().optional(),
+        notes: z.string().optional().describe("Internal notes, not post copy"),
+        status: contentStatus
+          .optional()
+          .describe("Defaults to draft. Cannot be published."),
+      }),
+    },
+    async (args) => {
+      try {
+        const post = await createSocialDraft({
+          ...args,
+          due_date: args.due_date ?? null,
+          theme_id: args.theme_id ?? null,
+        });
+        return jsonText({ ok: true, post });
+      } catch (err) {
+        return errorText(err instanceof Error ? err.message : "Create failed");
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_social_post",
+    {
+      title: "Update social post",
+      description:
+        "Update caption, title, channels, due date, or status on an existing Hub social post. Published posts are locked.",
+      inputSchema: z.object({
+        id: z.string().describe("Hub content id"),
+        title: z.string().optional(),
+        caption: z.string().optional(),
+        channels: z.array(z.string()).optional(),
+        due_date: optionalDate,
+        theme_id: z.string().optional(),
+        owner: z.string().optional(),
+        notes: z.string().optional(),
+        status: contentStatus.optional(),
+      }),
+    },
+    async ({ id, due_date, theme_id, ...rest }) => {
+      try {
+        const patch = {
+          ...rest,
+          ...(due_date !== undefined ? { due_date: due_date || null } : {}),
+          ...(theme_id !== undefined ? { theme_id: theme_id || null } : {}),
+        };
+        const post = await updateSocialPost(id, patch);
+        if (!post) return errorText(`Post not found: ${id}`);
+        return jsonText({ ok: true, post });
+      } catch (err) {
+        return errorText(err instanceof Error ? err.message : "Update failed");
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_themes",
+    {
+      title: "List quarterly themes",
+      description:
+        "Quarterly marketing themes — use summaries when drafting on-brand posts.",
+      inputSchema: z.object({}),
+    },
+    async () => jsonText(await listThemeContext())
+  );
+
+  server.registerTool(
+    "list_upcoming_events",
+    {
+      title: "List upcoming events",
+      description:
+        "Upcoming events from the Hub calendar — useful for timely social post ideas.",
+      inputSchema: z.object({
+        limit: z.number().int().min(1).max(50).optional(),
+      }),
+    },
+    async (args) => jsonText(await listUpcomingEvents(args.limit))
+  );
+
+  console.info("[mcp] registered tools", {
+    count: 10,
+    names: [
+      "create_whatsapp_enquiry",
+      "update_whatsapp_enquiry",
+      "list_enquiries",
+      "get_brand_context",
+      "list_social_posts",
+      "get_social_post",
+      "create_social_draft",
+      "update_social_post",
+      "list_themes",
+      "list_upcoming_events",
+    ],
+  });
 }
