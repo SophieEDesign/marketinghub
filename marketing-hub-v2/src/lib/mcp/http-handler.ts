@@ -1,6 +1,5 @@
 import {
   createMcpHandler,
-  isLegacyRequest,
   McpServer,
   WebStandardStreamableHTTPServerTransport,
   type AuthInfo,
@@ -39,6 +38,56 @@ function mcpMethodFromBody(parsedBody: unknown): string | undefined {
     return (parsedBody as { method: string }).method;
   }
   return undefined;
+}
+
+function hasModernEnvelope(parsedBody: unknown): boolean {
+  if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+    return false;
+  }
+  const params = (parsedBody as { params?: unknown }).params;
+  return Boolean(
+    params &&
+      typeof params === "object" &&
+      !Array.isArray(params) &&
+      "_meta" in (params as object)
+  );
+}
+
+/**
+ * ChatGPT sends MCP-Protocol-Version: 2026-07-28 without the modern `_meta`
+ * envelope. The SDK then 400s tools/list (`modern-header-without-claim`) and
+ * initialize (`initialize-with-modern-header`), so the connector shows as
+ * connected with zero tools. Downgrade those requests to 2025 Streamable HTTP.
+ */
+function coerceChatGptLegacyBody(parsedBody: unknown): unknown {
+  if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+    return parsedBody;
+  }
+  const body = parsedBody as {
+    method?: string;
+    params?: Record<string, unknown>;
+  };
+  if (body.method !== "initialize" || !body.params) return parsedBody;
+  return {
+    ...body,
+    params: {
+      ...body.params,
+      protocolVersion: "2025-03-26",
+    },
+  };
+}
+
+function withLegacyProtocolHeader(request: Request): Request {
+  const headers = new Headers(request.headers);
+  const proto = headers.get("mcp-protocol-version");
+  if (proto && proto !== "2025-03-26" && proto !== "2025-06-18") {
+    headers.set("mcp-protocol-version", "2025-03-26");
+  }
+  return new Request(request.url, {
+    method: request.method,
+    headers,
+    signal: request.signal,
+  });
 }
 
 function allMethodsPublic(parsedBody: unknown): boolean {
@@ -156,15 +205,28 @@ export function createHubMcpHttpHandler(options: HubMcpHttpOptions) {
 
     try {
       const authInfo = request.auth;
-      const legacy = await isLegacyRequest(request, parsedBody);
-      const response = legacy
-        ? await handleLegacyMcp(request, { authInfo, parsedBody })
-        : await modernHandler.fetch(request, { authInfo, parsedBody });
+      const forceLegacy = !hasModernEnvelope(parsedBody);
+      const body = forceLegacy
+        ? coerceChatGptLegacyBody(parsedBody)
+        : parsedBody;
+      const transportRequest = forceLegacy
+        ? withLegacyProtocolHeader(request)
+        : request;
+
+      const response = forceLegacy
+        ? await handleLegacyMcp(transportRequest, {
+            authInfo,
+            parsedBody: body,
+          })
+        : await modernHandler.fetch(transportRequest, {
+            authInfo,
+            parsedBody: body,
+          });
 
       console.info("[mcp] completed", {
         resourcePath,
         mcpMethod,
-        legacy,
+        legacy: forceLegacy,
         status: response.status,
         contentType: response.headers.get("content-type"),
         durationMs: Date.now() - started,

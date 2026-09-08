@@ -14,7 +14,7 @@ const handler = createHubMcpHttpHandler({
   resourcePath: "/api/mcp/enquiries",
   serverInfo: {
     name: "peters-may-marketing-hub-enquiries",
-    version: "1.4.0",
+    version: "1.4.1",
   },
   instructions: `You are connected to the Peters & May Marketing Hub WhatsApp enquiry tracker.
 
