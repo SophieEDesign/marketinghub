@@ -148,4 +148,16 @@ export async function listEnquiriesForMcp(input: {
   return items.map(toSummary);
 }
 
+export async function getEnquiryForMcp(
+  id: string
+): Promise<EnquirySummary | null> {
+  const needle = id.trim();
+  if (!needle) return null;
+  const items = await listEnquiriesForMcp({ include_test: true, limit: 100 });
+  return (
+    items.find((item) => item.id === needle || item.external_id === needle) ??
+    null
+  );
+}
+
 export { trackerFields };

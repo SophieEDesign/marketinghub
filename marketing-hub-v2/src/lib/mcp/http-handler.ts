@@ -104,6 +104,104 @@ function allMethodsPublic(parsedBody: unknown): boolean {
   return Boolean(method && PUBLIC_MCP_METHODS.has(method));
 }
 
+function isNullSchema(schema: unknown): boolean {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return false;
+  }
+  return (schema as { type?: unknown }).type === "null";
+}
+
+/**
+ * ChatGPT drops the whole connector tool list when any schema still has
+ * `$schema`, `null` unions, or missing `additionalProperties: false`.
+ */
+function sanitizeToolSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(sanitizeToolSchema);
+  }
+  if (!schema || typeof schema !== "object") return schema;
+
+  const input = schema as Record<string, unknown>;
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (key === "$schema" || key === "$id" || key === "unevaluatedProperties") {
+      continue;
+    }
+    next[key] = sanitizeToolSchema(value);
+  }
+
+  if (Array.isArray(next.type)) {
+    const types = next.type.filter((item) => item !== "null");
+    next.type = types.length === 1 ? types[0] : types;
+  }
+
+  for (const unionKey of ["anyOf", "oneOf"] as const) {
+    const union = next[unionKey];
+    if (!Array.isArray(union)) continue;
+    const filtered = union.filter((item) => !isNullSchema(item));
+    if (filtered.length === 1) {
+      const only = filtered[0];
+      delete next[unionKey];
+      if (only && typeof only === "object" && !Array.isArray(only)) {
+        return sanitizeToolSchema({
+          ...(only as Record<string, unknown>),
+          ...next,
+        });
+      }
+    } else {
+      next[unionKey] = filtered;
+    }
+  }
+
+  if (next.type === "object") {
+    next.additionalProperties = false;
+    if (!Array.isArray(next.required)) next.required = [];
+  }
+
+  return next;
+}
+
+async function sanitizeMcpResponse(
+  response: Response,
+  mcpMethod: string
+): Promise<Response> {
+  if (mcpMethod !== "tools/list" || !response.ok) return response;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return response;
+
+  try {
+    const payload = await response.json();
+    const tools = payload?.result?.tools;
+    if (!Array.isArray(tools)) {
+      return new Response(JSON.stringify(payload), {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      });
+    }
+
+    payload.result.tools = tools.map(
+      (tool: { inputSchema?: unknown; outputSchema?: unknown }) => ({
+        ...tool,
+        inputSchema: sanitizeToolSchema(tool.inputSchema),
+        ...(tool.outputSchema
+          ? { outputSchema: sanitizeToolSchema(tool.outputSchema) }
+          : {}),
+      })
+    );
+
+    const headers = new Headers(response.headers);
+    headers.set("Content-Type", "application/json");
+    return new Response(JSON.stringify(payload), {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  } catch {
+    return response;
+  }
+}
+
 function notConfigured(): Response {
   return new Response(
     JSON.stringify({
@@ -223,18 +321,20 @@ export function createHubMcpHttpHandler(options: HubMcpHttpOptions) {
             parsedBody: body,
           });
 
+      const sanitized = await sanitizeMcpResponse(response, mcpMethod);
+
       console.info("[mcp] completed", {
         resourcePath,
         mcpMethod,
         legacy: forceLegacy,
-        status: response.status,
-        contentType: response.headers.get("content-type"),
+        status: sanitized.status,
+        contentType: sanitized.headers.get("content-type"),
         durationMs: Date.now() - started,
       });
 
-      if (mcpMethod === "tools/list" && response.ok) {
+      if (mcpMethod === "tools/list" && sanitized.ok) {
         try {
-          const payload = await response.clone().json();
+          const payload = await sanitized.clone().json();
           const tools = payload?.result?.tools;
           if (Array.isArray(tools)) {
             console.info("[mcp] tools/list names", {
@@ -248,7 +348,7 @@ export function createHubMcpHttpHandler(options: HubMcpHttpOptions) {
         }
       }
 
-      return response;
+      return sanitized;
     } catch (err) {
       console.error("[mcp] handler error", { resourcePath, mcpMethod, err });
       return new Response(
@@ -276,10 +376,11 @@ export function createHubMcpHttpHandler(options: HubMcpHttpOptions) {
       }
     }
 
-    const authHeader = request.headers.get("authorization")?.trim() ?? "";
     const publicDiscovery =
-      request.method === "POST" && !authHeader && allMethodsPublic(parsedBody);
+      request.method === "POST" && allMethodsPublic(parsedBody);
 
+    // ChatGPT often sends a Bearer token on tools/list. If that token fails
+    // resource checks, withMcpAuth 401s and the connector shows zero tools.
     if (publicDiscovery) {
       return withMcpCors(await mcpCore(request), request);
     }

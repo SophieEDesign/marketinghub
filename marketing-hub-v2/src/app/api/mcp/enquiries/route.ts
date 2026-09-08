@@ -14,10 +14,11 @@ const handler = createHubMcpHttpHandler({
   resourcePath: "/api/mcp/enquiries",
   serverInfo: {
     name: "peters-may-marketing-hub-enquiries",
-    version: "1.4.1",
+    version: "1.6.0",
   },
   instructions: `You are connected to the Peters & May Marketing Hub WhatsApp enquiry tracker.
 
+- search then fetch to look up existing tracker rows.
 - create_whatsapp_enquiry for each new WhatsApp enquiry (omit external_id to auto-allocate WA-###).
 - update_whatsapp_enquiry for chase / quote / status / office updates (identify by external_id WA-###).
 - list_enquiries with channel "whatsapp" to review recent tracker rows.

@@ -9,9 +9,9 @@ const handler = createHubMcpHttpHandler({
   resourcePath: "/api/mcp",
   serverInfo: {
     name: "peters-may-marketing-hub",
-    version: "1.4.1",
+    version: "1.6.0",
   },
-  instructions: `You are connected to the Peters & May Marketing Hub MCP (10 tools).
+  instructions: `You are connected to the Peters & May Marketing Hub MCP (12 tools).
 
 WhatsApp enquiry tracker (Enquiries → WhatsApp tab) — use these first for new enquiries:
 - create_whatsapp_enquiry for each new WhatsApp enquiry (omit external_id to auto-allocate WA-###).
