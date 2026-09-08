@@ -257,6 +257,7 @@ function platformsFromChannel(
 
 function normalizeStatus(raw: string): string {
   const s = raw.toLowerCase();
+  if (s.includes("cancel")) return "Cancelled";
   if (s.includes("publish")) return "Published";
   if (s.includes("schedul")) return "Scheduled";
   if (s.includes("approv") || s.includes("review")) return "Approved";
@@ -268,6 +269,9 @@ function normalizeStatus(raw: string): string {
 
 function statusTone(status: string) {
   const s = status.toLowerCase();
+  if (s.includes("cancel")) {
+    return "bg-slate-100 text-slate-600 border-slate-300";
+  }
   if (s.includes("publish") || s.includes("approv")) {
     return "bg-emerald-50 text-emerald-800 border-emerald-200";
   }

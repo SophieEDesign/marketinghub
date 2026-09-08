@@ -122,6 +122,12 @@ describe("inboundStatusForExisting", () => {
     expect(inboundStatusForExisting("scheduled", "draft")).toBe("scheduled");
     expect(inboundStatusForExisting("approved", "draft")).toBe("review");
   });
+
+  it("keeps Hub cancelled even if Planable maps scheduled or published", () => {
+    expect(inboundStatusForExisting("cancelled", "scheduled")).toBe("cancelled");
+    expect(inboundStatusForExisting("cancelled", "published")).toBe("cancelled");
+    expect(inboundStatusForExisting("cancelled", "draft")).toBe("cancelled");
+  });
 });
 
 describe("groupPlanablePosts / groupKey", () => {
@@ -199,6 +205,9 @@ describe("isHubDirty / shouldPushSocialToPlanable", () => {
     expect(shouldPushSocialToPlanable(contentItem({ status: "draft" }))).toBe(
       false
     );
+    expect(
+      shouldPushSocialToPlanable(contentItem({ status: "cancelled" }))
+    ).toBe(false);
     expect(
       shouldPushSocialToPlanable(
         contentItem({ status: "review", content_type: "Editorial", channel: ["Editorial"] })

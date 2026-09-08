@@ -46,6 +46,7 @@ const CONTENT_STATUS_OPTIONS: { id: ContentStatus; label: string }[] = [
   { id: "review", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
+  { id: "cancelled", label: "Cancelled" },
 ];
 
 type ThemeEditForm = {

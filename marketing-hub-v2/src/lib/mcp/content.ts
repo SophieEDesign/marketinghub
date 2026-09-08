@@ -267,6 +267,7 @@ export const BRAND_CONTEXT = {
   reminders: [
     "Drafts created here land in the Hub Social calendar as idea/draft/review.",
     "Setting status to review/approved/scheduled sends one Facebook draft to Planable (caption or image required).",
+    "Cancelled keeps the piece in the Hub without sending it to Planable.",
     "Add LinkedIn/Instagram and publish only in Planable — then Sync from Planable to lock the Hub piece.",
     "Link posts to quarterly themes when relevant (use list_themes).",
     "Check upcoming events for timely post ideas (use list_upcoming_events).",

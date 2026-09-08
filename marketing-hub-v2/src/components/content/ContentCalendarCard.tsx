@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<ContentStatus, string> = {
   approved: "Approved",
   scheduled: "Scheduled",
   published: "Published",
+  cancelled: "Cancelled",
 };
 
 function statusTone(status: ContentStatus) {

@@ -40,6 +40,7 @@ const contentStatus = z.enum([
   "review",
   "approved",
   "scheduled",
+  "cancelled",
 ]);
 
 const enquiryChannel = z.enum(["web", "whatsapp"]);

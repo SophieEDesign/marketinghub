@@ -62,6 +62,7 @@ const COLUMNS: { id: ContentStatus; label: string }[] = [
   { id: "review", label: "Approved" },
   { id: "scheduled", label: "Scheduled" },
   { id: "published", label: "Published" },
+  { id: "cancelled", label: "Cancelled" },
 ];
 
 /** Hub can move pieces through these; Published only arrives from Planable sync. */
@@ -82,6 +83,7 @@ const STATUS_COLOR: Record<ContentStatus, string> = {
   approved: statusEventColor("review"),
   scheduled: statusEventColor("scheduled"),
   published: statusEventColor("published"),
+  cancelled: statusEventColor("cancelled"),
 };
 
 function emptyFormForScope(scope: "all" | "content" | "social") {

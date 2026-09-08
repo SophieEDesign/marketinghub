@@ -71,7 +71,8 @@ export type ContentStatus =
   | "review"
   | "approved"
   | "scheduled"
-  | "published";
+  | "published"
+  | "cancelled";
 
 export type ContentItem = {
   id: string;

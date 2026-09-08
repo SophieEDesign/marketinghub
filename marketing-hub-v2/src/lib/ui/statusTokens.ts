@@ -6,6 +6,7 @@ export type StatusToken =
   | "review"
   | "scheduled"
   | "published"
+  | "cancelled"
   | "won"
   | "lost"
   | "watching"
@@ -49,6 +50,12 @@ export const STATUS_STYLES: Record<
     text: "text-emerald-900",
     border: "border-emerald-200",
     event: "#3d8b5c",
+  },
+  cancelled: {
+    bg: "bg-slate-100",
+    text: "text-slate-600",
+    border: "border-slate-300",
+    event: "#64748b",
   },
   won: {
     bg: "bg-emerald-50",
@@ -106,6 +113,7 @@ export const STATUS_STYLES: Record<
 export function resolveStatusToken(raw: string): StatusToken {
   const s = raw.trim().toLowerCase().replace(/\s+/g, "_");
   if (s in STATUS_STYLES) return s as StatusToken;
+  if (s.includes("cancel")) return "cancelled";
   if (s.includes("publish")) return "published";
   if (s.includes("schedul")) return "scheduled";
   if (s.includes("approv") || s.includes("review")) return "review";

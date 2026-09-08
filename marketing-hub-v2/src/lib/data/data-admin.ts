@@ -5,6 +5,7 @@ import { readStore, updateStore } from "@/lib/store/local";
 import { getDataDir } from "@/lib/store/paths";
 import type { ContentStatus, HubStore } from "@/lib/types";
 import {
+  CONTENT_STATUS,
   DATA_COLLECTIONS,
   contactOwnerOptions,
   getCollection,
@@ -17,6 +18,26 @@ import {
   type FieldOption,
   type FieldType,
 } from "@/lib/data/collections";
+
+const CONTENT_STATUS_COLLECTIONS = new Set<CollectionKey>([
+  "content",
+  "theme_mains",
+  "theme_offshoots",
+]);
+
+function withCancelledContentStatus(
+  collection: CollectionKey,
+  key: string,
+  options: FieldOption[] | undefined
+): FieldOption[] | undefined {
+  if (key !== "status" || !CONTENT_STATUS_COLLECTIONS.has(collection)) {
+    return options;
+  }
+  if (!options?.length) return CONTENT_STATUS;
+  if (options.some((o) => o.value === "cancelled")) return options;
+  const cancelled = CONTENT_STATUS.find((o) => o.value === "cancelled");
+  return cancelled ? [...options, cancelled] : options;
+}
 
 const DATA_DIR = getDataDir();
 const EXTRAS_PATH = path.join(DATA_DIR, "field-extras.json");
@@ -236,10 +257,13 @@ export async function getTable(collection: string) {
         ...field,
         label: override.label || field.label,
         type: field.locked ? field.type : override.type || field.type,
-        options:
+        options: withCancelledContentStatus(
+          collection,
+          field.key,
           field.optionsSource || field.locked
             ? field.options
-            : (override.options ?? field.options),
+            : (override.options ?? field.options)
+        ),
         custom: false,
       });
     } else {

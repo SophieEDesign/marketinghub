@@ -73,6 +73,7 @@ export const CONTENT_STATUS: FieldOption[] = [
   { value: "review", label: "Approved" },
   { value: "scheduled", label: "Scheduled" },
   { value: "published", label: "Published" },
+  { value: "cancelled", label: "Cancelled" },
 ];
 
 const PARTNER_STATUS: FieldOption[] = [

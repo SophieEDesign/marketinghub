@@ -43,6 +43,7 @@ import {
 
 function mapStatus(raw: string): ContentStatus {
   const s = raw.toLowerCase();
+  if (s.includes("cancel")) return "cancelled";
   if (s.includes("publish")) return "published";
   if (s.includes("schedul")) return "scheduled";
   if (s.includes("approv") || s.includes("review")) return "review";

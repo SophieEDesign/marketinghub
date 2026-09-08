@@ -336,6 +336,7 @@ export function inboundStatusForExisting(
   existing: ContentStatus,
   mapped: ContentStatus
 ): ContentStatus {
+  if (existing === "cancelled") return "cancelled";
   if (mapped === "published") return "published";
   // Planable schedule wins over Hub Approved/review.
   if (mapped === "scheduled") return "scheduled";
@@ -554,9 +555,10 @@ export async function syncPlanableIntoHub(): Promise<PlanableSyncResult> {
         channel: channels.length ? channels : match.channel,
         content_type: "Social",
         due_date: due_date ?? match.due_date,
-        status: published
-          ? "published"
-          : inboundStatusForExisting(match.status, status),
+        status: inboundStatusForExisting(
+          match.status,
+          published ? "published" : status
+        ),
         asset_url: asset_url || match.asset_url,
         planable_url: planable_url || match.planable_url,
         planable_post_id: primary.id,

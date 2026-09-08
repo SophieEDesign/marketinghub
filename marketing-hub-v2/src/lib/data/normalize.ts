@@ -518,6 +518,7 @@ const STATUS_RANK: Record<string, number> = {
   review: 3,
   draft: 2,
   idea: 1,
+  cancelled: 0,
 };
 
 function contentScore(item: {
