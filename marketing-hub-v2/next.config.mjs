@@ -68,6 +68,14 @@ const nextConfig = {
         destination: protectedResource,
       },
       {
+        source: "/.well-known/oauth-protected-resource/api/mcp/enquiries",
+        destination: `${protectedResource}?resource=/api/mcp/enquiries`,
+      },
+      {
+        source: "/api/mcp/enquiries/.well-known/oauth-protected-resource",
+        destination: `${protectedResource}?resource=/api/mcp/enquiries`,
+      },
+      {
         source: "/api/mcp/.well-known/oauth-protected-resource",
         destination: protectedResource,
       },

@@ -132,8 +132,12 @@ export function getMcpOAuthIssuer(request?: Request): string {
   return `${getMcpPublicOrigin(request)}/api/mcp/oauth`;
 }
 
-export function getMcpResourceUrl(request?: Request): string {
-  return `${getMcpPublicOrigin(request)}/api/mcp`;
+export function getMcpResourceUrl(
+  request?: Request,
+  resourcePath = "/api/mcp"
+): string {
+  const path = resourcePath.startsWith("/") ? resourcePath : `/${resourcePath}`;
+  return `${getMcpPublicOrigin(request)}${path.replace(/\/$/, "")}`;
 }
 
 export function verifyMcpClient(

@@ -89,16 +89,30 @@ const whatsappEnquiryFields = {
   is_test: z.boolean().optional(),
 };
 
-export function registerHubMcpTools(server: McpServer) {
-  // WhatsApp tools first so ChatGPT surfaces them even if the client caches or
-  // truncates a long list from an older connector snapshot.
+export const ENQUIRY_MCP_TOOL_NAMES = [
+  "create_whatsapp_enquiry",
+  "update_whatsapp_enquiry",
+  "list_enquiries",
+] as const;
+
+export function registerEnquiryMcpTools(server: McpServer) {
   server.registerTool(
     "create_whatsapp_enquiry",
     {
       title: "Create WhatsApp enquiry",
       description:
         "Add a WhatsApp enquiry to the Marketing Hub enquiry tracker (whatsapp_enquiries). Fields match the Excel tracker. Prefer omitting external_id so the Hub allocates the next WA-###. Call once per new enquiry after drafting the handover.",
-      inputSchema: z.object(whatsappEnquiryFields),
+      inputSchema: z.object({
+        ...whatsappEnquiryFields,
+        customer_name: z
+          .string()
+          .describe("Customer / contact name"),
+      }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async (args) => {
       try {
@@ -124,6 +138,11 @@ export function registerHubMcpTools(server: McpServer) {
           .optional()
           .describe("Tracker ID e.g. WA-012 (preferred)"),
       }),
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async (args) => {
       try {
@@ -151,9 +170,18 @@ export function registerHubMcpTools(server: McpServer) {
         include_test: z.boolean().optional(),
         limit: z.number().int().min(1).max(100).optional(),
       }),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
     },
     async (args) => jsonText(await listEnquiriesForMcp(args))
   );
+}
+
+export function registerHubMcpTools(server: McpServer) {
+  registerEnquiryMcpTools(server);
 
   server.registerTool(
     "get_brand_context",
