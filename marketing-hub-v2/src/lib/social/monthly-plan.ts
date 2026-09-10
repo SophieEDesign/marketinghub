@@ -1,9 +1,21 @@
+import {
+  SOCIAL_MONTHLY_TASKS_KEY,
+  type SocialMonthlyTasksList,
+} from "@/lib/social/monthly-tasks";
+
 /** HubStore page_notes key for the social calendar monthly cadence. */
 export const SOCIAL_MONTHLY_PLAN_KEY = "social_monthly_plan" as const;
 
-export type PageNoteKey = typeof SOCIAL_MONTHLY_PLAN_KEY;
+export type PageNoteKey =
+  | typeof SOCIAL_MONTHLY_PLAN_KEY
+  | typeof SOCIAL_MONTHLY_TASKS_KEY;
 
-export const PAGE_NOTE_KEYS: PageNoteKey[] = [SOCIAL_MONTHLY_PLAN_KEY];
+export const PAGE_NOTE_KEYS: PageNoteKey[] = [
+  SOCIAL_MONTHLY_PLAN_KEY,
+  SOCIAL_MONTHLY_TASKS_KEY,
+];
+
+export { SOCIAL_MONTHLY_TASKS_KEY, type SocialMonthlyTasksList };
 
 export const WEEK_LABELS = ["Week 1", "Week 2", "Week 3", "Week 4"] as const;
 

@@ -32,6 +32,7 @@ import {
 import { titleFromPlanableMediaUrls, mediaFingerprintFromUrls } from "@/lib/planable/client";
 import { HUB_CALENDAR_CSS } from "@/components/content/ContentCalendarCard";
 import { SocialMonthlyPlan } from "@/components/social/SocialMonthlyPlan";
+import { SocialMonthlyTasks } from "@/components/social/SocialMonthlyTasks";
 import {
   CompactMultiImageThumb,
   PlatformPostPreview,
@@ -925,7 +926,12 @@ export function SocialClient({
         />
       )}
 
-      {!memberView ? <SocialMonthlyPlan /> : null}
+      {!memberView ? (
+        <>
+          <SocialMonthlyPlan />
+          <SocialMonthlyTasks />
+        </>
+      ) : null}
 
       <FilterBar
         search={search}

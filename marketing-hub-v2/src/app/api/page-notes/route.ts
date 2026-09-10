@@ -7,9 +7,16 @@ import {
   parseMonthlyPlan,
   serializeMonthlyPlan,
   SOCIAL_MONTHLY_PLAN_KEY,
+  SOCIAL_MONTHLY_TASKS_KEY,
   type PageNoteKey,
   type SocialMonthlyPlanMatrix,
 } from "@/lib/social/monthly-plan";
+import {
+  isMonthlyTasksList,
+  parseMonthlyTasks,
+  serializeMonthlyTasks,
+  type SocialMonthlyTasksList,
+} from "@/lib/social/monthly-tasks";
 import type { HubPageNotes } from "@/lib/types";
 
 function isPageNoteKey(value: unknown): value is PageNoteKey {
@@ -23,6 +30,9 @@ function resolveBody(notes: HubPageNotes | undefined, key: PageNoteKey): string 
   const stored = notes?.[key];
   if (key === SOCIAL_MONTHLY_PLAN_KEY) {
     return serializeMonthlyPlan(parseMonthlyPlan(stored));
+  }
+  if (key === SOCIAL_MONTHLY_TASKS_KEY) {
+    return serializeMonthlyTasks(parseMonthlyTasks(stored));
   }
   if (typeof stored === "string" && stored.trim()) return stored;
   return "";
@@ -44,6 +54,13 @@ export async function GET(request: NextRequest) {
       key: keyParam,
       body,
       plan: parseMonthlyPlan(body),
+    });
+  }
+  if (keyParam === SOCIAL_MONTHLY_TASKS_KEY) {
+    return jsonOk({
+      key: keyParam,
+      body,
+      tasks: parseMonthlyTasks(body),
     });
   }
   return jsonOk({ key: keyParam, body });
@@ -70,7 +87,6 @@ export async function PUT(request: NextRequest) {
     if (!plan) {
       return jsonError("Invalid monthly plan matrix", 400);
     }
-    // Sanitize cell strings (plain text only).
     body = serializeMonthlyPlan({
       version: 1,
       rows: plan.rows.map((row) => ({
@@ -84,6 +100,30 @@ export async function PUT(request: NextRequest) {
         ],
       })),
     });
+  } else if (key === SOCIAL_MONTHLY_TASKS_KEY) {
+    const tasks: SocialMonthlyTasksList | null =
+      payload.tasks && isMonthlyTasksList(payload.tasks)
+        ? payload.tasks
+        : typeof payload.body === "string"
+          ? parseMonthlyTasks(payload.body)
+          : null;
+    if (!tasks) {
+      return jsonError("Invalid monthly tasks list", 400);
+    }
+    body = serializeMonthlyTasks({
+      version: 1,
+      items: tasks.items
+        .map((item) => ({
+          label: String(item.label).trim().slice(0, 120),
+          notes: item.notes
+            ? String(item.notes).trim().slice(0, 400)
+            : undefined,
+        }))
+        .filter((item) => item.label.length > 0),
+    });
+    if (!body || body === '{"version":1,"items":[]}') {
+      return jsonError("At least one task is required", 400);
+    }
   } else if (typeof payload.body === "string") {
     body = payload.body;
   } else {
@@ -103,6 +143,13 @@ export async function PUT(request: NextRequest) {
       key,
       body: nextBody,
       plan: parseMonthlyPlan(nextBody),
+    });
+  }
+  if (key === SOCIAL_MONTHLY_TASKS_KEY) {
+    return jsonOk({
+      key,
+      body: nextBody,
+      tasks: parseMonthlyTasks(nextBody),
     });
   }
   return jsonOk({ key, body: nextBody });
