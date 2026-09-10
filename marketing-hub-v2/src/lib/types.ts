@@ -42,6 +42,8 @@ export type EventItem = {
   social_media_post_completed: boolean;
   /** Admin checklist — personal/staff social graphics for this event are done. */
   personal_social_media_graphics_completed: boolean;
+  /** Admin checklist — PR outreach to event organisers has been made. */
+  reached_out_for_pr_to_organisers: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

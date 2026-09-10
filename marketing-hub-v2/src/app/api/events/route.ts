@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
     personal_social_media_graphics_completed: Boolean(
       body.personal_social_media_graphics_completed
     ),
+    reached_out_for_pr_to_organisers: Boolean(
+      body.reached_out_for_pr_to_organisers
+    ),
     created_by: user.id,
   });
   return jsonOk({ event }, { status: 201 });

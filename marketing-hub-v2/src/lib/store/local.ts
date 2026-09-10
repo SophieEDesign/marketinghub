@@ -83,6 +83,8 @@ function migrateEvents(items: EventItem[] | undefined): EventItem[] | undefined 
     social_media_post_completed: item.social_media_post_completed ?? false,
     personal_social_media_graphics_completed:
       item.personal_social_media_graphics_completed ?? false,
+    reached_out_for_pr_to_organisers:
+      item.reached_out_for_pr_to_organisers ?? false,
   }));
 }
 

@@ -243,6 +243,7 @@ export async function importFromCoreData(): Promise<ImportResult> {
           link_url: cleaned.link_url,
           social_media_post_completed: false,
           personal_social_media_graphics_completed: false,
+          reached_out_for_pr_to_organisers: false,
           created_by: null,
           created_at: asIsoDate(r.created_at) || now,
           updated_at: asIsoDate(r.updated_at) || now,

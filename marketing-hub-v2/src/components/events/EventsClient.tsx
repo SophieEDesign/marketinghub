@@ -68,6 +68,7 @@ const emptyForm = {
   link_url: "",
   social_media_post_completed: false,
   personal_social_media_graphics_completed: false,
+  reached_out_for_pr_to_organisers: false,
 };
 
 type EventForm = typeof emptyForm;
@@ -93,6 +94,9 @@ function toEditForm(event: EventItem): EventForm {
     social_media_post_completed: Boolean(event.social_media_post_completed),
     personal_social_media_graphics_completed: Boolean(
       event.personal_social_media_graphics_completed
+    ),
+    reached_out_for_pr_to_organisers: Boolean(
+      event.reached_out_for_pr_to_organisers
     ),
   };
 }
@@ -408,6 +412,20 @@ function EventFields({
               }
             />
             Personal social media graphics completed
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-border"
+              checked={form.reached_out_for_pr_to_organisers}
+              onChange={(e) =>
+                onChange({
+                  ...form,
+                  reached_out_for_pr_to_organisers: e.target.checked,
+                })
+              }
+            />
+            Reached out for PR to event organisers
           </label>
         </div>
       ) : null}
@@ -1049,6 +1067,8 @@ export function EventsClient({
                   social_media_post_completed: edit.social_media_post_completed,
                   personal_social_media_graphics_completed:
                     edit.personal_social_media_graphics_completed,
+                  reached_out_for_pr_to_organisers:
+                    edit.reached_out_for_pr_to_organisers,
                 }
               : {}),
           },
@@ -1068,6 +1088,7 @@ export function EventsClient({
         EventItem,
         | "social_media_post_completed"
         | "personal_social_media_graphics_completed"
+        | "reached_out_for_pr_to_organisers"
       >
     >
   ) {
@@ -1625,6 +1646,22 @@ export function EventsClient({
                         }
                       />
                       Personal social media graphics completed
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        className="rounded border-border"
+                        disabled={saving}
+                        checked={Boolean(
+                          selected.reached_out_for_pr_to_organisers
+                        )}
+                        onChange={(e) =>
+                          void patchEventAdminChecks(selected.id, {
+                            reached_out_for_pr_to_organisers: e.target.checked,
+                          })
+                        }
+                      />
+                      Reached out for PR to event organisers
                     </label>
                   </div>
                 ) : null}
